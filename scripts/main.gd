@@ -12,7 +12,7 @@ const SCREENS = {
 	"transfers": preload("res://scripts/screens/transfers.gd"),
 	"club": preload("res://scripts/screens/club.gd"),
 	"player": preload("res://scripts/screens/player.gd"),
-	"nego": preload("res://scripts/screens/nego.gd"),
+	"nego": preload("res://scripts/screens/deal.gd"),
 	"match": preload("res://scripts/screens/match.gd"),
 	"table": preload("res://scripts/screens/table.gd"),
 	"fixtures": preload("res://scripts/screens/fixtures.gd"),

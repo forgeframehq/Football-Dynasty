@@ -170,6 +170,10 @@ func todo_items(c: Dictionary) -> Array:
 		a.append(["handshake", "%d transfer offer%s to answer" % [mine, "" if mine == 1 else "s"], UI.AMBER, func():
 			G.ui.tr_tab = 2
 			UI.main.root("transfers")])
+	for dl in G.DL.active():
+		if dl.mode == "buy" and (dl.stage == "club" or dl.stage == "talks") and dl.log.size() > 0:
+			var dpid = dl.pid
+			a.append(["handshake", ("Agree terms with %s" if dl.stage == "talks" else "%s: the club are waiting for a bid") % G.pname(s.players[dpid]), UI.AMBER, func(): UI.main.open("nego", {"pid": dpid, "mode": "buy"})])
 	var exp = 0
 	for pid in c.players:
 		var p = s.players[pid]

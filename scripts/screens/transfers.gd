@@ -136,9 +136,7 @@ func _offers(v: Control):
 			G.TR.accept_offer(o)
 			UI.toast("%s sold for %s" % [G.pname(p), G.money(o.fee)], UI.GREEN)
 			refresh(), "primary", "", 68)
-		var n = UI.btn("Haggle", func():
-			UI.toast(G.TR.haggle_offer(o))
-			refresh(), "secondary", "", 68)
+		var n = UI.btn("Negotiate", func(): UI.main.open("nego", {"pid": o.pid, "mode": "sell", "oid": o.id}), "secondary", "", 68)
 		var r = UI.btn("Reject", func():
 			s.offers.erase(o)
 			refresh(), "danger", "", 68)

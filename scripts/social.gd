@@ -68,6 +68,21 @@ static func on_result(us: Dictionary, them: Dictionary, gf: int, ga: int, star: 
 		d.trend = "#%s" % us.short
 
 
+static func on_signing(p: Dictionary, fee: int):
+	var d = data()
+	var uc = G.uc()
+	var scale = max(1.0, d.followers / 4000.0)
+	var big = p.ovr >= uc.rep + 2
+	var lines = ["%s is a %s player! Welcome!" % [G.pname(p), uc.short], "Announce %s. Oh wait, they did. Buzzing." % G.pname(p), "%s for %s? %s" % [G.pname(p), G.money(fee) if fee > 0 else "nothing", "Bargain." if fee < G.value(p) else "Steep, but I trust the gaffer."],
+		"Watched %s a few times. %s" % [G.pname(p), "Proper player." if big else "Squad depth, fair enough."]]
+	for i in 2:
+		var h = _fan()
+		_add(h.capitalize(), h, lines[G.rng.randi() % lines.size()], int(G.rng.randi_range(40, 700) * scale * (2.0 if big else 1.0)))
+	var pr = PRESS[G.rng.randi() % PRESS.size()]
+	_add(pr[0], pr[1], "DONE DEAL: %s complete the signing of %s%s." % [uc.name, G.pfull(p), (" for " + G.money(fee)) if fee > 0 else " on a free transfer"], int(G.rng.randi_range(500, 4000) * scale), false, "press")
+	d.followers += 400 + (2500 if big else 0)
+
+
 static func weekly():
 	var d = data()
 	var h = _fan()

@@ -99,6 +99,52 @@ func run(m):
 		await snap("player_other")
 		main.root("clubview", {"cid": 2})
 		await snap("clubview")
+	if want.call("deal"):
+		var tp = G.s.players[G.s.clubs[2].players[7]]
+		main.root("nego", {"pid": tp.id, "mode": "buy"})
+		await snap("deal_new")
+		var dd = G.DL.find(tp.id)
+		G.DL.enquire(dd)
+		G.s.day += 1
+		G.DL.tick()
+		main.stack[-1].refresh()
+		await snap("deal_club")
+		G.DL.submit_bid(dd, int(dd.ask * 0.85), 1, 0, 10)
+		main.stack[-1].refresh()
+		await snap("deal_wait")
+		G.s.day += 1
+		G.DL.tick()
+		dd.fee = dd.ask
+		G.DL._agree(dd, "ok")
+		main.root("nego", {"pid": tp.id, "mode": "buy"})
+		await snap("deal_talks")
+		var sc = main.stack[-1]
+		sc.t.wage = int(sc.t.wage * 0.95)
+		sc._offer_terms(tp)
+		await snap("deal_counter")
+		var dm = G.DL.demand(dd, sc.t)
+		sc.t.wage = dm.wage
+		sc.t.sign = dm.sign
+		sc.t.agent = dm.agent
+		c.budget = max(c.budget, dd.fee * 2)
+		c.wage_budget += dm.wage * 2
+		sc._offer_terms(tp)
+		await snap("deal_done", 0.8)
+		main.root("inbox")
+		await snap("deal_inbox")
+		main.root("player", {"pid": tp.id})
+		main.stack[-1].page = 1
+		main.stack[-1].refresh()
+		await snap("deal_personal")
+		main.stack[-1].page = 4
+		main.stack[-1].refresh()
+		await snap("deal_stats")
+		G.s.offers.append({"id": 999, "pid": c.xi[5], "from": 3, "fee": G.nice(G.value(G.s.players[c.xi[5]]) * 1.1), "exp": G.s.day + 5, "haggled": false})
+		if G.s.offers.size() > 0:
+			main.root("nego", {"pid": c.xi[5], "mode": "sell", "oid": 999})
+			await snap("deal_sell")
+		main.root("nego", {"pid": c.xi[3], "mode": "renew"})
+		await snap("deal_renew")
 	if want.call("tactics2"):
 		main.root("tactics")
 		var t = main.stack[-1]

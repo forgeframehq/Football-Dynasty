@@ -1,7 +1,7 @@
 extends "res://scripts/screens/screen.gd"
 # News and messages: list on the left, story in the middle, subject card on the right.
 
-const ICONS = {"info": "mail", "board": "landmark", "offer": "handshake", "contract": "file-text", "result": "flag"}
+const ICONS = {"info": "mail", "board": "landmark", "offer": "handshake", "contract": "file-text", "result": "flag", "deal": "handshake"}
 
 var sel := -1
 
@@ -69,9 +69,23 @@ func build():
 	v.add_child(tags)
 	var acts = UI.hb(10)
 	if m.kind == "offer":
-		acts.add_child(_act("Respond", "handshake", func():
-			G.ui.tr_tab = 2
-			UI.main.root("transfers")))
+		var live = null
+		for o in s.offers:
+			if o.id == m.ref:
+				live = o
+		if live != null:
+			var oid = live.id
+			var opid = live.pid
+			acts.add_child(_act("Respond", "handshake", func(): UI.main.open("nego", {"pid": opid, "mode": "sell", "oid": oid})))
+		else:
+			acts.add_child(_act("All offers", "handshake", func():
+				G.ui.tr_tab = 2
+				UI.main.root("transfers")))
+	if m.kind == "deal" and subj != null:
+		var dpid = subj.id
+		var dl = G.DL.find(dpid)
+		if dl != null and dl.stage != "dead" and subj.club != G.uc().id:
+			acts.add_child(_act({"club": "Make new bid", "talks": "Talk to player"}.get(dl.stage, "Open talks"), "handshake", func(): UI.main.open("nego", {"pid": dpid, "mode": "buy"})))
 	if m.kind == "contract":
 		acts.add_child(_act("Contracts", "file-text", func(): UI.main.root("lists", {"kind": "contracts", "grp": "club"})))
 	if m.kind == "board":
@@ -144,6 +158,8 @@ func _subject(m: Dictionary):
 		for o in s.offers:
 			if o.id == m.ref and s.players.has(o.pid):
 				return s.players[o.pid]
+	if m.kind == "deal" and m.ref != null and s.players.has(m.ref):
+		return s.players[m.ref]
 	for pid in G.uc().players:
 		var p = s.players[pid]
 		if m.title.contains(G.pname(p)) or m.body.contains(G.pfull(p)):

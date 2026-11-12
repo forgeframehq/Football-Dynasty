@@ -64,6 +64,24 @@ func _cell(text: String, val: String, col: Color, hi := false) -> Control:
 	return r
 
 
+func _hrow(cells: Array, col: Color, head := false, hi := false) -> Control:
+	var r = UI.panel(Color(UI.accent, 0.14) if hi else Color(1, 1, 1, 0.0 if head else 0.03), 4, 8, 3)
+	var h = UI.hb(6)
+	var widths = [92, 0, 46, 42, 42, 54]
+	for i in cells.size():
+		var l = UI.lbl(cells[i], 15 if head else 18, col, "semi" if head else "body")
+		if widths[i] == 0:
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			l.clip_text = true
+		else:
+			l.custom_minimum_size = Vector2(widths[i], 0)
+			if i >= 2:
+				l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		h.add_child(l)
+	r.add_child(h)
+	return r
+
+
 func _info(k: String, v: String, col := UI.TEXT) -> Control:
 	var b = UI.vb(-4)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -183,8 +201,14 @@ func _page(p: Dictionary, own: bool, free: bool):
 		v.add_child(UI.kv("Preferred foot", "Left" if p.foot == "L" else "Right"))
 		v.add_child(UI.kv("Skill moves · weak foot", "%d★ · %d★" % [p.sm, p.wf]))
 		v.add_child(UI.kv("Squad status", status))
-		v.add_child(UI.kv("Career", "%d apps · %d goals" % [p.cap, p.cg]))
+		v.add_child(UI.kv("Career", "%d apps · %d goals" % G.PS.career(p)))
 		v.add_child(UI.kv("Shirt number", str(p.get("num", "-"))))
+		var cp = G.PS.caps(p)
+		v.add_child(UI.kv("International", "%d caps · %d goals" % [cp[0], cp[1]] if cp[0] > 0 else "Uncapped"))
+		v.add_child(UI.kv("Languages", ", ".join(G.PS.languages(p))))
+		v.add_child(UI.kv("Favoured club", G.PS.favoured_name(p)))
+		if p.get("sellon", []).size() == 2:
+			v.add_child(UI.kv("Sell-on clause", "%d%% to %s" % [p.sellon[1], s.clubs[int(p.sellon[0])].short], UI.AMBER))
 		var b = pane(0, 8)
 		h.add_child(b[0])
 		v = b[1]
@@ -204,6 +228,17 @@ func _page(p: Dictionary, own: bool, free: bool):
 			lines.append([false, "Knows he is on the transfer list"])
 		if p.inj > 0:
 			lines.append([false, "Injured for around %s" % G.inj_text(p.inj)])
+		if p.has("rolep") and own:
+			lines.append([p.get("rolew", -1) != s.season, "Promised a %s role when he signed" % G.DL.ROLES[p.rolep].to_lower()])
+		if not G.PS.speaks_local(p, p.club) and p.club >= 0:
+			lines.append([false, "Still learning the language"])
+		var pc = UI.panel(Color(1, 1, 1, 0.04), 8, 12, 8)
+		var pcv = UI.vb(0)
+		pcv.add_child(UI.caps("Personality", 14, UI.accent))
+		pcv.add_child(UI.lbl(G.PS.personality(p), 22, UI.TEXT, "bold"))
+		pcv.add_child(UI.wrap(G.PS.blurb(p), 17, UI.MUTED))
+		pc.add_child(pcv)
+		v.add_child(pc)
 		for ln in lines:
 			var r = UI.hb(10)
 			r.add_child(UI.icon("check" if ln[0] else "x", 22, UI.GREEN if ln[0] else UI.AMBER))
@@ -278,13 +313,32 @@ func _page(p: Dictionary, own: bool, free: bool):
 		h.add_child(b[0])
 		v = b[1]
 		v.add_child(UI.caps("Career", 17, UI.accent))
-		v.add_child(UI.kv("Appearances", str(p.cap)))
-		v.add_child(UI.kv("Goals", str(p.cg)))
+		var car = G.PS.career(p)
+		v.add_child(UI.kv("Appearances", str(car[0])))
+		v.add_child(UI.kv("Goals", str(car[1])))
+		v.add_child(UI.kv("Goals per game", "%.2f" % (car[1] / float(max(1, car[0])))))
 		v.add_child(UI.caps("Match eligibility", 17, UI.accent))
 		v.add_child(UI.kv("Selection", "Available" if G.available(p) else "Unavailable", UI.GREEN if G.available(p) else UI.RED))
 		v.add_child(UI.kv("Injuries", "Out for %s" % G.inj_text(p.inj) if p.inj > 0 else "None"))
 		v.add_child(UI.kv("Suspensions", "%d match%s" % [p.susp, "" if p.susp == 1 else "es"] if p.susp > 0 else "None"))
 		v.add_child(UI.kv("Fitness", "%d%%" % int(p.cond), UI.cond_color(p.cond)))
+		var cc = pane(0, 2)
+		cc[0].size_flags_stretch_ratio = 1.5
+		h.add_child(cc[0])
+		v = cc[1]
+		v.add_child(UI.caps("Season by season", 17, UI.accent))
+		v.add_child(_hrow(["Season", "Club", "Apps", "Gls", "Ast", "Avg"], UI.MUTED, true))
+		var hist = G.PS.history(p)
+		var cn = "—" if free else club.short
+		v.add_child(_hrow([G.season_name(), cn, str(p.ss.ap), str(p.ss.g), str(p.ss.a), "%.2f" % G.avg_rating(p) if p.ss.ap > 0 else "-"], UI.TEXT, false, true))
+		for i in range(hist.size() - 1, -1, -1):
+			var r = hist[i]
+			v.add_child(_hrow([G.season_name(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]), "%.2f" % r[5]], UI.TEXT))
+		if p.has("pre") and p.pre[0] > 0:
+			v.add_child(_hrow(["Earlier", "Career to 2026", str(p.pre[0]), str(p.pre[1]), "", ""], UI.MUTED))
+		var cp2 = G.PS.caps(p)
+		if cp2[0] > 0:
+			v.add_child(_hrow(["Intl", p.nat, str(cp2[0]), str(cp2[1]), "", ""], UI.accent))
 
 
 func build():
@@ -375,8 +429,8 @@ func build():
 		v.add_child(UI.btn("Offer contract", func(): UI.main.open("nego", {"pid": p.id, "mode": "free"}), "primary", "handshake"))
 	elif not own and not loaned_out:
 		_scout_btn(v, p)
+		v.add_child(UI.btn("Approach %s" % s.clubs[p.club].short, func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"}), "primary", "handshake"))
 		if G.window_open():
-			v.add_child(UI.btn("Make transfer offer", func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"}), "primary", "handshake"))
 			var ap = UI.caps("Asking price around %s%s" % [G.money(G.TR.asking_price(p)), (" · release clause %s" % G.money(p.rc)) if p.get("rc", 0) > 0 else ""], 19, UI.MUTED)
 			ap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			v.add_child(ap)
@@ -407,8 +461,12 @@ func _bar(p: Dictionary):
 		acts.append(["New contract", "handshake", "primary", func(): UI.main.open("nego", {"pid": p.id, "mode": "renew"})])
 	elif free:
 		acts.append(["Offer contract", "handshake", "primary", func(): UI.main.open("nego", {"pid": p.id, "mode": "free"})])
-	elif G.window_open():
-		acts.append(["Make offer", "handshake", "primary", func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"})])
+	else:
+		var dl = G.DL.find(p.id)
+		var lab = "Approach club"
+		if dl != null and dl.mode == "buy" and dl.stage != "dead" and dl.stage != "done":
+			lab = {"new": "Approach club", "enq_wait": "Awaiting reply", "bid_wait": "Bid pending", "club": "Make bid", "talks": "Agree terms"}[dl.stage]
+		acts.append([lab, "handshake", "primary", func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"})])
 	acts.append(["Compare", "users", "secondary", func(): _compare(p)])
 	acts.append(["Similar", "search", "secondary", func(): UI.main.open("lists", {"kind": "similar", "pid": p.id, "grp": "search"})])
 	if not own:

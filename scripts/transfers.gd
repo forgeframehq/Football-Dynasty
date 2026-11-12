@@ -126,6 +126,16 @@ static func move(p: Dictionary, to_id: int, fee: int, wage: int, years: int):
 			fc.xi[i] = -1
 		fc.budget += fee
 		fc.earned += fee
+		if p.has("sellon") and fee > 0 and int(p.sellon[0]) != from_id and int(p.sellon[0]) < s.clubs.size():
+			# a previous club is owed a share of this sale
+			var cut = int(fee * p.sellon[1] / 100.0)
+			var oc = s.clubs[int(p.sellon[0])]
+			fc.budget -= cut
+			oc.budget += cut
+			if oc.id == s.user.club:
+				G.msg("Sell-on clause: %s" % G.pname(p), "%s has been sold by %s. Your %d%% sell-on clause brings in %s." % [G.pfull(p), fc.name, p.sellon[1], G.money(cut)], "info", null, true)
+			elif from_id == s.user.club:
+				G.msg("Sell-on clause paid", "%s of the %s fee goes to %s under the sell-on clause agreed when you signed him." % [G.money(cut), G.pname(p), oc.name], "info")
 	else:
 		s.free.erase(p.id)
 	var tc = s.clubs[to_id]
@@ -136,6 +146,10 @@ static func move(p: Dictionary, to_id: int, fee: int, wage: int, years: int):
 	p.erase("status")
 	p.erase("rc")
 	p.erase("unhappy")
+	p.erase("sellon")
+	p.erase("rolep")
+	if s.has("deals") and s.deals.has(p.id) and to_id != s.user.club:
+		s.deals[p.id].stage = "dead"
 	G.give_number(tc, p)
 	p.wage = wage
 	p.cend = s.season + years
@@ -221,6 +235,8 @@ static func accept_offer(o: Dictionary):
 	var p = G.s.players[o.pid]
 	var c = G.s.clubs[o.from]
 	move(p, o.from, o.fee, max(p.wage, G.wage_for(p.ovr, G.age(p))), G.rng.randi_range(2, 4))
+	if o.get("sellon", 0) > 0:
+		p["sellon"] = [G.s.user.club, o.sellon]
 	G.msg("%s sold" % G.pname(p), "%s has completed his move to %s for %s. The fee has been added to your transfer budget." % [G.pfull(p), c.name, G.money(o.fee)], "info")
 
 

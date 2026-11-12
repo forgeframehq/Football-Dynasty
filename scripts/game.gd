@@ -7,6 +7,8 @@ const TR = preload("res://scripts/transfers.gd")
 const RL = preload("res://scripts/roles.gd")
 const CP = preload("res://scripts/comps.gd")
 const OPS = preload("res://scripts/club_ops.gd")
+const PS = preload("res://scripts/persona.gd")
+const DL = preload("res://scripts/deals.gd")
 
 const SAVE_V = 2
 var slot := 0
@@ -1039,6 +1041,7 @@ func start_of_day():
 			for i in 30:
 				TR.ai_deal()
 			msg("Deadline day", "It is the last day of the transfer window. Clubs are scrambling to get deals done — any business you want to do has to happen today.", "info", null, true)
+	DL.tick()
 	TR.expire_offers()
 	LG.update_playoffs()
 	CP.daily()
@@ -1145,6 +1148,7 @@ func take_job(cid: int):
 	u.jobs = []
 	s.offers = []
 	s.negos = {}
+	s.deals = {}
 	var c = uc()
 	u.obj = LG.objective(c)
 	init_user_tactics(c)

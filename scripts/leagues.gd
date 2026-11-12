@@ -508,6 +508,7 @@ static func rollover():
 		c.wage_budget = G.nice(max(G.squad_wages(c) * 1.12, c.wage_budget * 0.9))
 	for pid in s.players:
 		var p = s.players[pid]
+		G.PS.season_end(p)
 		p.ss = G.new_stats()
 		p.ycs = 0
 		p.susp = 0
@@ -523,6 +524,7 @@ static func rollover():
 			remove_player(fa[i])
 	s.tx_log = []
 	s.negos = {}
+	s.deals = {}
 	s.offers = []
 	generate_fixtures()
 	u.obj = objective(ucl)
