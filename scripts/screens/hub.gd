@@ -5,7 +5,8 @@ extends "res://scripts/screens/screen.gd"
 const TITLES = {"dressing": "Dressing Room", "fans": "Fans", "sponsors": "Sponsors", "request": "Board Request", "report": "Team Report",
 	"tcentre": "Transfer Centre", "awards": "Awards", "scores": "Live Scores", "standards": "League Standards", "timeline": "Career Timeline",
 	"philosophy": "Philosophy", "status": "Game Status", "manual": "Manual", "achieve": "Achievements", "fame": "Hall of Fame",
-	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Identity", "analysis": "Match Analysis", "life": "Lifestyle", "contract": "My Contract"}
+	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Identity", "analysis": "Match Analysis", "life": "Lifestyle", "contract": "My Contract", "invest": "Investments", "owner": "Club Ownership"}
+const PROPS = [["Studio to let", 120000, 260], ["Terraced house", 320000, 640], ["City apartments", 1100000, 2300], ["Office building", 6000000, 13500]]
 const HOMES = [["Club flat", 0, "A small flat the club lends you."], ["City apartment", 180000, "Two bedrooms near the ground."], ["Riverside penthouse", 900000, "Top floor, skyline views."],
 	["Country villa", 3500000, "Gardens, a pool and privacy."], ["Mansion estate", 12000000, "The home of a football great."]]
 const CARS = [["Club car", 0], ["Executive saloon", 45000], ["Sports coupe", 160000], ["Supercar", 600000], ["Classic collection", 2500000]]
@@ -510,6 +511,154 @@ func _life(v: Control):
 		bv.add_child(r)
 
 
+func _invest(v: Control):
+	var lf = G.OPS.life()
+	if not lf.has("savings"):
+		G.OPS.invest_week(lf)
+	var pv = 0
+	for pr in lf.props:
+		pv += int(pr.value)
+	var sv = 0.0
+	for k in lf.shares:
+		sv += lf.px[int(k)] * float(lf.shares[k])
+	_note(v, "Put your salary to work. Savings are safe and slow. Property pays rent every week. Shares in the sponsor companies move up and down each week and can lose money. You have %s in cash." % G.money(lf.cash))
+	var a = _card(v, "Savings · safe")
+	a.add_child(UI.lbl(G.money(lf.savings), 36, UI.GREEN, "xbold"))
+	a.add_child(UI.lbl("About 3.7% a year, paid weekly.", 17, UI.MUTED))
+	var ah = UI.hb(8)
+	for amt in [50000, 500000]:
+		var x = amt
+		var b1 = UI.btn("Pay in %s" % G.money(x), func():
+			if lf.cash >= x:
+				lf.cash -= x
+				lf.savings += x
+				refresh()
+			else:
+				UI.toast("Not enough cash", UI.RED), "secondary", "", 46)
+		b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ah.add_child(b1)
+	a.add_child(ah)
+	a.add_child(UI.btn("Withdraw everything", func():
+		lf.cash += lf.savings
+		lf.savings = 0
+		refresh(), "ghost", "", 44))
+	var p = _card(v, "Property · steady (%s owned)" % G.money(pv))
+	for i in PROPS.size():
+		var n = 0
+		for pr in lf.props:
+			if pr.k == i:
+				n += 1
+		var r = UI.hb(10)
+		var tv = UI.vb(-4)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl("%s%s" % [PROPS[i][0], " × %d" % n if n > 0 else ""], 21, UI.TEXT, "semi"))
+		tv.add_child(UI.lbl_fill("Rent %s a week" % G.money(PROPS[i][2]), 15, UI.MUTED))
+		r.add_child(tv)
+		var idx = i
+		var b = UI.chip("BUY " + G.money(PROPS[i][1]), UI.accent, UI.on_color(UI.accent), 16)
+		UI.tap(b, func(): _buy(lf, PROPS[idx][1], PROPS[idx][0], func(): lf.props.append({"k": idx, "rent": PROPS[idx][2], "value": PROPS[idx][1]})), true)
+		r.add_child(b)
+		p.add_child(r)
+	if lf.props.size() > 0:
+		p.add_child(UI.btn("Sell all property for %s" % G.money(pv), func():
+			lf.cash += pv
+			lf.props = []
+			refresh(), "ghost", "", 44))
+	var sh = _card(v, "Shares · risky (%s held)" % G.money(int(sv)))
+	for i in SPONSORS.size():
+		var q = int(lf.shares.get(i, 0))
+		var price = lf.px[i]
+		var r = UI.hb(8)
+		var tv = UI.vb(-4)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl(SPONSORS[i][0], 20, UI.TEXT, "semi"))
+		tv.add_child(UI.lbl_fill("%s · €%.1f a share%s" % [SPONSORS[i][1], price, " · you hold %d" % q if q > 0 else ""], 15, UI.MUTED))
+		r.add_child(tv)
+		var idx = i
+		var bb = UI.chip("BUY 1K", UI.accent, UI.on_color(UI.accent), 15)
+		UI.tap(bb, func(): _buy(lf, int(lf.px[idx] * 1000), "1,000 %s shares" % SPONSORS[idx][0], func(): lf.shares[idx] = int(lf.shares.get(idx, 0)) + 1000), true)
+		r.add_child(bb)
+		if q > 0:
+			var sb = UI.chip("SELL", Color(1, 1, 1, 0.1), UI.TEXT, 15)
+			UI.tap(sb, func():
+				lf.cash += int(lf.px[idx] * q)
+				lf.shares.erase(idx)
+				UI.sfx("cash", -8.0)
+				refresh(), true)
+			r.add_child(sb)
+		sh.add_child(r)
+	var e = _card(v, "Work off the pitch")
+	e.add_child(UI.btn("Agent: %s (€2K a week)" % ("hired" if lf.agent else "none"), func():
+		lf.agent = not lf.agent
+		refresh(), "primary" if lf.agent else "secondary", "briefcase", 48))
+	e.add_child(UI.lbl("An agent makes the board more likely to agree a pay rise.", 16, UI.DIM))
+	e.add_child(UI.btn("TV and newspaper work: %s" % ("on" if lf.media else "off"), func():
+		lf.media = not lf.media
+		refresh(), "primary" if lf.media else "secondary", "megaphone", 48))
+	e.add_child(UI.lbl("Pays €8K a week and builds reputation, but the board likes it less each week.", 16, UI.DIM))
+
+
+func _owner(v: Control):
+	var s = G.s
+	var lf = G.OPS.life()
+	if not lf.has("savings"):
+		G.OPS.invest_week(lf)
+	var c = G.uc()
+	var mine = float(lf.stakes.get(c.id, 0))
+	_note(v, "Buy shares in clubs in blocks of 10%%. Every stake pays you a weekly dividend. Hold 51%% or more of the club you manage and you are the owner: you cannot be sacked, and you can put your own money into the club. You have %s in cash." % G.money(lf.cash))
+	var targets = [c]
+	var others = []
+	for o in s.clubs:
+		if o.id != c.id and not s.leagues[o.lg].roe and float(lf.stakes.get(o.id, 0)) > 0:
+			targets.append(o)
+		elif o.id != c.id and not s.leagues[o.lg].roe and not G.LG.is_reserve(o):
+			others.append(o)
+	others.sort_custom(func(a, b): return G.OPS.club_value(a) < G.OPS.club_value(b))
+	targets += others.slice(0, 8)
+	for o in targets:
+		var val = G.OPS.club_value(o)
+		var pct = float(lf.stakes.get(o.id, 0))
+		var p = UI.panel(UI.CARD, 14, 14, 9, Color(UI.GOLD, 0.6) if pct >= 51 else (Color(UI.accent, 0.5) if o.id == c.id else UI.LINE))
+		var h = UI.hb(10)
+		h.add_child(UI.badge(o, 40))
+		var tv = UI.vb(-4)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl_fill(o.name, 21, UI.TEXT, "semi"))
+		tv.add_child(UI.lbl_fill("Worth %s · you own %d%%%s" % [G.money(val), int(pct), " · OWNER" if pct >= 51 else ""], 15, UI.GOLD if pct >= 51 else UI.MUTED))
+		h.add_child(tv)
+		var oid = o.id
+		if pct < 100:
+			var b = UI.chip("BUY 10% " + G.money(int(val * 0.1)), UI.accent, UI.on_color(UI.accent), 15)
+			UI.tap(b, func(): _buy(lf, int(val * 0.1), "10%% of %s" % s.clubs[oid].name, func():
+				lf.stakes[oid] = float(lf.stakes.get(oid, 0)) + 10.0
+				if oid == c.id and lf.stakes[oid] >= 51.0 and lf.stakes[oid] < 61.0:
+					G.scrap("Owner", "You bought control of %s" % c.name)
+					G.msg("You now own %s" % c.name, "With a majority of the shares the club is yours. The board answers to you.", "board")), true)
+			h.add_child(b)
+		if pct > 0:
+			var sb = UI.chip("SELL 10%", Color(1, 1, 1, 0.1), UI.TEXT, 15)
+			UI.tap(sb, func():
+				lf.cash += int(val * 0.1)
+				lf.stakes[oid] = pct - 10.0
+				if lf.stakes[oid] <= 0:
+					lf.stakes.erase(oid)
+				UI.sfx("cash", -8.0)
+				refresh(), true)
+			h.add_child(sb)
+		p.add_child(h)
+		v.add_child(p)
+	if mine >= 51:
+		var ov = _card(v, "Owner's office")
+		ov.add_child(UI.kv("Transfer budget", G.money(c.budget)))
+		ov.add_child(UI.kv("Wage budget", "%s / wk" % G.money(c.wage_budget)))
+		for amt in [1000000, 10000000]:
+			var x = amt
+			ov.add_child(UI.btn("Put %s of your money into transfers" % G.money(x), func(): _buy(lf, x, "a cash injection", func(): c.budget += x), "secondary", "", 46))
+		ov.add_child(UI.btn("Raise the wage budget by 10%", func():
+			c.wage_budget = int(c.wage_budget * 1.1)
+			refresh(), "secondary", "", 46))
+
+
 func _contract(v: Control):
 	var s = G.s
 	var u = s.user
@@ -529,7 +678,7 @@ func _contract(v: Control):
 			var p = pct
 			rv.add_child(UI.btn("Ask for %d%% more" % p, func():
 				u["raise_day"] = s.day
-				var chance = clamp(0.5 + (u.conf - (55.0 + p * 0.6)) * 0.03, 0.03, 0.95)
+				var chance = clamp(0.5 + (u.conf - (55.0 + p * 0.6)) * 0.03 + (0.15 if G.OPS.life().get("agent", false) else 0.0), 0.03, 0.95)
 				if G.rng.randf() < chance:
 					u["salary"] = int(sal * (1.0 + p / 100.0))
 					UI.sfx("cash", -8.0)

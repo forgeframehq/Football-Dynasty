@@ -957,11 +957,13 @@ func apply_match(sim):
 		var sp = u.get("sponsor")
 		if sp != null and pts == 3:
 			uc().budget += int(sp.win)
+		if pts == 3:
+			OPS.life().cash += int(OPS.salary() * 0.25)
 		if t.goals - o.goals >= 4:
 			scrap("Big win", "%s %d-%d %s" % [t.club.name, t.goals, o.goals, o.club.name])
 		elif o.club.rep - t.club.rep >= 8 and pts == 3:
 			scrap("Giant killing", "%s beat %s %d-%d" % [t.club.name, o.club.name, t.goals, o.goals])
-		if u.conf < 6.0 and uc().t.p >= 10 and not u.sacked:
+		if u.conf < 6.0 and uc().t.p >= 10 and not u.sacked and float(OPS.life().get("stakes", {}).get(ucid, 0)) < 51.0:
 			u.sacked = true
 			stop_flag = true
 

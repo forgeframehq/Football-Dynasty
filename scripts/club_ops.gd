@@ -159,6 +159,39 @@ static func life() -> Dictionary:
 	return u.life
 
 
+static func club_value(c: Dictionary) -> int:
+	return G.nice(c.wage_budget * 52.0 * 1.4 + CAPACITY[c.fac.stadium - 1] * 900.0 if c.has("fac") else c.wage_budget * 52.0 * 1.6)
+
+
+static func invest_week(lf: Dictionary):
+	var s = G.s
+	if not lf.has("savings"):
+		lf["savings"] = 0
+		lf["props"] = []
+		lf["shares"] = {}
+		lf["px"] = []
+		lf["stakes"] = {}
+		lf["agent"] = false
+		lf["media"] = false
+	lf.savings = int(lf.savings * 1.0007)
+	for pr in lf.props:
+		lf.cash += int(pr.rent)
+		pr.value = int(pr.value * G.rng.randf_range(0.996, 1.007))
+	while lf.px.size() < 16:
+		lf.px.append(float(G.rng.randi_range(20, 180)))
+	for i in lf.px.size():
+		lf.px[i] = clamp(lf.px[i] * G.rng.randf_range(0.93, 1.085), 2.0, 5000.0)
+	for cid in lf.stakes:
+		var c = s.clubs[int(cid)]
+		lf.cash += int(c.wage_budget * 0.06 * float(lf.stakes[cid]) / 100.0)
+	if lf.agent:
+		lf.cash -= 2000
+	if lf.media:
+		lf.cash += 8000
+		s.user.conf = max(0.0, s.user.conf - 0.3)
+		s.user.rep = min(100.0, s.user.rep + 0.05)
+
+
 static func salary() -> int:
 	var u = G.s.user
 	if u.has("salary"):
@@ -188,6 +221,7 @@ static func weekly():
 				s.user.attr.mot = min(22, s.user.attr.mot + 1)
 				lf.study = ""
 	lf.settled = min(100.0, float(lf.settled) + 1.5 + lf.home * 0.8)
+	invest_week(lf)
 	var tv = int(c.wage_budget * 0.05)
 	var price = [46, 30, 20, 15][clampi(tier - 1, 0, 3)]
 	var fill = clamp(0.55 + (c.rep - 55.0) * 0.012 + (0.1 if c.form.count("W") >= 3 else 0.0), 0.35, 0.98)
