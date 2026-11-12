@@ -5,7 +5,16 @@ extends "res://scripts/screens/screen.gd"
 const TITLES = {"dressing": "Dressing Room", "fans": "Fans", "sponsors": "Sponsors", "request": "Board Request", "report": "Team Report",
 	"tcentre": "Transfer Centre", "awards": "Awards", "scores": "Live Scores", "standards": "League Standards", "timeline": "Career Timeline",
 	"philosophy": "Philosophy", "status": "Game Status", "manual": "Manual", "achieve": "Achievements", "fame": "Hall of Fame",
-	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Identity", "analysis": "Match Analysis", "life": "Lifestyle", "contract": "My Contract", "invest": "Investments", "owner": "Club Ownership"}
+	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Identity", "analysis": "Match Analysis", "life": "Lifestyle", "contract": "My Contract", "invest": "Investments", "owner": "Club Ownership", "press": "Press Conference", "doc": "Season Documentary"}
+const QUESTIONS = [["How confident are you of a result?", [["We will win. I have no doubt.", "bold"], ["We respect them, and we are ready.", "calm"], ["I only talk about my own team.", "flat"]]],
+	["Your star player has been quiet lately. Is he under pressure?", [["He is the best in the league. Watch him.", "bold"], ["Form comes and goes. He has my trust.", "calm"], ["Next question.", "flat"]]],
+	["The fans are asking for more attacking football.", [["They will get goals, I promise.", "bold"], ["We play to win, in whatever way it takes.", "calm"], ["The fans do not pick the team.", "cold"]]],
+	["What do you make of the opposition manager's comments?", [["He should worry about his own side.", "bold"], ["I have a lot of respect for him.", "calm"], ["I have not read them.", "flat"]]],
+	["Is the board giving you enough backing?", [["We need more if we want to compete.", "cold"], ["The board and I are working as one.", "calm"], ["That stays in the boardroom.", "flat"]]]]
+
+var pq := 0
+var plog: Array = []
+var slide := 0
 const PROPS = [["Studio to let", 120000, 260], ["Terraced house", 320000, 640], ["City apartments", 1100000, 2300], ["Office building", 6000000, 13500]]
 const HOMES = [["Club flat", 0, "A small flat the club lends you."], ["City apartment", 180000, "Two bedrooms near the ground."], ["Riverside penthouse", 900000, "Top floor, skyline views."],
 	["Country villa", 3500000, "Gardens, a pool and privacy."], ["Mansion estate", 12000000, "The home of a football great."]]
@@ -26,6 +35,14 @@ func build():
 	var kind = str(args.get("kind", "status"))
 	body.add_child(UI.topbar(TITLES.get(kind, "Club")))
 	if kind in ["manual", "request", "philosophy", "editor", "status"]:
+		max_w = 900
+		cols = 1
+	if kind == "press":
+		backdrop("press_room", 0.7)
+		max_w = 900
+		cols = 1
+	if kind == "doc":
+		backdrop("title", 0.72)
 		max_w = 900
 		cols = 1
 	if kind == "dressing":
@@ -657,6 +674,110 @@ func _owner(v: Control):
 		ov.add_child(UI.btn("Raise the wage budget by 10%", func():
 			c.wage_budget = int(c.wage_budget * 1.1)
 			refresh(), "secondary", "", 46))
+
+
+func _press(v: Control):
+	var s = G.s
+	var u = s.user
+	var c = G.uc()
+	if pq == 0 and plog.is_empty():
+		UI.sfx("sting_news", -12.0)
+	if pq >= 3:
+		u["press_day"] = s.day
+		var cv = _card(v, "The headlines")
+		for line in plog:
+			cv.add_child(UI.wrap(line, 21, UI.TEXT))
+		v.add_child(UI.btn("Done", func(): UI.main.back(), "primary", "check", 56))
+		return
+	var rng = RandomNumberGenerator.new()
+	rng.seed = s.day * 31 + c.id
+	var order = range(QUESTIONS.size())
+	for i in range(order.size() - 1, 0, -1):
+		var j = rng.randi() % (i + 1)
+		var t = order[i]
+		order[i] = order[j]
+		order[j] = t
+	var q = QUESTIONS[order[pq]]
+	var qc = _card(v, "Question %d of 3" % (pq + 1))
+	var ql = UI.wrap("“%s”" % q[0], 28, UI.TEXT, "disp")
+	qc.add_child(ql)
+	ql.modulate.a = 0.0
+	ql.create_tween().tween_property(ql, "modulate:a", 1.0, 0.5)
+	for ans in q[1]:
+		var kind = ans[1]
+		var text = ans[0]
+		v.add_child(UI.btn(text, func():
+			if kind == "bold":
+				for pid in c.players:
+					s.players[pid].mor = min(100.0, s.players[pid].mor + 2.0)
+				u["fans"] = min(100.0, float(u.get("fans", 55.0)) + 1.0)
+				u.conf = max(0.0, u.conf - 0.5)
+				plog.append("Bold words lift the squad and the fans. The board hopes you can back them up.")
+			elif kind == "calm":
+				u.conf = min(100.0, u.conf + 0.7)
+				plog.append("A measured answer. The board approves.")
+			elif kind == "cold":
+				u["fans"] = max(0.0, float(u.get("fans", 55.0)) - 2.0)
+				u.conf = max(0.0, u.conf - 1.0)
+				plog.append("A sharp reply makes the back pages. Fans and directors are not impressed.")
+			else:
+				plog.append("You gave nothing away.")
+			pq += 1
+			UI.sfx("click", -12.0)
+			refresh(), "secondary", "", 58))
+
+
+func _doc(v: Control):
+	var s = G.s
+	var u = s.user
+	var c = G.uc()
+	var slides = [["%s" % G.season_name(), "%s · %s" % [c.name, u.name]]]
+	slides.append(["%s in the %s" % [G.LG.ordinal(G.LG.position(c.id)), s.leagues[c.lg].name], "%d points · %d scored · %d conceded" % [c.t.pts, c.t.gf, c.t.ga]])
+	var sc_ = c.players.map(func(pid): return s.players[pid])
+	sc_.sort_custom(func(a, b): return a.ss.g > b.ss.g)
+	if sc_.size() > 0 and sc_[0].ss.g > 0:
+		slides.append(["%s · %d goals" % [G.pname(sc_[0]), sc_[0].ss.g], "Top scorer"])
+	var ev = u.get("scrap", []).filter(func(e): return e.day > s.day - 330)
+	ev.reverse()
+	for e in ev.slice(0, 10):
+		slides.append([str(e.text), "%s · %s" % [str(e.title), G.fmt_date(e.day, true)]])
+	slides.append(["Board %d%% · Fans %d%%" % [int(u.conf), int(u.get("fans", 55.0))], "How it stands"])
+	slide = clampi(slide, 0, slides.size() - 1)
+	var card = UI.panel(Color(0.04, 0.06, 0.1, 0.82), 24, 30, 40, Color(UI.GOLD, 0.6))
+	card.custom_minimum_size = Vector2(0, 300)
+	var cv = UI.vb(10)
+	cv.alignment = BoxContainer.ALIGNMENT_CENTER
+	var cap = UI.caps(slides[slide][1], 22, UI.GOLD)
+	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var big = UI.wrap(slides[slide][0], 46, UI.TEXT, "xbold")
+	big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cv.add_child(cap)
+	cv.add_child(big)
+	card.add_child(cv)
+	v.add_child(card)
+	card.modulate.a = 0.0
+	card.scale = Vector2(0.96, 0.96)
+	var tw = card.create_tween().set_parallel(true)
+	tw.tween_property(card, "modulate:a", 1.0, 0.6)
+	tw.tween_property(card, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	if slide == 0:
+		UI.sfx("sting_trophy", -12.0)
+	var nav = UI.hb(10)
+	nav.add_child(UI.lbl_fill("%d / %d" % [slide + 1, slides.size()], 18, UI.MUTED))
+	if slide < slides.size() - 1:
+		nav.add_child(UI.btn("Next", func():
+			slide += 1
+			refresh(), "primary", "chevron-right", 52))
+		var at = slide
+		get_tree().create_timer(3.4).timeout.connect(func():
+			if is_instance_valid(self) and slide == at and is_visible_in_tree():
+				slide += 1
+				refresh())
+	else:
+		nav.add_child(UI.btn("Watch again", func():
+			slide = 0
+			refresh(), "secondary", "repeat", 52))
+	v.add_child(nav)
 
 
 func _contract(v: Control):

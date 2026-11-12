@@ -244,6 +244,21 @@ func msg(title: String, body: String, kind := "info", ref = null, important := f
 		stop_flag = true
 
 
+const DERBIES = [["Manchester United", "Manchester City"], ["Liverpool", "Everton"], ["Arsenal", "Tottenham"], ["Liverpool", "Manchester United"], ["Chelsea", "Arsenal"],
+	["Newcastle", "Sunderland"], ["Aston Villa", "Birmingham"], ["Real Madrid", "Barcelona"], ["Real Madrid", "Atlético"], ["Sevilla", "Betis"], ["Athletic", "Real Sociedad"],
+	["Milan", "Inter"], ["Roma", "Lazio"], ["Juventus", "Torino"], ["Juventus", "Inter"], ["Napoli", "Roma"], ["Bayern", "Dortmund"], ["Dortmund", "Schalke"],
+	["Hamburg", "Bremen"], ["Paris", "Marseille"], ["Lyon", "Saint-Étienne"], ["Nice", "Monaco"], ["Sheffield United", "Sheffield Wednesday"], ["Leeds", "Manchester United"]]
+
+
+func is_derby(a: int, b: int) -> bool:
+	var na = s.clubs[a].name
+	var nb = s.clubs[b].name
+	for d in DERBIES:
+		if (na.contains(d[0]) and nb.contains(d[1])) or (na.contains(d[1]) and nb.contains(d[0])):
+			return na != nb
+	return false
+
+
 func scrap(title: String, text: String):
 	var u = s.user
 	if not u.has("scrap"):
@@ -959,6 +974,10 @@ func apply_match(sim):
 			uc().budget += int(sp.win)
 		if pts == 3:
 			OPS.life().cash += int(OPS.salary() * 0.25)
+		if is_derby(f.h, f.a):
+			u.fans = clamp(u.fans + (pts - 1.2) * 3.0, 0.0, 100.0)
+			if pts == 3:
+				scrap("Derby day", "%s beat %s %d-%d" % [t.club.name, o.club.name, t.goals, o.goals])
 		if t.goals - o.goals >= 4:
 			scrap("Big win", "%s %d-%d %s" % [t.club.name, t.goals, o.goals, o.club.name])
 		elif o.club.rep - t.club.rep >= 8 and pts == 3:

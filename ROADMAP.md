@@ -72,3 +72,18 @@ Options
 - City: housing (5), town buildings (6), open spaces and extras (7)
 - Orientation: square base seen as a diamond with one corner at the bottom, entrance on the bottom-right edge, light from the top left, blue used only where the club colour should go
 - Later: scene backgrounds, trophies, manager portraits, app icon, coaching badges and medals
+
+## Added later
+- [x] Lifestyle: salary, homes, garage, businesses, language, local causes
+- [x] Investments: savings, rental property, shares; agent; media work
+- [x] Club ownership: stakes with dividends, owner powers at 51%
+- [x] Screen transitions, pulsing match-day button
+- [x] Derbies (famous rivalries count double with fans)
+- [x] Press conference before matches, with effects on morale, fans and board
+- [x] Season Documentary (animated recap from the scrapbook)
+- [ ] Deadline day as a live hour-by-hour event
+- [ ] Rival managers who remember what you said
+- [ ] Player stories (academy captain, veteran farewell, homesick wonderkid)
+- [ ] Legends mode (retired players return as coaches or scouts)
+- [ ] Family, holidays, legacy items (statue, stand), property abroad, owner while managing elsewhere
+- [ ] Images for homes, cars, businesses and property; sponsor logos; manager portraits

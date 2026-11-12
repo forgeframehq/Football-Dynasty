@@ -61,7 +61,8 @@ func _next_match(c: Dictionary) -> Control:
 	var s = G.s
 	var f = G.next_user_fixture()
 	var today = f != null and f.day == s.day
-	var k = _card("Match day" if today else "Next match", G.fx_caption(f) if f != null else "", func(): UI.main.root("tactics"), true)
+	var derby = f != null and G.is_derby(f.h, f.a)
+	var k = _card(("Derby day" if derby else "Match day") if today else ("Next match · derby" if derby else "Next match"), G.fx_caption(f) if f != null else "", func(): UI.main.root("tactics"), true)
 	var v = k[1]
 	if f == null:
 		v.add_child(UI.wrap("No more fixtures this season. Continue to the season review.", 22, UI.MUTED))
@@ -155,6 +156,9 @@ func todo_items(c: Dictionary) -> Array:
 		a.append(["bandage", "%d unavailable player%s in your XI" % [out, "" if out == 1 else "s"], UI.RED, func(): UI.main.root("tactics")])
 	elif f != null:
 		a.append(["layout-grid", "Check your team for today's match", UI.accent, func(): UI.main.root("tactics")])
+	var nf = G.next_user_fixture()
+	if nf != null and nf.day - s.day <= 1 and int(s.user.get("press_day", -9)) < s.day - 1 and not nf.get("fr", false):
+		a.append(["megaphone", "Press conference before the match", UI.accent, func(): UI.main.open("hub", {"kind": "press", "grp": "manager"})])
 	var n = G.unread()
 	if n > 0:
 		a.append(["mail", "%d unread message%s" % [n, "" if n == 1 else "s"], UI.accent, func(): UI.main.root("inbox")])

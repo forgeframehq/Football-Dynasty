@@ -172,6 +172,15 @@ func _mk(sname: String, args: Dictionary) -> Control:
 	return scr
 
 
+func _enter(scr: Control, dx := 26.0):
+	# short slide-and-fade when a screen appears
+	scr.modulate.a = 0.0
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(scr, "modulate:a", 1.0, 0.16)
+	scr.position.x = dx
+	tw.tween_property(scr, "position:x", 0.0, 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
 func uses_chrome() -> bool:
 	return G.active and stack.size() > 0 and stack[-1].chrome
 
@@ -192,6 +201,7 @@ func root(sname: String, args := {}):
 	var scr = _mk(sname, args)
 	stack.append(scr)
 	holder.add_child(scr)
+	_enter(scr, 0.0)
 	_update_chrome()
 
 
@@ -204,6 +214,7 @@ func open(sname: String, args := {}):
 	var scr = _mk(sname, args)
 	stack.append(scr)
 	holder.add_child(scr)
+	_enter(scr)
 	_update_chrome()
 
 
@@ -413,6 +424,10 @@ func _build_top():
 				if pressing:
 					pressing = false
 					_continue(false))
+	if st.label == "Match day":
+		var pt = cb.create_tween().set_loops()
+		pt.tween_property(cb, "modulate", Color(1.25, 1.25, 1.25), 0.7).set_trans(Tween.TRANS_SINE)
+		pt.tween_property(cb, "modulate", Color.WHITE, 0.7).set_trans(Tween.TRANS_SINE)
 	cb.mouse_exited.connect(func():
 		pressing = false
 		cb.modulate = Color.WHITE)
@@ -552,6 +567,7 @@ func menu_items(key: String) -> Array:
 				UI.ambience(false)
 			open_menu("options")))
 		a.append(_row("award", "Achievements", "Career milestones", func(): root("hub", {"kind": "achieve", "grp": "options"})))
+		a.append(_row("play", "Season Documentary", "Your season, replayed", func(): root("hub", {"kind": "doc", "grp": "options"})))
 		a.append(_row("crown", "Hall of Fame", "Honours and scrapbook", func(): root("hub", {"kind": "fame", "grp": "options"})))
 		a.append(_row("pencil", "Editor", "On" if G.settings.get("editor", false) else "Off", func(): root("hub", {"kind": "editor", "grp": "options"})))
 		a.append(_row("book-open", "Manual", "How to play", func(): root("hub", {"kind": "manual", "grp": "options"})))
