@@ -3,6 +3,7 @@ extends "res://scripts/screens/screen.gd"
 
 
 func build():
+	backdrop("boardroom", 0.84)
 	var s = G.s
 	var u = s.user
 	var c = G.uc()

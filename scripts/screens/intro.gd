@@ -33,8 +33,10 @@ class Sil extends Control:
 func build():
 	chrome = false
 	if args.get("kind", "appoint") == "board":
+		backdrop("boardroom", 0.72)
 		_board()
 	else:
+		backdrop("press_room", 0.45)
 		_appoint()
 
 

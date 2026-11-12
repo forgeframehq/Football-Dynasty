@@ -53,6 +53,27 @@ func on_resume():
 	refresh()
 
 
+func backdrop(scene: String, dim := 0.6):
+	# full-screen scene image behind the screen's content
+	var path = "res://assets/scenes/%s.jpg" % scene
+	if has_node("backdrop") or not ResourceLoader.exists(path):
+		return
+	var t = TextureRect.new()
+	t.name = "backdrop"
+	t.texture = load(path)
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	t.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var d = ColorRect.new()
+	d.color = Color(0.03, 0.04, 0.07, dim)
+	d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.add_child(d)
+	add_child(t)
+	move_child(t, 0)
+
+
 func content(sep := 14, pad := 20) -> Container:
 	# content flows into columns; what does not fit goes onto further pages you swipe between
 	var v = FLOW.new()

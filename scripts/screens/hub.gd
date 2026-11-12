@@ -22,6 +22,10 @@ func build():
 	if kind in ["manual", "request", "philosophy", "editor", "status"]:
 		max_w = 900
 		cols = 1
+	if kind == "dressing":
+		backdrop("dressing_room", 0.78)
+	elif kind == "request":
+		backdrop("boardroom", 0.8)
 	var v = content(10)
 	call("_" + kind, v)
 
