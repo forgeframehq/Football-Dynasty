@@ -79,11 +79,12 @@ static func ordinal(n: int) -> String:
 	return "%d%s" % [n, suf]
 
 
-static func objective(c: Dictionary) -> Dictionary:
+static func objective(c: Dictionary, shift := 0) -> Dictionary:
+	# shift moves the expected finish: negative = more ambitious, positive = more cautious
 	var ids = G.s.leagues[c.lg].clubs.duplicate()
 	ids.sort_custom(func(a, b): return G.s.clubs[a].rep > G.s.clubs[b].rep)
-	var ex = ids.find(c.id) + 1
 	var n = ids.size()
+	var ex = clampi(ids.find(c.id) + 1 + shift, 1, n)
 	var z = zones(c.lg)
 	var safe = n - z.down - z.rpo
 	var text = ""
