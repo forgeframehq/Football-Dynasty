@@ -58,8 +58,14 @@ func _appoint():
 	var paper = UI.panel(Color("efe7d6"), 4, 26, 16, Color("cfc5ae"))
 	paper.custom_minimum_size = Vector2(880, 0)
 	paper.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	paper.get_theme_stylebox("panel").shadow_color = Color(0, 0, 0, 0.6)
-	paper.get_theme_stylebox("panel").shadow_size = 24
+	if ResourceLoader.exists("res://assets/scenes/newspaper.jpg"):
+		var tex = StyleBoxTexture.new()
+		tex.texture = load("res://assets/scenes/newspaper.jpg")
+		tex.content_margin_left = 30
+		tex.content_margin_right = 30
+		tex.content_margin_top = 18
+		tex.content_margin_bottom = 20
+		paper.add_theme_stylebox_override("panel", tex)
 	var pv = UI.vb(4)
 	paper.add_child(pv)
 	var top = UI.hb(8)
