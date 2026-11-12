@@ -23,6 +23,9 @@ const SCREENS = {
 	"clubview": preload("res://scripts/screens/clubview.gd"),
 	"compare": preload("res://scripts/screens/compare.gd"),
 	"comps": preload("res://scripts/screens/comps.gd"),
+	"campus": preload("res://scripts/screens/campus.gd"),
+	"training": preload("res://scripts/screens/training.gd"),
+	"scouting": preload("res://scripts/screens/scouting.gd"),
 }
 const TABS = [["home", "Home", "house"], ["squad", "Squad", "shirt"], ["tactics", "Tactics", "layout-grid"], ["transfers", "Market", "arrow-left-right"], ["club", "Club", "trophy"]]
 

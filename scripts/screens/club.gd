@@ -12,11 +12,14 @@ func build():
 	var v = content(12)
 	var items = [
 		["list-ordered", "League table", "%s in the %s" % [G.LG.ordinal(G.LG.position(c.id)), G.s.leagues[c.lg].name], func(): UI.main.open("table", {"lg": c.lg})],
+		["landmark", "Club & facilities", "Stadium %s · tap to upgrade" % G.OPS._thousands(G.OPS.capacity(c)), func(): UI.main.open("campus")],
+		["activity", "Training", "%s focus · %s intensity" % [G.OPS.FOCUS[c.train.focus], G.OPS.INTENSITY[c.train.inten].to_lower()], func(): UI.main.open("training")],
+		["search", "Scouting", "%d player%s being watched" % [G.s.scout.queue.size(), "" if G.s.scout.queue.size() == 1 else "s"], func(): UI.main.open("scouting")],
 		["trophy", "Competitions", "Cups and European football", func(): UI.main.open("comps")],
 		["calendar", "Fixtures & results", "Your season schedule", func(): UI.main.open("fixtures")],
 		["chart-bar", "Player stats", "Top scorers, assists and ratings", func(): UI.main.open("stats", {"lg": c.lg})],
 		["wallet", "Finances", "%s budget · %s/wk wages" % [G.money(c.budget), G.money(G.squad_wages(c))], func(): UI.main.open("finances")],
-		["landmark", "Board room", "%s · confidence %d%%" % [G.s.user.obj.text, int(G.s.user.conf)], func(): UI.main.open("board")],
+		["user", "Manager & board", "%s · confidence %d%%" % [G.s.user.obj.text, int(G.s.user.conf)], func(): UI.main.open("board")],
 		["mail", "Inbox", "%d unread" % G.unread(), func(): UI.main.open("inbox")],
 		["briefcase", "Job market", "Clubs interested in you", func(): UI.main.open("jobs")],
 	]

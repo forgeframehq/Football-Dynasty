@@ -22,7 +22,7 @@ func build():
 		c.add_child(cv)
 		head.add_child(c)
 	v.add_child(head)
-	var rows = [["Age", G.age(a), G.age(b), -1], ["Potential", a.pot, b.pot, 1], ["Value", G.value(a), G.value(b), 0], ["Wage / wk", a.wage, b.wage, 0],
+	var rows = [["Age", G.age(a), G.age(b), -1], ["Potential", G.OPS.pot_text(a), G.OPS.pot_text(b), 0], ["Value", G.value(a), G.value(b), 0], ["Wage / wk", a.wage, b.wage, 0],
 		["Apps", a.ss.ap, b.ss.ap, 1], ["Goals", a.ss.g, b.ss.g, 1], ["Assists", a.ss.a, b.ss.a, 1], ["Avg rating", G.avg_rating(a), G.avg_rating(b), 1]]
 	v.add_child(_table("Overview", rows, true))
 	var names = G.GK_STAT_NAMES if a.pos == "GK" and b.pos == "GK" else G.STAT_NAMES

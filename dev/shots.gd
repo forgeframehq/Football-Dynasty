@@ -22,6 +22,17 @@ func run(m):
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("only="):
 			only = a.substr(5)
+	if only == "campus":
+		G.new_game("Sudhi", 1)
+		for lv in [5, 3, 1]:
+			for k in G.OPS.FAC:
+				G.uc().fac[k] = lv
+			if lv == 3:
+				G.uc().build = {"key": "stadium", "done": G.s.day + 40, "cost": 0}
+			main.root("campus")
+			await snap("campus%d" % lv)
+		main.get_tree().quit()
+		return
 	await snap("menu")
 	main.open("new_career")
 	await snap("new_league")
@@ -122,10 +133,17 @@ func run(m):
 	main.tab("transfers")
 	await snap("deals")
 	G.ui.tr_tab = 0
-	for t in ["table", "fixtures", "stats", "finances", "board", "inbox", "jobs"]:
+	for t in ["table", "fixtures", "stats", "finances", "board", "inbox", "jobs", "training", "scouting", "comps", "campus"]:
 		main.open(t, {"lg": G.uc().lg})
 		await snap(t)
 		main.back()
+	main.open("comps", {"id": "ucl"})
+	await snap("comp_ucl")
+	main.back()
+	main.open("board")
+	main.stack[-1].sc.scroll_vertical = 600
+	await snap("board2")
+	main.back()
 	main.open("clubview", {"cid": 3})
 	await snap("clubview")
 	main.back()

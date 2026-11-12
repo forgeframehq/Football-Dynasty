@@ -207,7 +207,7 @@ static func row(p: Dictionary, c: Dictionary, view: int) -> Control:
 				h.add_child(UI.icon("trending-up", 24, UI.GREEN))
 			h.add_child(UI.ovr(p.ovr, 22))
 			h.add_child(UI.lbl("→", 22, UI.DIM))
-			h.add_child(UI.ovr(p.pot, 22))
+			h.add_child(UI.ovr(p.pot, 22) if G.OPS.knows(p) else UI.chip(G.OPS.pot_text(p), Color(1, 1, 1, 0.06), UI.MUTED, 20))
 	if view != 4:
 		h.add_child(UI.ovr(p.ovr))
 	r.add_child(h)

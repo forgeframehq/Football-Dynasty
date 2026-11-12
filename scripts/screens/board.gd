@@ -41,6 +41,7 @@ func build():
 	var nv = UI.vb(2)
 	nv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nv.add_child(UI.lbl_fill(u.name, 34, UI.TEXT, "disp"))
+	nv.add_child(UI.lbl_fill("%s · %s licence" % [u.nat, G.OPS.BADGES[u.badge]], 21, UI.MUTED))
 	nv.add_child(UI.stars(50.0 + u.rep * 0.4))
 	mh.add_child(nv)
 	mv.add_child(mh)
@@ -52,8 +53,43 @@ func build():
 	mv.add_child(t)
 	mv.add_child(UI.kv("Win rate", "%d%%" % int(100.0 * u.w / max(1, u.p))))
 	mv.add_child(UI.kv("Reputation", "%d / 100" % int(u.rep)))
+	mv.add_child(UI.kv("Playing career", G.OPS.BACKGROUNDS[u.bg]))
 	mc.add_child(mv)
 	v.add_child(mc)
+	v.add_child(UI.section("Coaching attributes", "%d point%s to spend" % [u.points, "" if u.points == 1 else "s"] if u.points > 0 else ""))
+	var atc = UI.card()
+	var atv = UI.vb(12)
+	for m in G.OPS.MATTR:
+		var r = UI.hb(12)
+		var tv = UI.vb(0)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl(m[1], 24, UI.TEXT, "semi"))
+		tv.add_child(UI.wrap(m[2], 18, UI.DIM))
+		r.add_child(tv)
+		r.add_child(UI.lbl(str(u.attr[m[0]]), 34, UI.ovr_color(50 + u.attr[m[0]] * 2), "xbold"))
+		if u.points > 0 and u.attr[m[0]] < 20:
+			var plus = UI.panel(UI.accent, 14, 12, 10)
+			plus.add_child(UI.icon("plus", 24, UI.on_color(UI.accent)))
+			var key = m[0]
+			UI.tap(plus, func():
+				u.attr[key] += 1
+				u.points -= 1
+				refresh(), true)
+			r.add_child(plus)
+		atv.add_child(r)
+	atc.add_child(atv)
+	v.add_child(atc)
+	if u.badge < 4:
+		if u.get("study", 0) > 0:
+			v.add_child(UI.kv("Studying for", "%s · %d days left" % [G.OPS.BADGES[u.badge + 1], max(1, u.study - s.day)], UI.accent))
+		else:
+			v.add_child(UI.btn("Study for %s licence" % G.OPS.BADGES[u.badge + 1], func():
+				u.study = s.day + 120 + u.badge * 30
+				UI.toast("Course booked — %d days" % (120 + u.badge * 30), UI.GREEN)
+				refresh(), "secondary", "graduation-cap", 72))
+			var note = UI.caps("Takes %d days · earns 3 attribute points and reputation" % (120 + u.badge * 30), 18, UI.DIM)
+			note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			v.add_child(note)
 	if u.trophies.size() > 0:
 		v.add_child(UI.section("Trophy cabinet"))
 		for tr in u.trophies:

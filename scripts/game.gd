@@ -6,6 +6,7 @@ const LG = preload("res://scripts/leagues.gd")
 const TR = preload("res://scripts/transfers.gd")
 const RL = preload("res://scripts/roles.gd")
 const CP = preload("res://scripts/comps.gd")
+const OPS = preload("res://scripts/club_ops.gd")
 
 const SAVE_V = 2
 const SAVE_PATH = "user://career.sav"
@@ -224,7 +225,12 @@ func unread() -> int:
 
 # ---------------------------------------------------------------- new game
 
-func new_game(mname: String, club_id: int):
+func new_game(profile, club_id: int):
+	if typeof(profile) == TYPE_STRING:
+		var nm = profile
+		profile = OPS.default_profile()
+		profile.name = nm
+	var mname = profile.name
 	var raw = DB.load_db()
 	rng.randomize()
 	lu_cache = {}
@@ -246,7 +252,12 @@ func new_game(mname: String, club_id: int):
 		init_club(c)
 	s.user = {"name": mname, "club": club_id, "rep": 0.0, "conf": 60.0, "obj": {}, "p": 0, "w": 0, "d": 0, "l": 0, "trophies": [], "sacked": false, "jobs": []}
 	var mc = uc()
-	s.user.rep = clamp(mc.rep - 25.0, 20.0, 70.0)
+	for k in ["nat", "badge", "bg", "attr"]:
+		s.user[k] = profile[k]
+	s.user["points"] = 0
+	s.user["study"] = 0
+	s.user.rep = 22.0 + profile.badge * 11.0 + profile.bg * 5.0
+	s.user.conf = clamp(60.0 - max(0.0, (mc.rep - 25.0) - s.user.rep) * 0.9, 30.0, 60.0)
 	s.user.obj = LG.objective(mc)
 	init_user_tactics(mc)
 	LG.generate_fixtures()
@@ -327,6 +338,7 @@ func ensure_state():
 		if cl.players.size() > 0 and not s.players[cl.players[0]].has("num"):
 			number_squad(cl)
 	var c = uc()
+	OPS.ensure(c)
 	if not c.has("slots") or c.slots.size() != 11:
 		if not FORMATIONS.has(c.formation):
 			c.formation = "4-3-3"
@@ -518,7 +530,7 @@ func pick_xi(c: Dictionary, slots: Array) -> Dictionary:
 	var avail = []
 	for pid in c.players:
 		var p = s.players[pid]
-		if p.inj <= 0 and p.susp <= 0:
+		if p.inj <= 0 and p.susp <= 0 and not p.get("youth", false):
 			avail.append(p)
 	var xi = []
 	xi.resize(11)
@@ -620,7 +632,7 @@ func fix_lineup() -> Array:
 		var bs = -1.0
 		for q in c.players:
 			var p = s.players[q]
-			if q in c.xi or not available(p):
+			if q in c.xi or not available(p) or p.get("youth", false):
 				continue
 			var sc = p.ovr * fit(p, slots[i][0])
 			if sc > bs:
@@ -635,7 +647,7 @@ func fix_lineup() -> Array:
 	if c.bench.size() < 7:
 		var rest = []
 		for q in c.players:
-			if not (q in c.xi) and not (q in c.bench) and available(s.players[q]):
+			if not (q in c.xi) and not (q in c.bench) and available(s.players[q]) and not s.players[q].get("youth", false):
 				rest.append(s.players[q])
 		rest.sort_custom(func(a, b): return a.ovr > b.ovr)
 		var has_gk = false
@@ -659,7 +671,7 @@ func lineup(cid: int, opp: int) -> Dictionary:
 		fix_lineup()
 		for i in 11:
 			c.roles[i] = RL.valid(c.roles[i], c.slots[i][0])
-		return {"club": cid, "xi": c.xi, "bench": c.bench, "formation": c.formation, "ment": c.ment, "press": c.press, "tempo": c.tempo, "user": true,
+		return {"club": cid, "xi": c.xi, "bench": c.bench, "formation": c.formation, "ment": c.ment, "press": c.press, "tempo": c.tempo, "user": true, "boost": 1.0 + (s.user.attr.tac - 10) * 0.0015,
 			"slots": c.slots, "rids": c.roles, "instr": c.instr, "pk": c.pk, "fk": c.fk, "ck": c.ck, "capt": c.capt}
 	var r = lu_cache.get(cid, null)
 	if r != null:
@@ -854,7 +866,7 @@ func apply_match(sim):
 					if c.id == ucid:
 						msg("%s suspended" % pname(p), "%s has picked up five yellow cards and is banned for the next match." % pfull(p))
 			if q.inj > 0:
-				p.inj = q.inj
+				p.inj = OPS.injury_days(q.inj) if c.id == ucid else q.inj
 				if c.id == ucid:
 					msg("Injury: %s" % pname(p), "%s picked up an injury and will be out for around %s." % [pfull(p), inj_text(q.inj)])
 		if o.goals == 0 and t.xi[0] >= 0:
@@ -863,6 +875,8 @@ func apply_match(sim):
 		s.players[sim.motm].ss.mom += 1
 	if f.get("comp", "") != "":
 		CP.on_result(f)
+	if f.h == ucid:
+		OPS.on_home_match(uc())
 	if involved:
 		var ui = 0 if f.h == ucid else 1
 		var t = sim.sd[ui]
@@ -918,7 +932,7 @@ func start_of_day():
 			continue
 		var p = s.players[pid]
 		if p.cond < 100:
-			p.cond = min(100, p.cond + 6)
+			p.cond = min(100, p.cond + (OPS.recover_rate(p) if p.club == s.user.club else 6))
 		if p.inj > 0:
 			p.inj -= 1
 		if p.cond >= 100 and p.inj <= 0:
@@ -938,6 +952,7 @@ func start_of_day():
 		msg("Transfer window open", "The January transfer window is open until the end of the month.", "info", null, true)
 	if cur.day == 15:
 		refresh_jobs()
+	OPS.daily()
 	if s.day == ymd(s.season + 1, 6, 12):
 		LG.rollover()
 		stop_flag = true
@@ -958,6 +973,8 @@ func develop_all():
 			elif a <= 23: pr = 0.3
 			elif a <= 26: pr = 0.15
 			pr *= 0.75 + min(0.5, p.ss.ap * 0.03)
+			if p.club == ucid:
+				pr *= OPS.growth_mult(p)
 			if rng.randf() < pr:
 				ch = 1
 		elif a >= 31:
@@ -970,6 +987,7 @@ func develop_all():
 					up.append("%s (%d)" % [pname(p), p.ovr])
 				else:
 					down.append("%s (%d)" % [pname(p), p.ovr])
+	OPS.monthly_training()
 	if up.size() + down.size() > 0:
 		var body = ""
 		if up.size() > 0:
@@ -1034,6 +1052,7 @@ func take_job(cid: int):
 	var c = uc()
 	u.obj = LG.objective(c)
 	init_user_tactics(c)
+	OPS.ensure(c)
 	msg("Welcome to %s" % c.name, "You have been appointed manager of %s.\n\nObjective: %s." % [c.name, u.obj.text], "board")
 	save_game()
 

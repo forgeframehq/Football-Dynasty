@@ -371,8 +371,21 @@ static func rollover():
 			var c = s.clubs[t[i]]
 			var tierf = 0.12 if lg.roe else [1.0, 0.22, 0.07, 0.03][s.leagues[c.lg].tier - 1]
 			var base = 900000.0 * pow(1.2, c.rep - 60.0)
-			c.budget = G.nice(max(0.0, c.budget) * 0.6 + base * 0.6 + 40000000.0 * tierf * (1.0 - float(i) / t.size()))
+			var prize = 40000000.0 * tierf * (1.0 - float(i) / t.size())
+			if c.id == ucl.id:
+				c.budget += G.nice(prize * 0.5)
+			else:
+				c.budget = G.nice(max(0.0, c.budget) * 0.6 + base * 0.6 + prize)
 	s.season += 1
+	G.OPS.return_loans()
+	var promoted_youth = []
+	for pid in ucl.players:
+		var yp0 = s.players[pid]
+		if yp0.get("youth", false) and G.age(yp0) >= 21:
+			yp0.erase("youth")
+			promoted_youth.append(G.pname(yp0))
+	if promoted_youth.size() > 0:
+		G.msg("Academy graduates", "These players are too old for the youth team and have joined the first-team squad: " + ", ".join(promoted_youth) + ".", "info")
 	# retirements and contracts
 	var retired = []
 	var left = []
@@ -398,13 +411,16 @@ static func rollover():
 	# youth intake, squad trimming, resets
 	for c in s.clubs:
 		var country = s.leagues[c.lg].country
-		for k in 2 + (1 if c.rep > 76 else 0):
+		var mine = c.id == ucl.id
+		var acad = c.fac.academy if mine and c.has("fac") else 3
+		for k in (2 + (1 if c.rep > 76 else 0) + (1 if mine and acad >= 4 else 0)):
 			var nat = country if rng.randf() < 0.75 else s.leagues[rng.randi() % s.leagues.size()].country
-			var o = clampi(int(c.rep) - 22 + rng.randi_range(-5, 6), 40, 70)
-			var pot = clampi(o + rng.randi_range(8, 22) + (rng.randi_range(0, 8) if rng.randf() < 0.15 else 0), o + 4, 94)
+			var o = clampi(int(c.rep) - 22 + rng.randi_range(-5, 6) + (acad - 3 if mine else 0), 40, 70)
+			var pot = clampi(o + rng.randi_range(8, 22) + (rng.randi_range(0, 8) if rng.randf() < 0.15 else 0) + (acad - 3) * 3, o + 4, 94)
 			var pos_opts = ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST", "ST"]
 			var yp = G.gen_player(c.id, pos_opts[rng.randi() % pos_opts.size()], rng.randi_range(16, 18), o, pot, nat)
 			if c.id == ucl.id:
+				yp["youth"] = true
 				G.msg("Youth intake: %s" % G.pname(yp), "%s (%s, %d) has been promoted from the academy. The coaches rate his potential at %d." % [G.pfull(yp), yp.pos, G.age(yp), yp.pot], "info")
 		if c.id != ucl.id and c.players.size() > 31:
 			var arr = []

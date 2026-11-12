@@ -1,8 +1,9 @@
 extends "res://scripts/screens/screen.gd"
 # New career flow: manager name, league, club.
 
-var step := 0
+var step := -1
 var mname := "Manager"
+var prof: Dictionary = {}
 var lg := -1
 var info: Array = []   # per club: {rep, budget, n}
 
@@ -29,23 +30,121 @@ func _load_info():
 
 
 func can_leave() -> bool:
-	if step == 1:
-		step = 0
+	if step >= 0:
+		step -= 1
 		refresh()
 		return false
 	return true
 
 
+func _left() -> int:
+	var used = 0
+	for k in prof.attr:
+		used += prof.attr[k] - 5
+	return G.OPS.points_for(prof.badge, prof.bg) - used
+
+
+func _profile():
+	body.add_child(UI.topbar("Your manager"))
+	var v = content(12)
+	v.add_child(UI.caps("Name", 21))
+	v.add_child(UI.input(mname, "Your name", func(t): mname = t))
+	var nr = UI.panel(UI.CARD2, 18, 18, 16, Color(1, 1, 1, 0.1))
+	var nh = UI.hb(8)
+	nh.add_child(UI.caps("Nationality", 20, UI.MUTED))
+	nh.add_child(UI.sp())
+	nh.add_child(UI.lbl(prof.nat, 28, UI.TEXT, "disp"))
+	nh.add_child(UI.icon("chevron-right", 22, UI.MUTED))
+	nr.add_child(nh)
+	UI.tap(nr, _pick_nat, true)
+	v.add_child(nr)
+	v.add_child(UI.section("Coaching badge", G.OPS.BADGES[prof.badge]))
+	v.add_child(UI.seg(["Nat C", "Nat B", "UEFA B", "UEFA A", "Pro"], prof.badge, func(i):
+		prof.badge = i
+		_clamp()
+		refresh(), 20))
+	v.add_child(UI.section("Playing career", G.OPS.BACKGROUNDS[prof.bg]))
+	v.add_child(UI.seg(["Sunday", "Semi-pro", "Pro", "Int'l"], prof.bg, func(i):
+		prof.bg = i
+		_clamp()
+		refresh(), 20))
+	v.add_child(UI.wrap("Higher badges and a bigger playing career mean more reputation and attribute points — and an easier start. Pick a low badge for a real challenge: boards at big clubs will have little patience.", 20, UI.MUTED))
+	var left = _left()
+	v.add_child(UI.section("Coaching attributes", "%d point%s left" % [left, "" if left == 1 else "s"]))
+	var ac = UI.card()
+	var av = UI.vb(12)
+	for m in G.OPS.MATTR:
+		var r = UI.hb(10)
+		var tv = UI.vb(0)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl(m[1], 24, UI.TEXT, "semi"))
+		tv.add_child(UI.wrap(m[2], 18, UI.DIM))
+		r.add_child(tv)
+		var key = m[0]
+		var minus = UI.panel(Color(1, 1, 1, 0.07), 14, 12, 10)
+		minus.add_child(UI.icon("minus", 24, UI.TEXT))
+		UI.tap(minus, func():
+			if prof.attr[key] > 5:
+				prof.attr[key] -= 1
+				refresh(), true)
+		r.add_child(minus)
+		var val = UI.lbl(str(prof.attr[key]), 34, UI.ovr_color(50 + prof.attr[key] * 2), "xbold")
+		val.custom_minimum_size = Vector2(48, 0)
+		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		r.add_child(val)
+		var plus = UI.panel(UI.GOLD if left > 0 else Color(1, 1, 1, 0.07), 14, 12, 10)
+		plus.add_child(UI.icon("plus", 24, Color("0a0e17") if left > 0 else UI.DIM))
+		UI.tap(plus, func():
+			if _left() > 0 and prof.attr[key] < 20:
+				prof.attr[key] += 1
+				refresh(), true)
+		r.add_child(plus)
+		av.add_child(r)
+	ac.add_child(av)
+	v.add_child(ac)
+	v.add_child(UI.btn("Choose a club", func():
+		step = 0
+		refresh(), "gold", "chevron-right"))
+
+
+func _clamp():
+	while _left() < 0:
+		for k in prof.attr:
+			if prof.attr[k] > 5 and _left() < 0:
+				prof.attr[k] -= 1
+
+
+func _pick_nat():
+	var build_sheet = func(v):
+		var nats = DB.names.keys()
+		nats.sort()
+		for n in nats:
+			var r = UI.panel(UI.CARD, 14, 18, 10, UI.GOLD if n == prof.nat else UI.LINE)
+			r.add_child(UI.lbl(n, 24, UI.TEXT, "semi"))
+			var nm = n
+			UI.tap(r, func():
+				prof.nat = nm
+				UI.close_sheet()
+				refresh())
+			v.add_child(r)
+	UI.sheet("Nationality", build_sheet)
+
+
 func build():
 	_load_info()
 	var raw = DB.raw
+	if prof.is_empty():
+		prof = G.OPS.default_profile()
+		prof.attr = {"tac": 5, "mot": 5, "you": 5, "neg": 5}
+		var pts = _left()
+		for i in pts:
+			prof.attr[["tac", "mot", "you", "neg"][i % 4]] += 1
+	if step < 0:
+		_profile()
+		return
 	if step == 0:
-		body.add_child(UI.topbar("New career"))
+		body.add_child(UI.topbar("Choose a league"))
 		var v = content(12)
-		v.add_child(UI.caps("Manager name", 22))
-		v.add_child(UI.input(mname, "Your name", func(t): mname = t))
-		v.add_child(UI.sp(0, 10))
-		v.add_child(UI.caps("Choose a league", 22))
 		var country = ""
 		for i in raw.leagues.size():
 			var l = raw.leagues[i]
@@ -135,5 +234,6 @@ func _confirm(ci: int):
 func _start(ci: int):
 	UI.close_sheet()
 	var nm = mname.strip_edges()
-	G.new_game(nm if nm != "" else "Manager", ci)
+	prof.name = nm if nm != "" else "Manager"
+	G.new_game(prof, ci)
 	UI.main.root("home")

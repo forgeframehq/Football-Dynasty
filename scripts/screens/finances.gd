@@ -27,6 +27,23 @@ func build():
 	wv.get_child(2).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	wc.add_child(wv)
 	v.add_child(wc)
+	var fin = c.fin
+	if fin.has("net"):
+		v.add_child(UI.section("Last week", "net %s" % G.money(fin.net)))
+		var fc = UI.card()
+		var fv = UI.vb(8)
+		fv.add_child(UI.kv("Sponsorship & commercial", "+" + G.money(fin.sponsor), UI.GREEN))
+		fv.add_child(UI.kv("Gate receipts", "+" + G.money(fin.tickets), UI.GREEN))
+		fv.add_child(UI.kv("Broadcasting", "+" + G.money(fin.tv), UI.GREEN))
+		fv.add_child(UI.kv("Player wages", "-" + G.money(fin.wages), UI.RED))
+		fv.add_child(UI.kv("Facility upkeep", "-" + G.money(fin.upkeep), UI.RED))
+		fv.add_child(UI.divider())
+		fv.add_child(UI.kv("Into the transfer budget", G.money(fin.net), UI.GREEN if fin.net >= 0 else UI.RED))
+		fc.add_child(fv)
+		v.add_child(fc)
+	else:
+		v.add_child(UI.wrap("Income and costs are settled every Monday and the difference goes into your transfer budget.", 21, UI.MUTED))
+	v.add_child(UI.btn("Club & facilities", func(): UI.main.open("campus"), "secondary", "landmark", 68))
 	var t = UI.hb(10)
 	t.add_child(UI.stat_tile("Spent", G.money(c.spent), UI.RED if c.spent > 0 else UI.TEXT))
 	t.add_child(UI.stat_tile("Received", G.money(c.earned), UI.GREEN if c.earned > 0 else UI.TEXT))

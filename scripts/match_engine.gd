@@ -59,7 +59,7 @@ func _side(lu: Dictionary, home: bool) -> Dictionary:
 		"rids": lu.rids.duplicate(), "slots": lu.slots.duplicate(true), "instr": lu.instr.duplicate(), "pk": lu.pk, "fk": lu.fk, "ck": lu.ck, "capt": lu.capt,
 		"ment": lu.ment, "press": lu.press, "tempo": lu.tempo, "att": 60.0, "mid": 60.0, "def": 60.0, "gk": 60.0, "goals": 0, "shots": 0, "sot": 0, "xg": 0.0,
 		"corners": 0, "fouls": 0, "yc": 0, "rc": 0, "poss": 0, "subs": 0, "scorers": [], "user": lu.user, "auto": not lu.user, "midp": 1.0, "ps": 0.25,
-		"w0": [], "w1": [], "t0": 0.0, "t1": 0.0, "shout": "", "shout_until": 0, "demand_used": false, "boost": 1.0, "drain": 1.0}
+		"w0": [], "w1": [], "t0": 0.0, "t1": 0.0, "shout": "", "shout_until": 0, "demand_used": false, "boost": lu.get("boost", 1.0), "drain": 1.0}
 	for sl in d.slots:
 		d.roles.append(sl[0])
 	for pid in d.xi:
@@ -68,7 +68,7 @@ func _side(lu: Dictionary, home: bool) -> Dictionary:
 	for pid in d.bench:
 		_pm(pid, false)
 	if d.capt >= 0 and d.capt in d.xi and pl[d.capt].at[13] >= 75:
-		d.boost = 1.008
+		d.boost *= 1.008
 	return d
 
 

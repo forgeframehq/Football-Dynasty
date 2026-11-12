@@ -26,6 +26,7 @@ static func asking_price(p: Dictionary) -> int:
 		m = 0.9
 	if p.cend - G.s.season <= 1:
 		m *= 0.85
+	m *= 1.0 - (G.s.user.attr.neg - 10) * 0.01
 	return G.nice(v * m)
 
 
@@ -82,7 +83,7 @@ static func wage_demand(p: Dictionary) -> int:
 	var base = float(G.wage_for(p.ovr, G.age(p)))
 	if p.club == uc.id:
 		return G.nice(max(base, p.wage * 1.08))
-	var m = 1.12
+	var m = 1.12 * (1.0 - (G.s.user.attr.neg - 10) * 0.008)
 	if p.club >= 0:
 		m += clamp((G.s.clubs[p.club].rep - uc.rep) * 0.02, 0.0, 0.3)
 		base = max(base, p.wage * 1.05)
@@ -170,7 +171,7 @@ static func daily():
 	var uc = G.uc()
 	for pid in uc.players:
 		var p = s.players[pid]
-		if not p.listed and p.ovr < uc.rep - 2:
+		if p.get("loan", -1) >= 0 or p.get("youth", false) or (not p.listed and p.ovr < uc.rep - 2):
 			continue
 		if rng.randf() < (0.2 if p.listed else 0.004) and not has_offer(pid):
 			make_offer(p)
@@ -248,7 +249,7 @@ static func ai_deal():
 		if seller.id == buyer.id or seller.id == s.user.club or seller.players.size() <= 21:
 			continue
 		var p = s.players[seller.players[rng.randi() % seller.players.size()]]
-		if p.ovr < buyer.rep - 1 or p.ovr > buyer.rep + 6 or G.age(p) > 30:
+		if p.ovr < buyer.rep - 1 or p.ovr > buyer.rep + 6 or G.age(p) > 30 or p.get("loan", -1) >= 0:
 			continue
 		if seller.rep > buyer.rep + 2 and not p.listed:
 			continue

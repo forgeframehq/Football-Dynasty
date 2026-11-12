@@ -53,7 +53,8 @@ func build():
 	hv.add_child(ch)
 	hh.add_child(hv)
 	var pv = UI.vb(-4)
-	var pl = UI.lbl(str(p.pot), 48, UI.ovr_color(p.pot), "xbold")
+	var known = G.OPS.knows(p) or p.get("loan", -1) == uc.id
+	var pl = UI.lbl(str(p.pot) if known else G.OPS.pot_text(p), 48 if known else 34, UI.ovr_color(p.pot) if known else UI.MUTED, "xbold")
 	pl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pv.add_child(pl)
 	var pc = UI.caps("Potential", 16, UI.MUTED)
@@ -138,13 +139,34 @@ func build():
 	v.add_child(g2)
 	# actions
 	v.add_child(UI.sp(0, 4))
-	if own:
-		v.add_child(UI.section("Squad status", "affects how he reacts to being left out"))
+	var loaned_in = own and p.get("loan", -1) >= 0
+	var loaned_out = (not own) and p.get("loan", -1) == uc.id
+	if loaned_in:
+		v.add_child(_note("clock", "On loan from %s until the end of the season." % s.clubs[p.loan].name, UI.BLUE))
+	if loaned_out:
+		v.add_child(_note("clock", "Your player — on loan at %s until the end of the season." % s.clubs[p.club].name, UI.BLUE))
+	if own and not loaned_in:
+		if p.get("youth", false):
+			v.add_child(UI.btn("Promote to first team", func():
+				p.erase("youth")
+				UI.toast("%s joins the first-team squad" % G.pname(p), UI.GREEN)
+				refresh(), "gold", "arrow-up"))
+		v.add_child(UI.section("Squad status", "how he reacts to being left out"))
 		v.add_child(UI.seg(["Key", "Rotation", "Backup", "Prospect"], G.status_of(p), func(i):
 			p["status"] = i
 			refresh(), 20))
+		var tf = p.get("tr", "")
+		var rt = p.get("rt", null)
+		var th = UI.hb(10)
+		var tb = UI.btn("Training: %s" % (tf if tf != "" else "general"), func(): _indiv(p), "secondary", "activity", 68)
+		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		th.add_child(tb)
+		var rb0 = UI.btn("Learning %s" % rt[0] if rt != null else "New position", func(): _retrain(p), "secondary", "repeat", 68)
+		rb0.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		th.add_child(rb0)
+		v.add_child(th)
 	v.add_child(UI.btn("Compare with…", func(): _compare(p), "secondary", "users", 68))
-	if own:
+	if own and not loaned_in:
 		v.add_child(UI.btn("Offer new contract", func(): UI.main.open("nego", {"pid": p.id, "mode": "renew"}), "primary", "handshake"))
 		var hb2 = UI.hb(10)
 		var lb = UI.btn("Unlist" if p.listed else "Transfer list", func():
@@ -153,19 +175,110 @@ func build():
 			refresh(), "secondary", "flag", 72)
 		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hb2.add_child(lb)
+		var lo = UI.btn("Loan out", func(): _loan_out(p), "secondary", "arrow-left-right", 72)
+		lo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hb2.add_child(lo)
 		var rb = UI.btn("Release", func(): _release(p), "danger", "log-out", 72)
 		rb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hb2.add_child(rb)
 		v.add_child(hb2)
 	elif free:
+		_scout_btn(v, p)
 		v.add_child(UI.btn("Offer contract", func(): UI.main.open("nego", {"pid": p.id, "mode": "free"}), "primary", "handshake"))
-	else:
+	elif not own and not loaned_out:
+		_scout_btn(v, p)
 		if G.window_open():
 			v.add_child(UI.btn("Make transfer offer", func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"}), "primary", "handshake"))
-			v.add_child(UI.caps("Asking price around %s" % G.money(G.TR.asking_price(p)), 19, UI.MUTED))
-			v.get_child(v.get_child_count() - 1).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			var ap = UI.caps("Asking price around %s" % G.money(G.TR.asking_price(p)), 19, UI.MUTED)
+			ap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			v.add_child(ap)
+			v.add_child(UI.btn("Ask for a season loan", func():
+				var r = G.OPS.can_loan_in(p)
+				if not r.ok:
+					UI.toast(r.why, UI.RED)
+					return
+				G.OPS.loan_in(p)
+				UI.toast("%s joins on loan" % G.pname(p), UI.GREEN)
+				refresh(), "secondary", "arrow-left-right", 68))
 		else:
 			v.add_child(_note("clock", "The transfer window is closed. You can approach %s when it reopens." % G.pname(p), UI.MUTED))
+
+
+func _scout_btn(v: Control, p: Dictionary):
+	if G.OPS.knows(p):
+		return
+	var watching = false
+	for q in G.s.scout.queue:
+		if q.pid == p.id:
+			watching = true
+			v.add_child(_note("search", "Your scouts are watching him — report in %d day%s." % [max(1, q.done - G.s.day), "" if q.done - G.s.day == 1 else "s"], UI.accent))
+	if not watching:
+		v.add_child(UI.btn("Scout player (%d days)" % G.OPS.scout_days(), func():
+			var err = G.OPS.scout_player(p)
+			if err != "":
+				UI.toast(err, UI.RED)
+			refresh(), "secondary", "search", 68))
+
+
+func _loan_out(p: Dictionary):
+	UI.confirm("Loan out %s?" % G.pname(p), "Your staff will find him a club where he should play regularly. He returns at the end of the season.", "Send on loan", func():
+		var err = G.OPS.loan_out(p)
+		if err != "":
+			UI.toast(err, UI.RED)
+		else:
+			UI.main.back())
+
+
+func _indiv(p: Dictionary):
+	var build_sheet = func(v):
+		v.add_child(UI.wrap("Extra work on one area each month. It does not raise his overall directly, but sharpens the attributes his role relies on.", 21, UI.MUTED))
+		for k in [""] + G.OPS.INDIV.keys():
+			var on = p.get("tr", "") == k
+			var r = UI.panel(Color(UI.accent, 0.14) if on else UI.CARD, 16, 18, 12, UI.accent if on else UI.LINE)
+			var h = UI.hb(10)
+			h.add_child(UI.lbl(k if k != "" else "General training", 26, UI.TEXT, "disp"))
+			h.add_child(UI.sp())
+			if k != "":
+				var names = []
+				for a in G.OPS.INDIV[k]:
+					names.append(G.RL.ATTR[a])
+				h.add_child(UI.caps(", ".join(names), 16, UI.DIM))
+			r.add_child(h)
+			var key = k
+			UI.tap(r, func():
+				if key == "":
+					p.erase("tr")
+				else:
+					p["tr"] = key
+				UI.close_sheet()
+				refresh())
+			v.add_child(r)
+	UI.sheet("Individual training", build_sheet)
+
+
+func _retrain(p: Dictionary):
+	if p.pos == "GK":
+		UI.toast("Goalkeepers cannot retrain", UI.RED)
+		return
+	var build_sheet = func(v):
+		v.add_child(UI.wrap("He will learn the position over about three months and can then play there without a penalty.", 21, UI.MUTED))
+		for pos in ["CB", "LB", "RB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST"]:
+			if pos == p.pos or pos in p.alt:
+				continue
+			var r = UI.panel(UI.CARD, 16, 18, 10, UI.LINE)
+			var h = UI.hb(12)
+			h.add_child(UI.pos(pos))
+			h.add_child(UI.lbl_fill("Current fit %d%%" % int(G.fit(p, pos) * 100), 23, UI.MUTED))
+			h.add_child(UI.caps("Best as %s" % G.RL.ROLES[G.RL.best(p, pos)].n, 17, UI.DIM))
+			r.add_child(h)
+			var np = pos
+			UI.tap(r, func():
+				G.OPS.start_retrain(p, np)
+				UI.close_sheet()
+				UI.toast("%s starts learning %s" % [G.pname(p), np], UI.GREEN)
+				refresh())
+			v.add_child(r)
+	UI.sheet("Retrain position", build_sheet)
 
 
 func _compare(p: Dictionary):
