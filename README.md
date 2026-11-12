@@ -1,6 +1,8 @@
 # Football Dynasty
 
-A portrait football career-manager for Android, built with Godot 4.7 (GDScript, GL Compatibility renderer).
+A landscape football career-manager for Android, built with Godot 4.7 (GDScript, GL Compatibility renderer).
+
+v0.3 is the landscape rebuild: icon rail with slide-out menus, a persistent Continue button, a six-panel home dashboard, two-pane news, a sortable squad table, tabbed tactics with drag-and-drop, a new start sequence and an isometric club city. The agreed feature list and what has shipped is in [ROADMAP.md](ROADMAP.md).
 Personal project — real league, club and player names are used, so it is **not for distribution**.
 
 ## Install on your phone
@@ -66,6 +68,6 @@ Open the folder in Godot 4.7+. Useful commands:
 
 ```
 godot --headless --path . -- --selftest 3      # simulate 3 full seasons, print calibration numbers
-godot --path . --resolution 720x1560 -- --shots # walk every screen and save screenshots to /tmp/shots
+godot --path . --resolution 1600x720 -- --shots # walk every screen and save screenshots to /tmp/shots
 python3 tools/build_db.py players.csv           # rebuild data/db.json from an EA FC ratings CSV export
 ```

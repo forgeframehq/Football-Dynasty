@@ -9,22 +9,25 @@ Agreed feature list for the landscape rebuild (v0.3 onward). Items are ticked wh
 - Ship in stages, with an APK after each stage.
 
 ## Stage 1: landscape shell
-- [ ] Landscape layout for every screen
-- [ ] Icon rail: Inbox, Home, Club, Manager, World, Search, Options
-- [ ] Slide-out menus with live info on each row
-- [ ] Continue button that says why it stopped; long-press runs to the next match
-- [ ] Home dashboard with six panels and a To-Do list
-- [ ] Inbox and news as two panes with a subject card, tags and action buttons
-- [ ] Squad as a sortable table
-- [ ] Match screen with a wide pitch and side panels
-- [ ] Start sequence: title screen, mode, Nation > League > Club picker with club panel and Random Team, game world, manager profile, board meeting, breaking-news scene
-- [ ] Tactics: pitch plus squad list, drag between them, tabs for Formation, Shape, Defence, Attack, Set Pieces, Captain, role badges and movement arrows, pitch that redraws for each instruction, one-tap styles
-- [ ] Isometric club city from generated images (pan, zoom, tap to upgrade, building sites, growth with stadium level)
-- [ ] ElevenLabs sounds: UI, stings, match, crowd loop
+- [x] Landscape layout for every screen
+- [x] Icon rail: Inbox, Home, Club, Manager, World, Search, Options
+- [x] Slide-out menus with live info on each row
+- [x] Continue button that says why it stopped; long-press runs to the next match
+- [x] Home dashboard with six panels and a To-Do list
+- [x] Inbox and news as two panes with a subject card, tags and action buttons
+- [x] Squad as a sortable table
+- [x] Match screen with a wide pitch and side panels
+- [x] Start sequence: title screen, Nation > League > Club picker with club panel and Random Team, manager profile, board meeting, breaking-news scene
+- [ ] Start sequence extras: mode select, game-world detail setting, first three fixtures in the club panel
+- [x] Tactics: pitch plus squad list, drag between them, tabs for Formation, Shape, Defence, Attack, Set Pieces, Captain, role badges and movement arrows, pitch that redraws for each instruction, one-tap styles
+- [x] Isometric club city from generated images (pan, zoom, tap to upgrade, growth with stadium level)
+- [ ] City extras: building sites with a crane, match-day crowds and car parks, night lighting
+- [x] ElevenLabs sounds: UI, stings, match, crowd loop
 
 ## Stage 2: menu contents
 Club
-- [ ] Medical Centre, Contracts, Loan Watch, Team Report and Squad Gaps
+- [x] Medical Centre, Contracts, Loan Watch
+- [ ] Team Report and Squad Gaps
 - [ ] Dressing Room (hierarchy, morale, friendships, promises)
 - [ ] Fans (confidence, attendance trend, favourites, expectations)
 - [ ] Sponsors (shirt and stadium deals with targets)
@@ -41,10 +44,10 @@ Manager
 World
 - [ ] Transfer Centre (rumours, done deals, records, deadline-day ticker)
 - [ ] Awards (team of the week and season, golden boot, world player of the year)
-- [ ] Top 50 and Wonderkids, Manager Watch, Live Scores, League Standards
+- [x] Top 50 and Wonderkids, Manager Watch, Live Scores, League Standards
 
 Search
-- [ ] Smart Lists (bargains, expiring, free agents, loan-listed, release clauses in budget)
+- [x] Smart Lists (bargains, expiring, free agents, loan-listed, release clauses in budget)
 - [ ] Find Similar, Role Finder, Shortlist Alerts, saved filters, Staff Search, Find Club
 
 Options

@@ -174,6 +174,10 @@ func build():
 		var path = "res://assets/iso/%s.png" % it.file
 		if ResourceLoader.exists(path):
 			var k = span * 2.0 * A / 600.0
+			if it.k == "":
+				# town buildings sit a little smaller than club facilities
+				k *= 0.84
+				anchor = ground.iso(it.u * P + 0.5, it.v * P + 0.5) + Vector2(0, B * 0.84)
 			var t = TextureRect.new()
 			t.texture = load(path)
 			t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

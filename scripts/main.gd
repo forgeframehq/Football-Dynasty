@@ -226,7 +226,7 @@ func back():
 				G.save_game()
 				G.active = false
 				root("menu"))
-		elif G.active and stack[-1].chrome:
+		elif G.active:
 			root("home")
 		return
 	var top = stack.pop_back()

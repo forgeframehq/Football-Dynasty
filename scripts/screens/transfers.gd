@@ -32,7 +32,7 @@ func build():
 		3: _deals(v)
 
 
-func _search(v: VBoxContainer):
+func _search(v: Control):
 	var s = G.s
 	var st = G.ui
 	var c = G.uc()
@@ -95,7 +95,7 @@ func _prow(p: Dictionary) -> Control:
 	return UI.player_row(p, func(): UI.main.open("player", {"pid": pid}), "%d yrs · %s · %s" % [G.age(p), club, G.money(G.value(p))])
 
 
-func _shortlist(v: VBoxContainer):
+func _shortlist(v: Control):
 	var s = G.s
 	if s.shortlist.size() == 0:
 		v.add_child(UI.wrap("Your shortlist is empty. Tap the star on any player's profile to keep track of him here.", 23, UI.MUTED))
@@ -107,7 +107,7 @@ func _shortlist(v: VBoxContainer):
 			s.shortlist.erase(pid)
 
 
-func _offers(v: VBoxContainer):
+func _offers(v: Control):
 	var s = G.s
 	if s.offers.size() == 0:
 		v.add_child(UI.wrap("No offers on the table. Transfer-list a player from his profile to attract bids while the window is open.", 23, UI.MUTED))
@@ -150,7 +150,7 @@ func _offers(v: VBoxContainer):
 		v.add_child(card)
 
 
-func _deals(v: VBoxContainer):
+func _deals(v: Control):
 	var s = G.s
 	if s.tx_log.size() == 0:
 		v.add_child(UI.wrap("No transfers completed yet this season.", 23, UI.MUTED))
