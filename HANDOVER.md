@@ -1,7 +1,7 @@
-# Football Dynasty — Handover (12 Nov 2026)
+# Football Dynasty — Handover (12 Nov 2026, after v0.6.1)
 
 ## Where things stand
-- v0.6.0, commit `a320804` on `main`, APK published on release tag `latest` (87.4 MB).
+- v0.6.1 on `main` (dense pass for the main screens plus two phone fixes); the APK is published on release tag `latest`.
 - Personal football manager for Android (not for publishing): FIFA/PES career feel with Football Manager Mobile depth.
 - Godot 4.7.2, GDScript, GL Compatibility, all UI built in code. Landscape, base viewport 1100×620, immersive and edge-to-edge.
 - Repo `forgeframehq/Football-Dynasty` (public). Real player, club and league names (17,849 players, 49 leagues).
@@ -17,10 +17,11 @@ Standing rules:
 - Parse errors: `godot --headless --path . --import`, search output for "error".
 - Simulate: `godot --headless --path . -- --selftest N [club=ID]`.
 - Screenshots: run under xvfb at 1380×620 with `-- --shots only=key1,key2` (script `dev/shots.gd`). Keys: menu, new, intro, home, inbox, squad, tactics, training, fixtures, finances, board, jobs, table, comps, stats, transfers, scouting, club, menus, lists, hub, social, player, deal, life, tactics2, city, trophies, match.
-- Helper scripts lived in `/tmp` and are gone: recreate an xvfb wrapper and a Pillow script that tiles PNGs into a sheet.
+- Helpers are in the repo: `GODOT=/path/to/godot dev/shots.sh key1,key2 [days=N] [notch=PX]` prints script errors and saves PNGs; `python3 dev/sheet.py out.png` tiles them. Extra keys: `dense` (round view, club view), `exit` (confirm pop-up). `days=N` plays N Continue presses first (about 75 is a whole season); `notch=PX` fakes a camera cut-out on the left.
+- Godot is not preinstalled: download `Godot_v4.7.2-stable_linux.x86_64.zip` from the godotengine/godot GitHub releases.
 - Build check: `gh run list -R forgeframehq/Football-Dynasty --limit 1`; APK: `gh api repos/forgeframehq/Football-Dynasty/releases/tags/latest -q '.assets[]'`.
 - Commits: author `Claude <noreply@anthropic.com>`; end messages with the Co-Authored-By and Claude-Session lines the session supplies.
-- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.6.0, code 6).
+- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.6.1, code 7).
 
 ## Code map
 - Autoloads: `DB` (data), `UI` (`scripts/ui.gd`), `G` (`scripts/game.gd`). Save is `G.s`, binary, integer keys survive.
@@ -31,8 +32,9 @@ Standing rules:
 - New or rebuilt screens: `deal.gd` (registered as `nego`; modes buy, free, renew, sell), `life.gd`, `search.gd`, `player.gd` (six pages), `table.gd`, `stats.gd`, `comps.gd`, `scouting.gd`, `transfers.gd`, `jobs.gd`. `hub.gd` and `lists.gd` hold many small pages chosen by `args.kind`.
 
 ## What is left (suggested order)
-1. Finish the dense pass: training, finances, fixtures, club view, board, home, and the `hub.gd` / `lists.gd` pages.
-2. Get phone feedback on v0.6.0: table text size (18–19), full screen, cut-out spacing.
+1. Finish the dense pass: only the small pages in `hub.gd` and `lists.gd` are left (training, finances, fixtures, club view, board and home were done in v0.6.1).
+2. Get phone feedback on v0.6.1: table text size (18–19), the rail beside the camera cut-out, the confirm pop-ups.
+2b. Tactics depth, proposed to Sudhi on 12 Nov and waiting for his answer (do not build before he agrees): eFootball-style team playstyles with manager proficiency, more Defence and Attack instructions, player skills, and link-up pairs between specific players.
 3. World system: continent > nation > competition > club picker; up to five playable nations (club's nation locked); background real nations with estimated results; placeholder nations generated on first open; generated players scoutable and buyable but with capped, uncertain potential and fair prices (no wonderkid loophole). Needs nation/continent table and an open-source flag set.
 4. Transfer extras: deadline-day live event, loans through the talks screen, swaps, shortlist alerts.
 5. Match depth: two-legged ties, extra time, shoot-outs, opposition instructions, tactical familiarity, partnerships.
@@ -53,6 +55,10 @@ Standing rules:
 - Dataset source: `github.com/bca2519-afk/easpprts_application` (`players.csv`).
 
 ## Pitfalls
+- Inside a lambda in `ui.gd`, a bare `wrap(...)` calls Godot's built-in maths `wrap()`, not the label helper. Write `self.wrap(...)`. This is what broke every `UI.confirm` pop-up up to v0.6.0.
+- `G.advance()` runs to the next stop (match day, important message), not one day.
+- Left cut-out: `main.gd` keeps `notch_l`; with the rail showing, the safe margin is 0 and the rail is `rail_w()` wide with its icons pushed right of the cut-out. Screens without the rail still get the full left margin.
+- `G.OPS.week_money(c)` is the single source for weekly club income and costs; `weekly()` and the Finances screen both use it.
 - The ElevenLabs API key was pasted in chat; it should be regenerated and must never go in the repo.
 - `godot --check-only -s file` falsely reports "Identifier not found: G". Use `--import`, shots and selftest.
 - `c.build` is `null` when idle. Zero-size custom-draw controls get culled. Literal `%` in format strings is `%%`.

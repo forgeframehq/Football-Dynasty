@@ -2,7 +2,7 @@
 
 A landscape football career-manager for Android, built with Godot 4.7 (GDScript, GL Compatibility renderer).
 
-v0.3 is the landscape rebuild: icon rail with slide-out menus, a persistent Continue button, a six-panel home dashboard, two-pane news, a sortable squad table, tabbed tactics with drag-and-drop, a new start sequence and an isometric club city. The agreed feature list and what has shipped is in [ROADMAP.md](ROADMAP.md).
+Landscape throughout: icon rail with slide-out menus, a persistent Continue button, dense table-based screens, tabbed tactics with drag-and-drop, transfers as a negotiation, a manager lifestyle and an isometric club city. The agreed feature list and what has shipped is in [ROADMAP.md](ROADMAP.md); [HANDOVER.md](HANDOVER.md) has the working notes.
 Personal project — real league, club and player names are used, so it is **not for distribution**.
 
 ## Install on your phone
@@ -32,7 +32,7 @@ Builds are signed with the debug key in `tools/debug.keystore`, so new builds in
   AI transfers, free agents, deadline day.
 - **Scouting** – other clubs' players show a potential range until scouted; standing scouting assignments.
 - **Training** – team focus and intensity, individual programmes, position retraining.
-- **Club** – 3D campus with stadium and five facilities (levels 1–5) that change as you upgrade them;
+- **Club** – isometric club city with stadium and five facilities (levels 1–5) that change as you upgrade them;
   weekly finances from sponsorship, gates, TV, wages and upkeep.
 - **Career** – board objective and confidence, sacking and job offers, player growth and decline over 18 attributes,
   morale and unhappy players, injuries, youth intake, season awards, trophy room.

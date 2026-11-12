@@ -289,14 +289,28 @@ static func salary() -> int:
 	return G.nice(c.wage_budget * 0.012 * (0.5 + u.rep / 100.0))
 
 
-static func weekly():
+static func week_money(c: Dictionary) -> Dictionary:
+	# the club's income and costs for the week so far (settled every Monday by weekly())
 	var s = G.s
-	var c = G.uc()
 	var tier = s.leagues[c.lg].tier
 	var wages = G.squad_wages(c)
 	var sponsor = int(c.wage_budget * (0.86 + 0.03 * c.fac.commercial))
 	if s.user.get("sponsor") != null:
 		sponsor += int(s.user.sponsor.weekly)
+	var tv = int(c.wage_budget * 0.05)
+	var price = [46, 30, 20, 15][clampi(tier - 1, 0, 3)]
+	var fill = clamp(0.55 + (c.rep - 55.0) * 0.012 + (0.1 if c.form.count("W") >= 3 else 0.0), 0.35, 0.98)
+	var tickets = int(c.fin.home * capacity(c) * fill * price)
+	var levels = 0
+	for k in FAC:
+		levels += c.fac[k]
+	var upkeep = int(c.wage_budget * 0.011 * levels)
+	return {"tickets": tickets, "sponsor": sponsor, "tv": tv, "wages": wages, "upkeep": upkeep, "home": c.fin.home, "net": sponsor + tv + tickets - wages - upkeep}
+
+
+static func weekly():
+	var s = G.s
+	var c = G.uc()
 	# the manager's own money and life
 	var lf = life()
 	lf.cash += salary() + int(lf.income)
@@ -312,17 +326,11 @@ static func weekly():
 	lf.settled = min(100.0, float(lf.settled) + 1.5 + lf.home * 0.8)
 	invest_week(lf)
 	G.SOC.weekly()
-	var tv = int(c.wage_budget * 0.05)
-	var price = [46, 30, 20, 15][clampi(tier - 1, 0, 3)]
-	var fill = clamp(0.55 + (c.rep - 55.0) * 0.012 + (0.1 if c.form.count("W") >= 3 else 0.0), 0.35, 0.98)
-	var tickets = int(c.fin.home * capacity(c) * fill * price)
-	var levels = 0
-	for k in FAC:
-		levels += c.fac[k]
-	var upkeep = int(c.wage_budget * 0.011 * levels)
-	var net = sponsor + tv + tickets - wages - upkeep
+	var wm = week_money(c)
+	var net = wm.net
 	c.budget += net
-	c.fin = {"tickets": tickets, "sponsor": sponsor, "tv": tv, "wages": wages, "upkeep": upkeep, "home": 0, "net": net}
+	wm.home = 0
+	c.fin = wm
 	c.bank_log.push_front(net)
 	if c.bank_log.size() > 12:
 		c.bank_log.resize(12)

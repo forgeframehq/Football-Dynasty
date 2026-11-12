@@ -1,6 +1,6 @@
 extends RefCounted
 # Dev tool: opens screens and saves screenshots to /tmp/shots.
-#   xvfb-run -a -s "-screen 0 1600x720x24" godot --path . --audio-driver Dummy --rendering-driver opengl3 --resolution 1600x720 -- --shots [only=a,b] [club=ID]
+#   xvfb-run -a -s "-screen 0 1600x720x24" godot --path . --audio-driver Dummy --rendering-driver opengl3 --resolution 1600x720 -- --shots [only=a,b] [club=ID] [days=N] [notch=PX]
 
 var main
 var n := 0
@@ -20,11 +20,14 @@ func run(m):
 	main = m
 	var only: Array = []
 	var club = 1
+	var days = 0
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("only="):
 			only = Array(a.substr(5).split(","))
 		if a.begins_with("club="):
 			club = int(a.substr(5))
+		if a.begins_with("days="):
+			days = int(a.substr(5))
 	var want = func(k): return only.is_empty() or k in only
 	if want.call("menu"):
 		await snap("menu")
@@ -45,6 +48,15 @@ func run(m):
 		await snap("intro_board")
 	for i in 3:
 		G.advance()
+	for i in days:
+		# play on so screens have results, finances and news to show
+		var fx0 = G.user_fixture_today()
+		if fx0 != null:
+			var sim0 = G.new_sim(fx0, false)
+			while sim0.phase < 4:
+				sim0.step()
+			G.apply_match(sim0)
+		G.advance()
 	var c = G.uc()
 	var simple = ["home", "inbox", "squad", "tactics", "training", "fixtures", "finances", "campus", "board", "trophies", "jobs", "table", "comps", "stats", "transfers", "scouting", "club"]
 	if want.call("trophies"):
@@ -53,6 +65,18 @@ func run(m):
 		if want.call(k):
 			main.root(k, {"lg": c.lg} if k in ["table", "stats"] else {})
 			await snap(k)
+	if want.call("dense"):
+		main.root("fixtures")
+		main.stack[-1].mode = 1
+		main.stack[-1].refresh()
+		await snap("fixtures_round")
+		main.root("clubview", {"cid": 2})
+		await snap("clubview")
+	if want.call("exit"):
+		main.root("home")
+		main.back()
+		await snap("exit", 0.6)
+		main.close_sheet()
 	if want.call("menus"):
 		main.root("home")
 		for k in ["club", "manager", "world", "search", "options"]:

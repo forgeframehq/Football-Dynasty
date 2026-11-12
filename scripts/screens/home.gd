@@ -224,7 +224,7 @@ func _fixtures(c: Dictionary) -> Control:
 		if not all[i].played:
 			idx = i
 			break
-	for i in range(max(0, idx - 2), min(all.size(), idx + 4)):
+	for i in range(max(0, idx - 2), min(all.size(), idx + 5)):
 		var f = all[i]
 		var home = f.h == c.id
 		var oc = s.clubs[f.a if home else f.h]
@@ -251,49 +251,89 @@ func _fixtures(c: Dictionary) -> Control:
 	return k[0]
 
 
+func _kv2(v: Control, a: Array, b: Array):
+	# two label-value pairs on one line
+	var h = UI.hb(14)
+	for x in [a, b]:
+		var k = UI.kv(x[0], x[1], x[2] if x.size() > 2 else UI.TEXT, 17)
+		k.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(k)
+	v.add_child(h)
+
+
 func _club(c: Dictionary) -> Control:
 	var s = G.s
 	var k = _card("Club", "", func(): UI.main.root("board"))
 	var v = k[1]
-	v.add_theme_constant_override("separation", 6)
+	v.add_theme_constant_override("separation", 3)
 	var inj = 0
+	var sus = 0
+	var mor = 0.0
+	var cond = 0.0
+	var unhappy = 0
 	for pid in c.players:
-		if s.players[pid].inj > 0:
-			inj += 1
+		var p = s.players[pid]
+		inj += 1 if p.inj > 0 else 0
+		sus += 1 if p.susp > 0 else 0
+		unhappy += 1 if p.get("unhappy", 0) > 0 else 0
+		mor += p.mor
+		cond += p.cond
+	var n = max(1, c.players.size())
+	var fans = float(s.user.get("fans", 55.0))
 	var oh = UI.hb(8)
-	oh.add_child(UI.icon("target", 22, UI.accent))
-	oh.add_child(UI.lbl_fill(s.user.obj.text, 22, UI.TEXT, "semi"))
+	oh.add_child(UI.icon("target", 20, UI.accent))
+	oh.add_child(UI.lbl_fill(s.user.obj.text, 20, UI.TEXT, "semi"))
 	v.add_child(oh)
-	var ch = UI.hb(10)
-	ch.add_child(UI.lbl("Board confidence", 19, UI.MUTED))
-	ch.add_child(UI.bar(s.user.conf / 100.0, UI.cond_color(s.user.conf + 20), 8))
-	ch.add_child(UI.lbl("%d%%" % int(s.user.conf), 20, UI.cond_color(s.user.conf + 20), "disp"))
+	var ch = UI.hb(8)
+	ch.add_child(UI.lbl("Board", 17, UI.MUTED))
+	ch.add_child(UI.bar(s.user.conf / 100.0, UI.cond_color(s.user.conf + 20), 7))
+	ch.add_child(UI.lbl("%d%%" % int(s.user.conf), 18, UI.cond_color(s.user.conf + 20), "disp"))
+	ch.add_child(UI.lbl("Fans", 17, UI.MUTED))
+	ch.add_child(UI.bar(fans / 100.0, UI.cond_color(fans + 20), 7))
+	ch.add_child(UI.lbl("%d%%" % int(fans), 18, UI.cond_color(fans + 20), "disp"))
 	v.add_child(ch)
 	v.add_child(UI.divider())
-	v.add_child(UI.kv("Transfer budget", G.money(c.budget), UI.GREEN))
-	v.add_child(UI.kv("Wage room", "%s / wk" % G.money(max(0, c.wage_budget - G.squad_wages(c)))))
-	v.add_child(UI.kv("Injured", str(inj), UI.RED if inj > 0 else UI.TEXT))
+	var net = c.fin.get("net", null)
+	_kv2(v, ["Budget", G.money(c.budget), UI.GREEN], ["Wage room", G.money(max(0, c.wage_budget - G.squad_wages(c)))])
+	_kv2(v, ["Last week", G.money(net) if net != null else "-", (UI.GREEN if net >= 0 else UI.RED) if net != null else UI.DIM], ["Squad", "%d players" % c.players.size()])
+	_kv2(v, ["Morale", "%d%%" % int(mor / n), UI.cond_color(mor / n + 15)], ["Condition", "%d%%" % int(cond / n), UI.cond_color(cond / n)])
+	_kv2(v, ["Injured", str(inj), UI.RED if inj > 0 else UI.TEXT], ["Suspended", str(sus), UI.RED if sus > 0 else UI.TEXT])
 	var b = c.get("build")
 	if b != null and not b.is_empty():
-		v.add_child(UI.kv("Building", "%s · %d days" % [str(b.key).capitalize(), max(1, b.done - s.day)], UI.AMBER))
+		v.add_child(UI.kv("Building", "%s · %d days" % [str(b.key).capitalize(), max(1, b.done - s.day)], UI.AMBER, 17))
+	elif unhappy > 0:
+		v.add_child(UI.kv("Unhappy players", str(unhappy), UI.RED, 17))
 	return k[0]
 
 
 func _news() -> Control:
 	var s = G.s
-	var k = _card("Around the leagues")
+	var k = _card("Around the leagues", "", func(): UI.main.root("inbox"))
 	var v = k[1]
-	v.add_theme_constant_override("separation", 7)
-	if s.news.is_empty():
-		v.add_child(UI.wrap("No news yet. The season starts in August.", 21, UI.MUTED))
-	for i in min(5, s.news.size()):
+	v.add_theme_constant_override("separation", 4)
+	var shown = min(4, s.news.size())
+	for i in shown:
 		var item = s.news[i]
 		var r = UI.hb(10)
-		var d = UI.caps(G.fmt_date(item.day).substr(4), 16, UI.DIM)
-		d.custom_minimum_size = Vector2(60, 0)
+		var d = UI.caps(G.fmt_date(item.day).substr(4), 15, UI.DIM)
+		d.custom_minimum_size = Vector2(56, 0)
 		r.add_child(d)
-		var t = UI.wrap(item.text, 19, UI.MUTED)
-		t.max_lines_visible = 2
+		var t = UI.wrap(item.text, 17, UI.MUTED)
+		t.max_lines_visible = 2 if shown <= 2 else 1
+		t.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		r.add_child(t)
 		v.add_child(r)
+	# quiet days: fill the rest of the panel with the newest messages
+	var room = 5 - shown * (2 if shown <= 2 else 1)
+	if room > 0 and not s.inbox.is_empty():
+		if shown > 0:
+			v.add_child(UI.divider())
+		for i in min(room, s.inbox.size()):
+			var m = s.inbox[i]
+			var r = UI.hb(10)
+			r.add_child(UI.icon("mail", 16, UI.DIM if m.read else UI.accent))
+			r.add_child(UI.lbl_fill(m.title, 17, UI.MUTED if m.read else UI.TEXT, "body" if m.read else "semi"))
+			v.add_child(r)
+	elif shown == 0:
+		v.add_child(UI.wrap("No news yet. The season starts in August.", 18, UI.MUTED))
 	return k[0]

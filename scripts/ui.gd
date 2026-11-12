@@ -458,11 +458,11 @@ func stat_tile(label: String, value: String, color := TEXT) -> PanelContainer:
 	return p
 
 
-func kv(k: String, v: String, vc := TEXT) -> HBoxContainer:
+func kv(k: String, v: String, vc := TEXT, size := 23) -> HBoxContainer:
 	var h = hb(8)
-	h.add_child(lbl(k, 23, MUTED))
+	h.add_child(lbl(k, size, MUTED))
 	h.add_child(sp())
-	h.add_child(lbl(v, 23, vc, "semi"))
+	h.add_child(lbl(v, size, vc, "semi"))
 	return h
 
 
@@ -587,7 +587,7 @@ func confirm(title: String, text: String, yes: String, cb: Callable, danger := f
 		close_sheet()
 		cb.call()
 	var build = func(v):
-		v.add_child(wrap(text, 24, MUTED))
+		v.add_child(self.wrap(text, 24, MUTED))   # bare wrap() inside a lambda resolves to the built-in maths function
 		v.add_child(sp(0, 8))
 		v.add_child(btn(yes, on_yes, "danger" if danger else "primary"))
 		v.add_child(btn("Cancel", close_sheet, "ghost", "", 68))

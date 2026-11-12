@@ -110,7 +110,12 @@ Options
 - [x] Player profile as six swipeable pages: profile with position map and all attributes, personal, positions and roles, contract, stats, manage
 - [x] Player Search as a dense sortable table with three views, filters and paging
 - [x] Dense rework: league table, player stats (four boards), cups (list + detail), scouting (reports on file), transfer market desk, job market
-- [ ] Dense rework still to do: training, finances, fixtures, club view, board, hub pages
+- [x] Dense rework: training (squad table with programme picker), finances (weekly ledger, 12-week balance, full wage bill), fixtures (season table with match panel, round view beside the league table), club view (profile, ratings, record, squad table), board room (objective, manager, career history), home (fuller Club and news panels)
+- [ ] Dense rework still to do: the small pages in `hub.gd` and `lists.gd`
 - [x] Lifestyle screen: overview, estate agent, car showroom with named cars and garage, businesses, weekly money in and out, net worth, holidays
 - [x] Player personal details: personality, favoured club, languages, caps, career totals, season-by-season table
 - [ ] Lifestyle later: family, legacy items (statue, stand), property abroad
+
+## Fixes (v0.6.1, from phone feedback 12 Nov)
+- [x] "Leave the game?" and every other confirm pop-up showed no buttons (bare `wrap()` in a lambda called the built-in maths function)
+- [x] Camera cut-out: the rail background now runs to the screen edge and the icon column is narrower, so the strip beside the notch is no longer dead space

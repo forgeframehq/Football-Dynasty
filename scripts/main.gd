@@ -36,6 +36,7 @@ const SCREENS = {
 }
 const RAIL = [["inbox", "mail"], ["home", "house"], ["club", ""], ["manager", "user"], ["world", "globe"], ["search", "search"], ["options", "settings"]]
 const RAIL_W = 92
+var notch_l := 0            # width of the camera cut-out strip on the left, in viewport units
 const TOP_H = 70
 const NATIONS = ["England", "Spain", "Italy", "Germany", "France"]
 
@@ -145,10 +146,33 @@ func _safe_area():
 		r = max(0.0, (win.x - sa.end.x) * k)
 		t = max(0.0, sa.position.y * k)
 		b = max(0.0, (win.y - sa.end.y) * k)
-	safe.add_theme_constant_override("margin_left", int(l))
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("notch="):
+			l = float(arg.substr(6))      # dev: pretend there is a camera cut-out on the left
+	# with the rail showing, its background runs under the camera cut-out and only the icons stay clear of it
+	notch_l = int(l)
+	_apply_left()
 	safe.add_theme_constant_override("margin_right", int(r))
 	safe.add_theme_constant_override("margin_top", int(t))
 	safe.add_theme_constant_override("margin_bottom", int(b))
+
+
+func rail_col() -> int:
+	return 66 if notch_l > 16 else RAIL_W
+
+
+func rail_w() -> int:
+	return notch_l + rail_col()
+
+
+func _apply_left():
+	if safe == null or rail == null:
+		return
+	safe.add_theme_constant_override("margin_left", 0 if rail.visible else notch_l)
+	if int(rail.custom_minimum_size.x) != rail_w():
+		rail.custom_minimum_size = Vector2(rail_w(), 0)
+		if rail.visible and uses_chrome():
+			_build_rail()
 
 
 func _notification(what):
@@ -277,6 +301,7 @@ func _update_chrome():
 	var on = uses_chrome()
 	rail.visible = on
 	topbar.visible = on
+	_apply_left()
 	if not on:
 		return
 	_build_rail()
@@ -306,9 +331,9 @@ func _build_rail():
 	var v = UI.vb(0)
 	var cur = _rail_key()
 	var bk = UI.panel(Color(0, 0, 0, 0), 0, 0, 0)
-	bk.custom_minimum_size = Vector2(RAIL_W, 66)
+	bk.custom_minimum_size = Vector2(rail_w(), 66)
 	var can_back = stack.size() > 1 or (stack.size() == 1 and stack[0].sname != "home")
-	bk.add_child(UI.center(UI.icon("chevron-left", 40, UI.TEXT if can_back else UI.DIM)))
+	bk.add_child(UI.margin(UI.center(UI.icon("chevron-left", 40, UI.TEXT if can_back else UI.DIM)), notch_l, 0, 0, 0))
 	UI.tap(bk, back, true)
 	v.add_child(bk)
 	var n = G.unread()
@@ -317,14 +342,14 @@ func _build_rail():
 		var sel = key == cur
 		var cell = UI.panel(Color(UI.accent, 0.92) if sel else Color(0, 0, 0, 0), 0, 0, 0)
 		cell.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		cell.custom_minimum_size = Vector2(RAIL_W, 60)
+		cell.custom_minimum_size = Vector2(rail_w(), 60)
 		var fg = UI.on_color(UI.accent) if sel else UI.TEXT
 		var inner: Control
 		if key == "club":
 			inner = UI.badge(G.uc(), 46)
 		else:
 			inner = UI.icon(it[1], 36, fg)
-		var cc = UI.center(inner)
+		var cc = UI.margin(UI.center(inner), notch_l, 0, 0, 0)
 		cell.add_child(cc)
 		if key == "inbox" and n > 0:
 			var bd = UI.chip(str(n), UI.RED, Color.WHITE, 17)
@@ -332,7 +357,7 @@ func _build_rail():
 			var holder2 = Control.new()
 			holder2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			holder2.add_child(bd)
-			bd.position = Vector2(RAIL_W - 40, 6)
+			bd.position = Vector2(rail_w() - (40 if notch_l <= 16 else 30), 6)
 			cell.add_child(holder2)
 		UI.tap(cell, func(): _rail_tap(key), true)
 		v.add_child(cell)
@@ -597,7 +622,7 @@ func open_menu(key: String):
 	var root_c = Control.new()
 	root_c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root_c.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var left = safe.get_theme_constant("margin_left") + RAIL_W
+	var left = rail_w()
 	var dim = ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.5)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
