@@ -1,17 +1,34 @@
 extends "res://scripts/screens/screen.gd"
-# Shape, roles, starting XI, bench, instructions, set pieces and presets.
+# Tactics: pitch on the left, squad list or instructions on the right, tabs across the top.
 
 const PITCH = preload("res://scripts/widgets/pitch.gd")
-const TOKEN = preload("res://scripts/widgets/token.gd")
-const MENT_SHORT = ["Bus", "Def", "Bal", "Att", "All out"]
+const TOKEN = preload("res://scripts/widgets/ptoken.gd")
+const OVERLAY = preload("res://scripts/widgets/tac_overlay.gd")
+const TABS = ["Formation", "Shape", "Defence", "Attack", "Set Pieces", "Captain"]
+# name, mentality, pressing, tempo, width, line, passing, counter, description
+const STYLES = [
+	["Gegenpress", 3, 2, 2, 1, 2, 1, false, "Win it back high and attack at once."],
+	["Possession", 2, 1, 0, 1, 2, 0, false, "Short passes, patience, control."],
+	["Counter", 1, 0, 2, 1, 0, 2, true, "Sit deep, then break at speed."],
+	["Park the Bus", 0, 0, 0, 0, 0, 2, true, "Everyone behind the ball."],
+	["Wing Play", 3, 1, 1, 2, 1, 1, false, "Stretch the pitch and cross."],
+	["Route One", 2, 1, 2, 1, 1, 2, false, "Get it forward early."],
+]
 
+var tab := 0
 var sel = null   # {"k": "xi"/"sub"/"res", "i": index or pid}
 var pitch: Control
-var drag = null  # {"t": token, "i": slot, "start": Vector2, "moved": bool}
+var drag = null  # token drag
+var ldrag = null # list drag
+var ghost: Control = null
+var tokens: Array = []
 
 
-func _init():
-	show_nav = true
+func style_name(c: Dictionary) -> String:
+	for st in STYLES:
+		if c.ment == st[1] and c.press == st[2] and c.tempo == st[3] and c.instr.width == st[4] and c.instr.line == st[5] and c.instr["pass"] == st[6] and c.instr.counter == st[7]:
+			return st[0]
+	return "Custom"
 
 
 func build():
@@ -20,131 +37,292 @@ func build():
 	var tr = G.team_ratings(c.id)
 	var chips = UI.hb(6)
 	for k in [["ATT", tr.att], ["MID", tr.mid], ["DEF", tr.def]]:
-		var ch = UI.vb(-4)
-		var a = UI.lbl(str(k[1]), 30, UI.ovr_color(k[1]), "disp")
+		var ch = UI.vb(-6)
+		var a = UI.lbl(str(k[1]), 26, UI.ovr_color(k[1]), "disp")
 		a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		var b = UI.caps(k[0], 15, UI.DIM)
+		var b = UI.caps(k[0], 14, UI.DIM)
 		b.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		ch.add_child(a)
 		ch.add_child(b)
-		ch.custom_minimum_size = Vector2(52, 0)
+		ch.custom_minimum_size = Vector2(46, 0)
 		chips.add_child(ch)
 	body.add_child(UI.topbar("Tactics", false, chips))
-	var v = content(14)
-	var top = UI.hb(10)
-	var fb = UI.panel(UI.CARD2, 18, 18, 14, Color(1, 1, 1, 0.1))
-	fb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var fh = UI.hb(10)
-	fh.add_child(UI.caps("Shape", 19, UI.MUTED))
-	fh.add_child(UI.sp())
-	fh.add_child(UI.lbl(c.formation, 30, UI.TEXT, "disp"))
-	fh.add_child(UI.icon("chevron-right", 24, UI.MUTED))
-	fb.add_child(fh)
-	UI.tap(fb, _pick_formation, true)
-	top.add_child(fb)
-	top.add_child(UI.btn("Best XI", func():
-		G.auto_pick(c)
-		G.auto_roles(c)
+	UI.main.t_sub = "%s · %s · %s" % [TABS[tab], c.formation, style_name(c)]
+	body.add_child(UI.margin(UI.seg(TABS, tab, func(i):
+		tab = i
 		sel = null
-		refresh(), "secondary", "sparkles", 66))
-	top.add_child(UI.btn("Presets", _presets, "secondary", "save", 66))
-	v.add_child(top)
-	v.add_child(UI.caps("Tap to select · tap again for role · drag to move" if sel == null else "Tap another player to swap · tap again for his role", 19, UI.DIM if sel == null else UI.accent))
+		refresh(), 19), 20, 0, 20, 8))
+	var h = panes(14, 20)
+	var left = UI.vb(8)
+	left.custom_minimum_size = Vector2(clamp((UI.main.size.x - 92) * 0.45, 500, 700), 0)
 	pitch = PITCH.new()
-	pitch.custom_minimum_size = Vector2(0, 900)
-	v.add_child(pitch)
+	pitch.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pitch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_child(pitch)
+	var ov = OVERLAY.new()
+	ov.mode = [0, 1, 2, 3, 0, 0][tab]
+	ov.c = c
+	ov.pitch = pitch
+	pitch.add_child(ov)
 	var slots = G.slots_of(c)
-	var c1 = Color(c.c1)
-	var c2 = Color(c.c2)
+	tokens = []
 	for i in 11:
 		var t = TOKEN.new()
-		t.role = slots[i][0]
-		t.c1 = c1
-		t.c2 = c2
+		t.pos = slots[i][0]
+		t.c1 = Color(c.c1)
+		t.c2 = Color(c.c2)
+		t.dim = tab in [1, 2, 3]
 		if c.xi[i] >= 0:
 			t.p = G.s.players[c.xi[i]]
 			t.cond = t.p.cond
-			t.fitv = G.fit(t.p, t.role)
-			t.rname = G.RL.ROLES[c.roles[i]].n
-			t.stars = G.RL.stars(t.p, c.roles[i])
+			t.fitv = G.fit(t.p, t.pos)
+			t.abbr = str(c.roles[i]).to_upper()
 			t.captain = c.capt == c.xi[i]
+			var rd = G.RL.ROLES[c.roles[i]]
+			if c.roles[i] in ["if", "ifb"]:
+				t.arrow = 2 if slots[i][1] < 0.5 else 3
+			elif rd.m[0] >= 1.1:
+				t.arrow = 1
+			elif c.roles[i] == "anc":
+				t.arrow = 4
 		t.selected = sel != null and sel.k == "xi" and sel.i == i
 		t.set_meta("slot", slots[i])
 		t.mouse_filter = Control.MOUSE_FILTER_STOP
 		var idx = i
 		t.gui_input.connect(func(e): _token_input(e, t, idx))
 		pitch.add_child(t)
+		tokens.append(t)
 	pitch.resized.connect(_place)
 	_place.call_deferred()
-	# instructions
-	v.add_child(UI.section("Mentality", G.MENTALITY[c.ment]))
-	v.add_child(UI.seg(MENT_SHORT, c.ment, func(i):
-		c.ment = i
-		refresh(), 20))
-	var ins = c.instr
-	for row in [["Pressing", G.PRESSING, "press", c], ["Tempo", G.TEMPO, "tempo", c], ["Width", ["Narrow", "Normal", "Wide"], "width", ins],
-			["Defensive line", ["Deep", "Normal", "High"], "line", ins], ["Passing", ["Short", "Mixed", "Direct"], "pass", ins]]:
-		var d = row[3]
-		var key = row[2]
-		v.add_child(UI.section(row[0], row[1][d[key]]))
-		v.add_child(UI.seg(row[1], d[key], func(i):
-			d[key] = i
-			refresh(), 20))
-	var ct = UI.panel(UI.CARD, 18, 18, 14, UI.accent if ins.counter else UI.LINE)
-	var cth = UI.hb(10)
-	cth.add_child(UI.icon("zap", 26, UI.accent if ins.counter else UI.DIM))
-	var ctv = UI.vb(0)
-	ctv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ctv.add_child(UI.lbl("Counter-attack", 25, UI.TEXT, "semi"))
-	ctv.add_child(UI.lbl("More chances when the opposition has more of the ball", 19, UI.MUTED))
-	cth.add_child(ctv)
-	cth.add_child(UI.chip("ON" if ins.counter else "OFF", Color(UI.accent if ins.counter else UI.DIM, 0.16), UI.accent if ins.counter else UI.DIM, 20))
-	ct.add_child(cth)
-	UI.tap(ct, func():
-		ins.counter = not ins.counter
-		refresh())
-	v.add_child(ct)
-	# set pieces
-	v.add_child(UI.section("Captain & set pieces"))
-	var sp_card = UI.card(18, 10)
-	var spv = UI.vb(0)
-	for row in [["Captain", "capt", 13], ["Penalties", "pk", 17], ["Free kicks", "fk", 16], ["Corners", "ck", 3]]:
-		var r = UI.panel(Color(0, 0, 0, 0), 0, 0, 10)
+	if tab == 0:
+		var acts = UI.hb(8)
+		for it in [["%s" % c.formation, "layout-grid", _pick_formation], [style_name(c), "zap", _pick_style], ["Best XI", "sparkles", func():
+				G.auto_pick(c)
+				G.auto_roles(c)
+				sel = null
+				refresh()], ["Presets", "save", _presets]]:
+			var bt = UI.btn(it[0], it[2], "secondary", it[1], 46)
+			bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			acts.add_child(bt)
+		left.add_child(acts)
+	h.add_child(left)
+	var rp = pane(0, 6)
+	h.add_child(rp[0])
+	var v = rp[1]
+	sc = rp[0].get_child(0)
+	match tab:
+		0: _squad_list(v, c)
+		1:
+			_instr(v, "Mentality", G.MENTALITY, c, "ment", "How many players commit forward. Attacking shapes create more and concede more.")
+			_instr(v, "Width", ["Narrow", "Normal", "Wide"], c.instr, "width", "Narrow packs the middle of the pitch; wide stretches play out to the flanks.")
+		2:
+			_instr(v, "Defensive line", ["Deep", "Balanced", "High"], c.instr, "line", "A high line squeezes the pitch but leaves space in behind for quick forwards.")
+			_instr(v, "Closing down", ["Sit back", "Own half", "All over"], c, "press", "Pressing all over wins the ball early and costs your players stamina.")
+		3:
+			_instr(v, "Passing", ["Short", "Mixed", "Direct"], c.instr, "pass", "Short passing keeps the ball; direct passing gets it forward quickly.")
+			_instr(v, "Tempo", G.TEMPO, c, "tempo", "A fast tempo creates more chances and gives the ball away more often.")
+			_instr(v, "Counter-attack", ["No", "Yes"], c.instr, "counter", "Break forward at speed when the opposition has more of the ball.")
+		4:
+			for row in [["Penalties", "pk", 17], ["Free kicks", "fk", 16], ["Corners", "ck", 3]]:
+				_taker(v, c, row[0], row[1], row[2])
+		5: _captain(v, c)
+
+
+func _head(v: Control, text: String, right := ""):
+	var hp = UI.panel(Color(UI.accent, 0.22), 8, 12, 4)
+	var hh = UI.hb(8)
+	hh.add_child(UI.caps(text, 20, UI.TEXT))
+	hh.add_child(UI.sp())
+	if right != "":
+		hh.add_child(UI.caps(right, 17, UI.accent))
+	hp.add_child(hh)
+	v.add_child(hp)
+
+
+func _instr(v: Control, title: String, options: Array, d: Dictionary, key: String, hint: String):
+	var cur = int(d[key])
+	_head(v, title, str(options[cur]))
+	v.add_child(UI.seg(options, cur, func(i):
+		d[key] = (i == 1) if typeof(d[key]) == TYPE_BOOL else i
+		refresh(), 19))
+	v.add_child(UI.wrap(hint, 18, UI.MUTED))
+	v.add_child(UI.sp(0, 6))
+
+
+func _taker(v: Control, c: Dictionary, title: String, key: String, at: int):
+	var pid = c[key]
+	var ok = pid >= 0 and G.s.players.has(pid) and pid in c.players
+	_head(v, title, G.RL.ATTR[at])
+	var r = UI.panel(UI.CARD2, 12, 14, 10, UI.LINE)
+	var h = UI.hb(10)
+	if ok:
+		h.add_child(UI.pos(G.s.players[pid].pos, 18))
+	h.add_child(UI.lbl_fill(G.pname(G.s.players[pid]) if ok else "Automatic (best available)", 23, UI.TEXT, "semi"))
+	if ok:
+		h.add_child(UI.ovr(G.s.players[pid].at[at], 20))
+	h.add_child(UI.chip("CHANGE", Color(1, 1, 1, 0.08), UI.TEXT, 16))
+	r.add_child(h)
+	UI.tap(r, func(): _pick_taker(title, key, at))
+	v.add_child(r)
+	v.add_child(UI.sp(0, 6))
+
+
+func _captain(v: Control, c: Dictionary):
+	_head(v, "Captain", "Lifts morale when he plays")
+	var list = []
+	for pid in c.xi + c.bench:
+		if pid >= 0:
+			list.append(G.s.players[pid])
+	list.sort_custom(func(a, b): return G.age(a) * 2 + a.ovr > G.age(b) * 2 + b.ovr)
+	for p in list:
+		var on = c.capt == p.id
+		var r = UI.panel(Color(UI.accent, 0.16) if on else UI.CARD2, 10, 12, 6, UI.accent if on else UI.LINE)
 		var h = UI.hb(10)
-		h.add_child(UI.lbl(row[0], 24, UI.MUTED))
-		h.add_child(UI.sp())
-		var pid = c[row[1]]
-		h.add_child(UI.lbl(G.pname(G.s.players[pid]) if pid >= 0 and G.s.players.has(pid) and pid in c.players else "Auto", 24, UI.TEXT, "semi"))
-		h.add_child(UI.icon("chevron-right", 22, UI.DIM))
+		h.add_child(UI.pos(p.pos, 18))
+		h.add_child(UI.lbl_fill(G.pname(p), 22, UI.TEXT, "semi"))
+		h.add_child(UI.lbl("%d yrs" % G.age(p), 18, UI.MUTED))
+		h.add_child(UI.ovr(p.ovr, 20))
+		if on:
+			h.add_child(UI.chip("C", UI.GOLD, Color("0a0e17"), 16))
 		r.add_child(h)
-		var key = row[1]
-		var at = row[2]
-		var title = row[0]
-		UI.tap(r, func(): _pick_taker(title, key, at))
-		spv.add_child(r)
-	sp_card.add_child(spv)
-	v.add_child(sp_card)
-	# bench
-	v.add_child(UI.section("Substitutes", "%d / 7" % c.bench.size()))
+		var pid = p.id
+		UI.tap(r, func():
+			c.capt = pid
+			refresh())
+		v.add_child(r)
+
+
+func _squad_list(v: Control, c: Dictionary):
+	var hint = "Tap two players to swap them. Drag a name onto the pitch. Tap a role to change it." if sel == null else "Now tap the player to swap with."
+	v.add_child(UI.lbl(hint, 16, UI.DIM if sel == null else UI.accent))
+	_head(v, "Starting XI", "Role")
+	for i in 11:
+		if c.xi[i] >= 0:
+			v.add_child(_row(G.s.players[c.xi[i]], "xi", i, c))
+	_head(v, "Substitutes", "%d / 7" % c.bench.size())
 	for pid in c.bench:
-		v.add_child(_row(G.s.players[pid], "sub"))
+		v.add_child(_row(G.s.players[pid], "sub", -1, c))
 	var rest = []
 	for pid in c.players:
 		if not (pid in c.xi) and not (pid in c.bench) and not G.s.players[pid].get("youth", false):
 			rest.append(G.s.players[pid])
 	rest.sort_custom(func(a, b): return a.ovr > b.ovr)
-	v.add_child(UI.section("Reserves", str(rest.size())))
+	_head(v, "Reserves", str(rest.size()))
 	for p in rest:
-		v.add_child(_row(p, "res"))
+		v.add_child(_row(p, "res", -1, c))
+
+
+func _row(p: Dictionary, kind: String, slot: int, c: Dictionary) -> Control:
+	var key = slot if kind == "xi" else p.id
+	var on = sel != null and sel.k == kind and sel.i == key
+	var r = UI.panel(Color(UI.accent, 0.16) if on else Color(1, 1, 1, 0.03), 10, 10, 4, UI.accent if on else Color(0, 0, 0, 0))
+	var h = UI.hb(10)
+	var tag = c.slots[slot][0] if kind == "xi" else ("SUB" if kind == "sub" else "RES")
+	var lc = UI.LINE_COL[G.LINE.get(tag, 2)] if kind == "xi" else UI.MUTED
+	h.add_child(UI.chip(tag, Color(lc, 0.16), lc, 17, 54))
+	var okc = UI.GREEN if G.available(p) else UI.RED
+	var dot = UI.panel(Color(0, 0, 0, 0), 9, 0, 0, okc)
+	dot.get_theme_stylebox("panel").set_border_width_all(3)
+	dot.custom_minimum_size = Vector2(18, 18)
+	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(dot)
+	var nv = UI.vb(-5)
+	nv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nv.add_child(UI.lbl_fill(G.pname(p), 21, UI.TEXT if G.available(p) else UI.DIM, "semi"))
+	var alt = p.pos
+	var al = p.get("alt", [])
+	if typeof(al) == TYPE_ARRAY and al.size() > 0:
+		alt += " / " + " / ".join(al)
+	elif typeof(al) == TYPE_STRING and al != "":
+		alt += " / " + al
+	var state = "injured" if p.inj > 0 else ("suspended" if p.susp > 0 else "%d%% fit" % int(p.cond))
+	nv.add_child(UI.lbl_fill("%s · %s" % [alt, state], 15, UI.RED if not G.available(p) else UI.MUTED))
+	h.add_child(nv)
+	h.add_child(UI.ovr(p.ovr, 19))
+	if kind == "xi":
+		var rid = c.roles[slot]
+		var stars = G.RL.stars(p, rid)
+		var col = UI.GREEN if stars >= 4 else (UI.AMBER if stars == 3 else UI.RED)
+		var rc = UI.chip(str(rid).to_upper(), Color(col, 0.16), col, 17, 58)
+		UI.tap(rc, func(): _pick_role(slot), true)
+		h.add_child(rc)
+	else:
+		h.add_child(UI.sp(58, 0))
+	r.add_child(h)
+	r.mouse_filter = Control.MOUSE_FILTER_PASS
+	r.gui_input.connect(func(e): _row_input(e, kind, key, G.pname(p)))
+	return r
+
+
+func _row_input(e: InputEvent, kind: String, key: int, nm: String):
+	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+		if e.pressed:
+			ldrag = {"start": e.global_position, "kind": kind, "key": key, "on": false}
+		elif ldrag != null:
+			var d = ldrag
+			ldrag = null
+			if ghost != null:
+				ghost.queue_free()
+				ghost = null
+			if d.on:
+				for i in tokens.size():
+					var t = tokens[i]
+					if Rect2(t.global_position, t.size).grow(12).has_point(e.global_position):
+						sel = {"k": d.kind, "i": d.key}
+						_tap("xi", i)
+						return
+			elif d.start.distance_to(e.global_position) < 22:
+				UI.sfx("click", -16.0)
+				_tap(d.kind, d.key)
+	elif e is InputEventMouseMotion and ldrag != null:
+		var dv = e.global_position - ldrag.start
+		if not ldrag.on and absf(dv.x) > 24 and absf(dv.x) > absf(dv.y) * 1.3:
+			ldrag.on = true
+			ghost = UI.chip(nm, UI.accent, UI.on_color(UI.accent), 20)
+			ghost.z_index = 20
+			ghost.top_level = true
+			add_child(ghost)
+		if ldrag.on and ghost != null:
+			ghost.global_position = e.global_position - Vector2(50, 46)
+
+
+func _pick_style():
+	var c = G.uc()
+	var build_sheet = func(v):
+		v.add_child(UI.wrap("A style sets every team instruction in one tap. You can still change each one afterwards.", 20, UI.MUTED))
+		for st in STYLES:
+			var on = style_name(c) == st[0]
+			var r = UI.panel(Color(UI.accent, 0.14) if on else UI.CARD, 14, 16, 10, UI.accent if on else UI.LINE)
+			var h = UI.hb(10)
+			var tv = UI.vb(-2)
+			tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tv.add_child(UI.lbl(st[0], 26, UI.TEXT, "disp"))
+			tv.add_child(UI.lbl(st[8], 18, UI.MUTED))
+			h.add_child(tv)
+			h.add_child(UI.caps("%s · %s" % [G.MENTALITY[st[1]], G.PRESSING[st[2]]], 16, UI.DIM))
+			r.add_child(h)
+			var x = st
+			UI.tap(r, func():
+				c.ment = x[1]
+				c.press = x[2]
+				c.tempo = x[3]
+				c.instr.width = x[4]
+				c.instr.line = x[5]
+				c.instr["pass"] = x[6]
+				c.instr.counter = x[7]
+				UI.close_sheet()
+				refresh())
+			v.add_child(r)
+	UI.sheet("Playing style", build_sheet)
 
 
 func _place():
 	if pitch == null or not is_instance_valid(pitch):
 		return
-	for t in pitch.get_children():
+	for t in tokens:
 		var sl = t.get_meta("slot")
-		var p = pitch.pt(0.045 + sl[2] * 0.9, sl[1])
-		t.position = p - Vector2(t.size.x / 2.0, 46)
+		var p = pitch.pt(0.05 + sl[2] * 0.88, sl[1])
+		t.position = p - Vector2(t.size.x / 2.0, 30)
 
 
 func _token_input(e: InputEvent, t: Control, i: int):
@@ -156,14 +334,24 @@ func _token_input(e: InputEvent, t: Control, i: int):
 			var d = drag
 			drag = null
 			t.modulate = Color.WHITE
-			if d.moved and i > 0:
-				_drop(i, t.position + Vector2(t.size.x / 2.0, 46))
+			if d.moved:
+				var centre = t.position + Vector2(t.size.x / 2.0, 30)
+				for j in tokens.size():
+					if j != i and (tokens[j].position + Vector2(tokens[j].size.x / 2.0, 30)).distance_to(centre) < 46:
+						sel = {"k": "xi", "i": i}
+						_tap("xi", j)
+						return
+				if i > 0 and tab == 0:
+					_drop(i, centre)
+				else:
+					t.position = d.orig
 			else:
 				t.position = d.orig
+				UI.sfx("click", -16.0)
 				_tap("xi", i)
 	elif e is InputEventMouseMotion and drag != null and drag.t == t:
 		var delta = e.global_position - drag.start
-		if not drag.moved and delta.length() > 18 and i > 0:
+		if not drag.moved and delta.length() > 18:
 			drag.moved = true
 			t.z_index = 5
 		if drag.moved:
@@ -178,7 +366,7 @@ func _drop(i: int, centre: Vector2):
 	var m = 14.0
 	var w = clamp((centre.x - m) / (pitch.size.x - 2 * m), 0.06, 0.94)
 	var u = clamp(1.0 - (centre.y - m) / (pitch.size.y - 2 * m), 0.0, 1.0)
-	var y = clamp((u - 0.045) / 0.9, 0.17, 0.9)
+	var y = clamp((u - 0.05) / 0.88, 0.17, 0.9)
 	var pos = G.RL.zone_pos(w, y)
 	c.slots[i] = [pos, snapped(w, 0.01), snapped(y, 0.01)]
 	c.roles[i] = G.RL.best(G.s.players[c.xi[i]], pos) if c.xi[i] >= 0 else G.RL.BY_POS[pos][0]
@@ -192,25 +380,6 @@ func _shape_name(slots: Array) -> String:
 	for sl in slots:
 		n[G.LINE[sl[0]]] += 1
 	return "%d-%d-%d" % [n[1], n[2], n[3]]
-
-
-func _row(p: Dictionary, kind: String) -> Control:
-	var on = sel != null and sel.k == kind and sel.i == p.id
-	var r = UI.panel(Color(UI.accent, 0.14) if on else UI.CARD, 18, 16, 10, UI.accent if on else UI.LINE)
-	var h = UI.hb(12)
-	h.add_child(UI.pos(p.pos))
-	h.add_child(UI.lbl_fill(G.pname(p), 25, UI.TEXT if G.available(p) else UI.DIM, "semi"))
-	if p.inj > 0:
-		h.add_child(UI.chip("INJ", Color(UI.RED, 0.14), UI.RED, 16))
-	elif p.susp > 0:
-		h.add_child(UI.chip("BAN", Color(UI.RED, 0.14), UI.RED, 16))
-	else:
-		h.add_child(UI.caps("%d%%" % p.cond, 19, UI.cond_color(p.cond)))
-	h.add_child(UI.ovr(p.ovr, 24))
-	r.add_child(h)
-	var pid = p.id
-	UI.tap(r, func(): _tap(kind, pid))
-	return r
 
 
 func _tap(kind: String, i: int):
