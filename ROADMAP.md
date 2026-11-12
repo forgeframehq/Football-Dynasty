@@ -27,28 +27,28 @@ Agreed feature list for the landscape rebuild (v0.3 onward). Items are ticked wh
 ## Stage 2: menu contents
 Club
 - [x] Medical Centre, Contracts, Loan Watch
-- [ ] Team Report and Squad Gaps
+- [x] Team Report and Squad Gaps
 - [ ] Dressing Room (hierarchy, morale, friendships, promises)
-- [ ] Fans (confidence, attendance trend, favourites, expectations)
-- [ ] Sponsors (shirt and stadium deals with targets)
+- [x] Fans (confidence, attendance trend, favourites, expectations)
+- [x] Sponsors (shirt and stadium deals with targets)
 - [ ] Match Analysis (shot maps, season trends)
-- [ ] Club Identity (kit colours, records, legends, all-time XI)
+- [x] Club Identity (kit colours, records, legends, all-time XI)
 - [ ] Staff hiring
 
 Manager
-- [ ] Philosophy (club DNA with bonuses)
+- [x] Philosophy (club DNA with bonuses)
 - [ ] Rival Managers, Career Timeline, My Contract (salary spent on courses)
 - [ ] Board Request (transfer funds, wages, stadium, new contract)
 - [ ] Holiday mode, Game Status
 
 World
-- [ ] Transfer Centre (rumours, done deals, records, deadline-day ticker)
+- [x] Transfer Centre (rumours, done deals, records, deadline-day ticker)
 - [ ] Awards (team of the week and season, golden boot, world player of the year)
 - [x] Top 50 and Wonderkids, Manager Watch, Live Scores, League Standards
 
 Search
 - [x] Smart Lists (bargains, expiring, free agents, loan-listed, release clauses in budget)
-- [ ] Find Similar, Role Finder, Shortlist Alerts, saved filters, Staff Search, Find Club
+- [x] Find Similar, Role Finder, Shortlist Alerts, saved filters, Staff Search, Find Club
 
 Options
 - [ ] Editor, Save Backup, Achievements, Hall of Fame, Manual, Scrapbook
