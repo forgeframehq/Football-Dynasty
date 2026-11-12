@@ -611,7 +611,7 @@ func _owner(v: Control):
 	for o in s.clubs:
 		if o.id != c.id and not s.leagues[o.lg].roe and float(lf.stakes.get(o.id, 0)) > 0:
 			targets.append(o)
-		elif o.id != c.id and not s.leagues[o.lg].roe and not G.LG.is_reserve(o):
+		elif o.id != c.id and not s.leagues[o.lg].roe and not G.LG.is_reserve(o.id):
 			others.append(o)
 	others.sort_custom(func(a, b): return G.OPS.club_value(a) < G.OPS.club_value(b))
 	targets += others.slice(0, 8)
