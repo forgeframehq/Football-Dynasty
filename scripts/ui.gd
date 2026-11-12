@@ -329,6 +329,37 @@ func badge(c: Dictionary, size := 64) -> Control:
 	return b
 
 
+func trophy(title: String, h := 96.0) -> Control:
+	# picture for a trophy, chosen from its name; falls back to the icon
+	var n = 5
+	if title.contains("Champions League"):
+		n = 6
+	elif title.contains("Europa"):
+		n = 7
+	elif title.contains("Conference"):
+		n = 3
+	elif title.contains("League Cup") or title.contains("EFL"):
+		n = 3
+	elif title.contains("Cup") or title.contains("Copa") or title.contains("Coppa") or title.contains("Pokal") or title.contains("Coupe"):
+		n = 2
+	elif title.contains("Golden Boot"):
+		n = 8
+	elif title.contains("Player of"):
+		n = 9
+	elif title.contains("Manager of"):
+		n = 10
+	var path = "res://assets/trophies/trophy_%02d.png" % n
+	if not ResourceLoader.exists(path):
+		return icon("trophy", int(h * 0.6), GOLD)
+	var t = TextureRect.new()
+	t.texture = load(path)
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	t.custom_minimum_size = Vector2(h, h)
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return t
+
+
 func flag(nat: String, w := 34.0) -> Control:
 	var f = FLAG.new()
 	f.setup(nat, w)

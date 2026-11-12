@@ -32,7 +32,7 @@ func build():
 			var p = UI.panel(Color(col, 0.08), 22, 16, 18, Color(col, 0.4))
 			p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			var pv = UI.vb(6)
-			var ic = UI.icon("trophy", 64, col)
+			var ic = UI.trophy(t, 120)
 			ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 			pv.add_child(ic)
 			var parts = t.rsplit(" ", true, 1)
@@ -59,7 +59,7 @@ func build():
 		var cv = UI.vb(10)
 		for k in counts:
 			var r = UI.hb(12)
-			r.add_child(UI.icon("trophy", 28, UI.GOLD))
+			r.add_child(UI.trophy(str(k), 44))
 			var tv = UI.vb(0)
 			tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			tv.add_child(UI.lbl(k, 25, UI.TEXT, "semi"))

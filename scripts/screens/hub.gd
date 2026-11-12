@@ -1194,7 +1194,7 @@ func _fame(v: Control):
 	var tv = _card(v, "Honours")
 	for t in u.trophies:
 		var h = UI.hb(10)
-		h.add_child(UI.icon("trophy", 22, UI.GOLD))
+		h.add_child(UI.trophy(str(t), 44))
 		h.add_child(UI.lbl_fill(str(t), 21, UI.TEXT, "semi"))
 		tv.add_child(h)
 	if u.trophies.is_empty():

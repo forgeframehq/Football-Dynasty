@@ -47,6 +47,8 @@ func run(m):
 		G.advance()
 	var c = G.uc()
 	var simple = ["home", "inbox", "squad", "tactics", "training", "fixtures", "finances", "campus", "board", "trophies", "jobs", "table", "comps", "stats", "transfers", "scouting", "club"]
+	if want.call("trophies"):
+		G.s.user.trophies = ["Premier League 2026/27", "FA Cup 2026/27", "UEFA Champions League 2027/28", "EFL Cup 2027/28"]
 	for k in simple:
 		if want.call(k):
 			main.root(k, {"lg": c.lg} if k in ["table", "stats"] else {})
