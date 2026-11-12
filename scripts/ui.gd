@@ -3,6 +3,7 @@ extends Node
 
 const BADGE = preload("res://scripts/widgets/badge.gd")
 const BAR = preload("res://scripts/widgets/bar.gd")
+const FLAG = preload("res://scripts/widgets/flag.gd")
 
 const BG = Color("090d16")
 const BG2 = Color("0f1522")
@@ -42,15 +43,23 @@ func _ready():
 		f.close()
 
 
+func _stream(nm: String):
+	for ext in ["mp3", "wav"]:
+		var path = "res://assets/sfx/%s.%s" % [nm, ext]
+		if ResourceLoader.exists(path):
+			return load(path)
+	return null
+
+
 func sfx(nm: String, db := -6.0):
 	if not G.settings.get("sound", true):
 		return
 	if not players.has(nm):
-		var path = "res://assets/sfx/%s.wav" % nm
-		if not ResourceLoader.exists(path):
+		var st = _stream(nm)
+		if st == null:
 			return
 		var pl = AudioStreamPlayer.new()
-		pl.stream = load(path)
+		pl.stream = st
 		add_child(pl)
 		players[nm] = pl
 	players[nm].volume_db = db
@@ -59,14 +68,16 @@ func sfx(nm: String, db := -6.0):
 
 func ambience(on: bool):
 	if not players.has("crowd"):
-		var path = "res://assets/sfx/crowd.wav"
-		if not ResourceLoader.exists(path):
+		var st = _stream("crowd")
+		if st == null:
 			return
+		if st is AudioStreamMP3:
+			st.loop = true
+		elif st is AudioStreamWAV:
+			st.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			st.loop_begin = 0
+			st.loop_end = int(st.get_length() * st.mix_rate)
 		var pl = AudioStreamPlayer.new()
-		var st = load(path)
-		st.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		st.loop_begin = 0
-		st.loop_end = int(st.get_length() * st.mix_rate)
 		pl.stream = st
 		pl.volume_db = -16.0
 		add_child(pl)
@@ -249,7 +260,7 @@ func icon(nm: String, size := 28, color := TEXT) -> TextureRect:
 
 # ---------------------------------------------------------------- composite widgets
 
-func btn(text: String, cb: Callable, kind := "primary", icon_name := "", height := 84) -> PanelContainer:
+func btn(text: String, cb: Callable, kind := "primary", icon_name := "", height := 66) -> PanelContainer:
 	var bg = accent
 	var fg = on_color(accent)
 	var border = Color(0, 0, 0, 0)
@@ -318,6 +329,12 @@ func badge(c: Dictionary, size := 64) -> Control:
 	return b
 
 
+func flag(nat: String, w := 34.0) -> Control:
+	var f = FLAG.new()
+	f.setup(nat, w)
+	return f
+
+
 func bar(frac: float, color: Color, h := 8, bg := Color(1, 1, 1, 0.08)) -> Control:
 	var b = BAR.new()
 	b.frac = clamp(frac, 0.0, 1.0)
@@ -355,6 +372,7 @@ func seg(options: Array, sel: int, cb: Callable, size := 22) -> PanelContainer:
 
 func section(text: String, right := "") -> HBoxContainer:
 	var h = hb(8)
+	h.set_meta("glue", true)
 	h.add_child(caps(text, 22, MUTED))
 	h.add_child(sp())
 	if right != "":
@@ -429,6 +447,12 @@ func player_row(p: Dictionary, cb: Callable, extra := "") -> PanelContainer:
 
 
 func topbar(title: String, back := true, right: Control = null) -> Control:
+	if main != null and main.uses_chrome():
+		main.set_title(title, "", right)
+		var z = Control.new()
+		z.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		z.custom_minimum_size = Vector2(0, 4)
+		return z
 	var h = hb(12)
 	h.custom_minimum_size = Vector2(0, 76)
 	if back:
@@ -536,6 +560,12 @@ func slider(minv: float, maxv: float, value: float, step: float, cb: Callable) -
 
 func clubbar(right: Control = null) -> Control:
 	var c = G.uc()
+	if main != null and main.uses_chrome():
+		main.set_title(c.name, "%s · %s" % [G.s.user.name, G.s.leagues[c.lg].name], right)
+		var z = Control.new()
+		z.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		z.custom_minimum_size = Vector2(0, 4)
+		return z
 	var h = hb(16)
 	h.add_child(badge(c, 76))
 	var v = vb(0)

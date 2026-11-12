@@ -8,6 +8,8 @@ var lg := -1
 
 
 func build():
+	cols = 1
+	max_w = 1100
 	var s = G.s
 	if lg < 0:
 		lg = args.get("lg", G.uc().lg)

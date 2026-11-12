@@ -1,9 +1,11 @@
 extends Control
-# Application shell: background, screen stack, bottom navigation, sheets and toasts.
+# Application shell (landscape): icon rail, slide-out menus, top bar with Continue,
+# screen stack, sheets and toasts.
 
 const SCREENS = {
 	"menu": preload("res://scripts/screens/menu.gd"),
 	"new_career": preload("res://scripts/screens/new_career.gd"),
+	"intro": preload("res://scripts/screens/intro.gd"),
 	"home": preload("res://scripts/screens/home.gd"),
 	"squad": preload("res://scripts/screens/squad.gd"),
 	"tactics": preload("res://scripts/screens/tactics.gd"),
@@ -27,18 +29,30 @@ const SCREENS = {
 	"training": preload("res://scripts/screens/training.gd"),
 	"trophies": preload("res://scripts/screens/trophies.gd"),
 	"scouting": preload("res://scripts/screens/scouting.gd"),
+	"lists": preload("res://scripts/screens/lists.gd"),
 }
-const TABS = [["home", "Home", "house"], ["squad", "Squad", "shirt"], ["tactics", "Tactics", "layout-grid"], ["transfers", "Market", "arrow-left-right"], ["club", "Club", "trophy"]]
+const RAIL = [["inbox", "mail"], ["home", "house"], ["club", ""], ["manager", "user"], ["world", "globe"], ["search", "search"], ["options", "settings"]]
+const RAIL_W = 92
+const TOP_H = 70
+const NATIONS = ["England", "Spain", "Italy", "Germany", "France"]
 
 var holder: Control
-var nav: PanelContainer
+var rail: PanelContainer
+var topbar: PanelContainer
+var safe: MarginContainer
 var overlay: Control
 var glow: TextureRect
-var top_sp: Control
 var stack: Array = []
-var cur_tab := ""
 var sheet_node: Control = null
+var menu_node: Control = null
+var menu_key := ""
 var dev = null
+var t_title := ""
+var t_sub := ""
+var t_right: Control = null
+var busy := false
+var press_t := 0.0
+var pressing := false
 
 
 func _ready():
@@ -68,7 +82,7 @@ func _build():
 	add_child(bg)
 	glow = TextureRect.new()
 	var g = Gradient.new()
-	g.set_color(0, Color(1, 1, 1, 0.26))
+	g.set_color(0, Color(1, 1, 1, 0.22))
 	g.set_color(1, Color(1, 1, 1, 0.0))
 	var gt = GradientTexture2D.new()
 	gt.gradient = g
@@ -81,25 +95,31 @@ func _build():
 	glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	glow.stretch_mode = TextureRect.STRETCH_SCALE
 	glow.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	glow.offset_left = -260
-	glow.offset_right = 260
-	glow.offset_bottom = 560
+	glow.offset_bottom = 520
 	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(glow)
-	var frame = UI.vb(0)
-	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(frame)
-	top_sp = UI.sp(0, 12)
-	frame.add_child(top_sp)
+	safe = MarginContainer.new()
+	safe.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	safe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(safe)
+	var frame = UI.hb(0)
+	safe.add_child(frame)
+	rail = UI.panel(Color("0b101a"), 0, 0, 0)
+	rail.custom_minimum_size = Vector2(RAIL_W, 0)
+	rail.get_theme_stylebox("panel").border_color = UI.LINE
+	rail.get_theme_stylebox("panel").border_width_right = 1
+	frame.add_child(rail)
+	var right = UI.vb(0)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	frame.add_child(right)
+	topbar = UI.panel(Color(0, 0, 0, 0), 0, 20, 0)
+	topbar.custom_minimum_size = Vector2(0, TOP_H)
+	right.add_child(topbar)
 	holder = Control.new()
 	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.clip_contents = true
-	frame.add_child(holder)
-	nav = UI.panel(Color("0c111c"), 0, 8, 8, Color(0, 0, 0, 0))
-	nav.get_theme_stylebox("panel").border_color = UI.LINE
-	nav.get_theme_stylebox("panel").border_width_top = 1
-	frame.add_child(nav)
+	right.add_child(holder)
 	overlay = Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -110,15 +130,21 @@ func _build():
 
 func _safe_area():
 	var win = DisplayServer.window_get_size()
-	var safe = DisplayServer.get_display_safe_area()
-	var top = 12.0
-	var bot = 8.0
-	if OS.has_feature("mobile") and win.y > 0 and safe.size.y > 0:
+	var sa = DisplayServer.get_display_safe_area()
+	var l = 0.0
+	var r = 0.0
+	var t = 0.0
+	var b = 0.0
+	if OS.has_feature("mobile") and win.x > 0 and sa.size.x > 0:
 		var k = size.y / float(win.y)
-		top = max(12.0, safe.position.y * k + 6.0)
-		bot = max(8.0, (win.y - safe.end.y) * k + 6.0)
-	top_sp.custom_minimum_size = Vector2(0, top)
-	nav.get_theme_stylebox("panel").content_margin_bottom = bot
+		l = max(0.0, sa.position.x * k)
+		r = max(0.0, (win.x - sa.end.x) * k)
+		t = max(0.0, sa.position.y * k)
+		b = max(0.0, (win.y - sa.end.y) * k)
+	safe.add_theme_constant_override("margin_left", int(l))
+	safe.add_theme_constant_override("margin_right", int(r))
+	safe.add_theme_constant_override("margin_top", int(t))
+	safe.add_theme_constant_override("margin_bottom", int(b))
 
 
 func _notification(what):
@@ -129,6 +155,15 @@ func _notification(what):
 			G.save_game()
 
 
+func _process(dt):
+	if pressing:
+		press_t += dt
+		if press_t > 0.65:
+			pressing = false
+			press_t = 0.0
+			_continue(true)
+
+
 func _mk(sname: String, args: Dictionary) -> Control:
 	var scr = SCREENS[sname].new()
 	scr.args = args
@@ -136,19 +171,23 @@ func _mk(sname: String, args: Dictionary) -> Control:
 	return scr
 
 
-func _is_tab(sname: String) -> bool:
-	for t in TABS:
-		if t[0] == sname:
-			return true
-	return false
+func uses_chrome() -> bool:
+	return G.active and stack.size() > 0 and stack[-1].chrome
+
+
+func set_title(title: String, sub := "", right: Control = null):
+	t_title = title
+	t_sub = sub
+	t_right = right
 
 
 func root(sname: String, args := {}):
 	close_sheet()
+	close_menu()
 	for old in stack:
 		old.queue_free()
 	stack = []
-	cur_tab = sname if _is_tab(sname) else ""
+	t_right = null
 	var scr = _mk(sname, args)
 	stack.append(scr)
 	holder.add_child(scr)
@@ -157,8 +196,10 @@ func root(sname: String, args := {}):
 
 func open(sname: String, args := {}):
 	close_sheet()
+	close_menu()
 	if stack.size() > 0:
 		stack[-1].visible = false
+	t_right = null
 	var scr = _mk(sname, args)
 	stack.append(scr)
 	holder.add_child(scr)
@@ -169,24 +210,28 @@ func back():
 	if sheet_node != null:
 		close_sheet()
 		return
+	if menu_node != null:
+		close_menu()
+		return
 	if stack.size() == 0:
 		return
 	if stack[-1].has_method("can_leave") and not stack[-1].can_leave():
 		return
 	if stack.size() <= 1:
-		# nothing to pop: other tabs go Home, Home and the menu ask to leave
-		if cur_tab != "" and cur_tab != "home":
-			tab("home")
-		elif cur_tab == "home":
+		var nm = stack[-1].sname
+		if nm == "menu":
+			get_tree().quit()
+		elif nm == "home":
 			UI.confirm("Leave the game?", "Your career is saved automatically.", "Save & exit to menu", func():
 				G.save_game()
 				G.active = false
 				root("menu"))
-		elif stack[-1].sname == "menu":
-			get_tree().quit()
+		elif G.active and stack[-1].chrome:
+			root("home")
 		return
 	var top = stack.pop_back()
 	top.queue_free()
+	t_right = null
 	stack[-1].visible = true
 	stack[-1].on_resume()
 	_update_chrome()
@@ -200,36 +245,372 @@ func refresh_nav():
 	_update_chrome()
 
 
+# ---------------------------------------------------------------- chrome
+
+func _clear(n: Node):
+	for c in n.get_children():
+		n.remove_child(c)
+		c.queue_free()
+
+
 func _update_chrome():
 	if G.active:
 		UI.set_accent_from(G.uc())
 	else:
 		UI.accent = UI.GOLD
 	glow.modulate = UI.accent
-	var vis = stack.size() > 0 and stack[-1].show_nav
-	nav.visible = vis
-	if not vis:
+	var on = uses_chrome()
+	rail.visible = on
+	topbar.visible = on
+	if not on:
 		return
-	for c in nav.get_children():
-		nav.remove_child(c)
-		c.queue_free()
-	var h = UI.hb(0)
-	for t in TABS:
-		var on = t[0] == cur_tab
-		var it = UI.panel(Color(0, 0, 0, 0), 14, 4, 8)
-		it.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var v = UI.vb(4)
-		var ic = UI.icon(t[2], 34, UI.accent if on else UI.DIM)
-		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		v.add_child(ic)
-		var l = UI.lbl(t[1].to_upper(), 18, UI.TEXT if on else UI.DIM, "cond")
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		v.add_child(l)
-		it.add_child(v)
-		var nm = t[0]
-		UI.tap(it, func(): tab(nm), true)
-		h.add_child(it)
-	nav.add_child(h)
+	_build_rail()
+	_build_top()
+
+
+func _rail_key() -> String:
+	if menu_key != "":
+		return menu_key
+	if stack.size() == 0:
+		return ""
+	var nm = stack[0].sname
+	var groups = {"inbox": ["inbox"], "home": ["home"],
+		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists"],
+		"manager": ["board", "trophies", "jobs"], "world": ["table", "comps", "stats", "clubview"],
+		"search": ["transfers", "scouting", "player", "nego", "compare"]}
+	if nm == "lists":
+		return str(stack[0].args.get("grp", "club"))
+	for k in groups:
+		if nm in groups[k]:
+			return k
+	return ""
+
+
+func _build_rail():
+	_clear(rail)
+	var v = UI.vb(0)
+	var cur = _rail_key()
+	var bk = UI.panel(Color(0, 0, 0, 0), 0, 0, 0)
+	bk.custom_minimum_size = Vector2(RAIL_W, 66)
+	var can_back = stack.size() > 1 or (stack.size() == 1 and stack[0].sname != "home")
+	bk.add_child(UI.center(UI.icon("chevron-left", 40, UI.TEXT if can_back else UI.DIM)))
+	UI.tap(bk, back, true)
+	v.add_child(bk)
+	var n = G.unread()
+	for it in RAIL:
+		var key = it[0]
+		var sel = key == cur
+		var cell = UI.panel(Color(UI.accent, 0.92) if sel else Color(0, 0, 0, 0), 0, 0, 0)
+		cell.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		cell.custom_minimum_size = Vector2(RAIL_W, 60)
+		var fg = UI.on_color(UI.accent) if sel else UI.TEXT
+		var inner: Control
+		if key == "club":
+			inner = UI.badge(G.uc(), 46)
+		else:
+			inner = UI.icon(it[1], 36, fg)
+		var cc = UI.center(inner)
+		cell.add_child(cc)
+		if key == "inbox" and n > 0:
+			var bd = UI.chip(str(n), UI.RED, Color.WHITE, 17)
+			bd.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+			var holder2 = Control.new()
+			holder2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			holder2.add_child(bd)
+			bd.position = Vector2(RAIL_W - 40, 6)
+			cell.add_child(holder2)
+		UI.tap(cell, func(): _rail_tap(key), true)
+		v.add_child(cell)
+	rail.add_child(v)
+
+
+func _rail_tap(key: String):
+	if key == "inbox" or key == "home":
+		root(key)
+		return
+	if menu_key == key:
+		close_menu()
+	else:
+		open_menu(key)
+
+
+func cont_state() -> Dictionary:
+	var s = G.s
+	if s.review != null:
+		return {"label": "Season review", "sub": "", "icon": "trophy"}
+	if s.user.sacked:
+		return {"label": "Find a job", "sub": "", "icon": "briefcase"}
+	var f = G.next_user_fixture()
+	if f != null and f.day == s.day:
+		return {"label": "Match day", "sub": "%s (%s)" % [s.clubs[f.a if f.h == s.user.club else f.h].short, "H" if f.h == s.user.club else "A"], "icon": "play"}
+	var sub = ""
+	if f != null:
+		var d = f.day - s.day
+		sub = "%s (%s) in %d day%s" % [s.clubs[f.a if f.h == s.user.club else f.h].short, "H" if f.h == s.user.club else "A", d, "" if d == 1 else "s"]
+	return {"label": "Continue", "sub": sub, "icon": "fast-forward"}
+
+
+func _build_top():
+	_clear(topbar)
+	var h = UI.hb(14)
+	var c = G.uc()
+	var b = UI.badge(c, 48)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(b)
+	var tv = UI.vb(-4)
+	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tv.add_child(UI.lbl_fill(t_title.to_upper() if t_title != "" else c.name.to_upper(), 30, UI.TEXT, "xbold"))
+	var sub = t_sub if t_sub != "" else c.name
+	tv.add_child(UI.lbl_fill(sub, 18, UI.MUTED))
+	h.add_child(tv)
+	if t_right != null and is_instance_valid(t_right):
+		if t_right.get_parent() != null:
+			t_right.get_parent().remove_child(t_right)
+		t_right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(t_right)
+	if G.window_open():
+		var wc = UI.chip("WINDOW OPEN", Color(UI.GREEN, 0.14), UI.GREEN, 16)
+		h.add_child(wc)
+	var d = G.date(G.s.day)
+	var dv = UI.vb(-6)
+	dv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var d1 = UI.caps(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d.weekday], 16, UI.MUTED)
+	d1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var d2 = UI.lbl("%d %s %d" % [d.day, G.MONTHS[d.month - 1].to_upper(), d.year], 22, UI.TEXT, "disp")
+	d2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dv.add_child(d1)
+	dv.add_child(d2)
+	var dp = UI.panel(Color(1, 1, 1, 0.05), 12, 14, 6)
+	dp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	dp.add_child(dv)
+	h.add_child(dp)
+	var st = cont_state()
+	var cb = UI.panel(UI.accent, 12, 18, 4)
+	cb.custom_minimum_size = Vector2(210, 54)
+	cb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var fg = UI.on_color(UI.accent)
+	var ch = UI.hb(10)
+	ch.alignment = BoxContainer.ALIGNMENT_CENTER
+	ch.add_child(UI.icon(st.icon, 26, fg))
+	var cv = UI.vb(-6)
+	cv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	cv.add_child(UI.lbl(st.label.to_upper(), 26, fg, "xbold"))
+	if st.sub != "":
+		cv.add_child(UI.lbl(st.sub, 15, Color(fg, 0.75), "semi"))
+	ch.add_child(cv)
+	cb.add_child(ch)
+	cb.mouse_filter = Control.MOUSE_FILTER_STOP
+	cb.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+			if e.pressed:
+				pressing = true
+				press_t = 0.0
+				cb.modulate = Color(1, 1, 1, 0.7)
+			else:
+				cb.modulate = Color.WHITE
+				if pressing:
+					pressing = false
+					_continue(false))
+	cb.mouse_exited.connect(func():
+		pressing = false
+		cb.modulate = Color.WHITE)
+	h.add_child(cb)
+	topbar.add_child(h)
+
+
+func _continue(to_match: bool):
+	if busy or not G.active:
+		return
+	var s = G.s
+	if s.review != null:
+		root("review")
+		return
+	if s.user.sacked:
+		root("jobs", {"sacked": true})
+		return
+	var f = G.user_fixture_today()
+	if f != null:
+		root("match", {"fx": f})
+		return
+	busy = true
+	UI.sfx("continue", -10.0)
+	UI.toast("Simulating to the next match…" if to_match else "Simulating…", UI.MUTED)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var before = G.unread()
+	var first_id = s.inbox[0].id if s.inbox.size() > 0 else -1
+	for i in (8 if to_match else 1):
+		G.advance()
+		if G.user_fixture_today() != null or s.review != null or s.user.sacked:
+			break
+	busy = false
+	if s.review != null:
+		root("review")
+		return
+	if s.user.sacked:
+		root("jobs", {"sacked": true})
+		return
+	if stack.size() > 0:
+		stack[-1].refresh()
+	_update_chrome()
+	if G.unread() > before and s.inbox.size() > 0 and s.inbox[0].id != first_id:
+		UI.sfx("message", -8.0)
+		UI.toast("New message: %s" % s.inbox[0].title, UI.accent)
+
+
+# ---------------------------------------------------------------- slide-out menus
+
+func _row(icon_name: String, label: String, info: String, cb: Callable, flag := "") -> Array:
+	return [icon_name, label, info, cb, flag]
+
+
+func menu_items(key: String) -> Array:
+	var s = G.s
+	var c = G.uc()
+	var a: Array = []
+	if key == "club":
+		var youth = 0
+		var inj = 0
+		var loaned = 0
+		var expiring = 0
+		for pid in c.players:
+			var p = s.players[pid]
+			if p.get("youth", false): youth += 1
+			if p.inj > 0: inj += 1
+			if p.cend <= s.season + 1: expiring += 1
+		for p in s.players.values():
+			if p.get("loan", -1) == c.id and p.club != c.id: loaned += 1
+		var f = G.next_user_fixture()
+		a.append(_row("shirt", "First Team", "%d players" % (c.players.size() - youth), func(): root("squad", {"tab": 0})))
+		a.append(_row("graduation-cap", "Youth & Reserves", "%d players" % youth, func(): root("squad", {"tab": 1})))
+		a.append(_row("layout-grid", "Tactics", "%s · %s" % [c.formation, G.MENTALITY[c.ment]], func(): root("tactics")))
+		a.append(_row("dumbbell", "Development Hub", "%s focus" % G.OPS.FOCUS[c.train.focus], func(): root("training")))
+		a.append(_row("stethoscope", "Medical Centre", "%d injured" % inj if inj > 0 else "All fit", func(): root("lists", {"kind": "medical", "grp": "club"})))
+		a.append(_row("file-text", "Contracts", "%d expiring" % expiring if expiring > 0 else "None expiring", func(): root("lists", {"kind": "contracts", "grp": "club"})))
+		a.append(_row("repeat", "Loan Watch", "%d out on loan" % loaned, func(): root("squad", {"tab": 2})))
+		a.append(_row("calendar", "Fixtures", "Next: %s" % s.clubs[f.a if f.h == c.id else f.h].short if f != null else "Season over", func(): root("fixtures")))
+		a.append(_row("wallet", "Finances", "%s budget" % G.money(c.budget), func(): root("finances")))
+		a.append(_row("building", "Club City", "Stadium %s" % G.OPS._thousands(G.OPS.capacity(c)), func(): root("campus")))
+	elif key == "manager":
+		a.append(_row("user", "Manager Profile", s.user.name, func(): root("board")))
+		a.append(_row("target", "Board Confidence", "%d%% · %s" % [int(s.user.conf), s.user.obj.text], func(): root("board")))
+		a.append(_row("trophy", "Trophy Cabinet", "%d won" % s.user.trophies.size(), func(): root("trophies")))
+		a.append(_row("briefcase", "Jobs", "%d club%s interested" % [s.user.jobs.size(), "" if s.user.jobs.size() == 1 else "s"], func(): root("jobs")))
+	elif key == "world":
+		a.append(_row("list-ordered", "Club Division", "%s in the %s" % [G.LG.ordinal(G.LG.position(c.id)), s.leagues[c.lg].name], func(): root("table", {"lg": c.lg})))
+		a.append(_row("trophy", "Cups & Continental", "%d competitions" % G.CP.club_comps(c.id).size(), func(): root("comps")))
+		for nat in NATIONS:
+			for i in s.leagues.size():
+				var l = s.leagues[i]
+				if l.get("country", "") == nat and int(l.get("tier", 1)) == 1:
+					var lid = i
+					a.append(_row("", nat, l.name, func(): root("table", {"lg": lid}), nat))
+					break
+		a.append(_row("chart-bar", "Player Stats", "Scorers, assists, ratings", func(): root("stats", {"lg": c.lg})))
+		a.append(_row("crown", "Top 50 Players", "Best in the world", func(): root("lists", {"kind": "top50", "grp": "world"})))
+		a.append(_row("sparkles", "Wonderkids", "Best aged 21 or under", func(): root("lists", {"kind": "wonderkids", "grp": "world"})))
+	elif key == "search":
+		a.append(_row("search", "Player Search", "Transfer market", func(): root("transfers")))
+		a.append(_row("binoculars", "Scouting", "%d being watched" % s.scout.queue.size(), func(): root("scouting")))
+		a.append(_row("tags", "Bargains", "Good players, low prices", func(): root("lists", {"kind": "bargains", "grp": "search"})))
+		a.append(_row("clock", "Expiring Contracts", "Out of contract in June", func(): root("lists", {"kind": "expiring", "grp": "search"})))
+		a.append(_row("users", "Free Agents", "Available now", func(): root("lists", {"kind": "free", "grp": "search"})))
+		a.append(_row("flag", "Transfer Listed", "Clubs want to sell", func(): root("lists", {"kind": "listed", "grp": "search"})))
+		a.append(_row("briefcase", "Jobs", "Clubs interested in you", func(): root("jobs")))
+	elif key == "options":
+		var snd = G.settings.get("sound", true)
+		a.append(_row("save", "Save Game", "Saved automatically each day", func():
+			G.save_game()
+			close_menu()
+			UI.toast("Game saved", UI.GREEN)))
+		a.append(_row("volume-2" if snd else "volume-x", "Sound", "On" if snd else "Off", func():
+			G.settings["sound"] = not snd
+			G.save_settings()
+			if not G.settings["sound"]:
+				UI.ambience(false)
+			open_menu("options")))
+		a.append(_row("log-out", "Exit to Menu", "Saves first", func():
+			G.save_game()
+			G.active = false
+			root("menu")))
+	return a
+
+
+func open_menu(key: String):
+	close_menu()
+	UI.sfx("open", -14.0)
+	menu_key = key
+	var root_c = Control.new()
+	root_c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root_c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var left = safe.get_theme_constant("margin_left") + RAIL_W
+	var dim = ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.5)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.offset_left = left
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.pressed:
+			close_menu())
+	root_c.add_child(dim)
+	var p = UI.panel(Color("111827"), 0, 0, 0)
+	p.get_theme_stylebox("panel").border_color = Color(UI.accent, 0.8)
+	p.get_theme_stylebox("panel").border_width_left = 3
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	p.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	p.offset_left = left
+	p.offset_right = left + 400
+	p.offset_top = safe.get_theme_constant("margin_top")
+	var v = UI.vb(0)
+	var head = UI.hb(12)
+	head.add_child(UI.badge(G.uc(), 44))
+	var hv = UI.vb(-4)
+	hv.add_child(UI.lbl(G.uc().name, 24, UI.TEXT, "bold"))
+	hv.add_child(UI.caps({"club": "Club", "manager": "Manager", "world": "World", "search": "Search", "options": "Options"}[key], 18, UI.accent))
+	head.add_child(hv)
+	v.add_child(UI.margin(head, 18, 12, 18, 10))
+	v.add_child(UI.divider())
+	var lv = UI.vb(0)
+	for it in menu_items(key):
+		var r = UI.panel(Color(0, 0, 0, 0), 0, 18, 9)
+		var h = UI.hb(14)
+		if it[4] != "":
+			h.add_child(UI.flag(it[4], 34))
+		else:
+			h.add_child(UI.icon(it[0], 28, UI.TEXT))
+		var tv = UI.vb(-3)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl_fill(it[1], 25, UI.TEXT, "semi"))
+		if it[2] != "":
+			tv.add_child(UI.lbl_fill(it[2], 17, UI.MUTED))
+		h.add_child(tv)
+		h.add_child(UI.icon("chevron-right", 20, UI.DIM))
+		r.add_child(h)
+		UI.tap(r, it[3])
+		lv.add_child(r)
+		lv.add_child(UI.divider())
+	v.add_child(UI.scroll(lv))
+	p.add_child(v)
+	root_c.add_child(p)
+	overlay.add_child(root_c)
+	menu_node = root_c
+	p.modulate.a = 0.0
+	p.position.x -= 30
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(p, "modulate:a", 1.0, 0.12)
+	tw.tween_property(p, "position:x", p.position.x + 30, 0.12)
+	_build_rail()
+
+
+func close_menu():
+	if menu_node != null:
+		menu_node.queue_free()
+		menu_node = null
+	if menu_key != "":
+		menu_key = ""
+		if rail != null and rail.visible:
+			_build_rail()
 
 
 # ---------------------------------------------------------------- overlays
@@ -247,46 +628,39 @@ func open_sheet(title: String, build: Callable):
 		if e is InputEventMouseButton and e.pressed:
 			close_sheet())
 	root_c.add_child(dim)
-	var p = UI.panel(UI.BG2, 32, 26, 24, Color(1, 1, 1, 0.1))
+	var p = UI.panel(UI.BG2, 26, 24, 20, Color(1, 1, 1, 0.1))
 	p.mouse_filter = Control.MOUSE_FILTER_STOP
-	var outer = UI.vb(14)
+	p.custom_minimum_size = Vector2(min(680.0, size.x - 80), 0)
+	var outer = UI.vb(12)
 	var head = UI.hb(8)
-	head.add_child(UI.lbl_fill(title.to_upper(), 34, UI.TEXT, "xbold"))
-	var x = UI.panel(Color(1, 1, 1, 0.07), 16, 10, 10)
-	x.add_child(UI.icon("x", 26, UI.MUTED))
+	head.add_child(UI.lbl_fill(title.to_upper(), 30, UI.TEXT, "xbold"))
+	var x = UI.panel(Color(1, 1, 1, 0.07), 14, 9, 9)
+	x.add_child(UI.icon("x", 24, UI.MUTED))
 	UI.tap(x, close_sheet, true)
 	head.add_child(x)
 	outer.add_child(head)
-	var v = UI.vb(12)
+	var v = UI.vb(10)
 	var s = UI.scroll(v)
 	s.size_flags_vertical = Control.SIZE_FILL
 	outer.add_child(s)
 	p.add_child(outer)
-	root_c.add_child(p)
-	p.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	p.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	p.offset_left = 12
-	p.offset_right = -12
-	p.offset_bottom = -14
-	p.offset_top = -14
+	var cc = CenterContainer.new()
+	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cc.add_child(p)
+	root_c.add_child(cc)
 	overlay.add_child(root_c)
 	sheet_node = root_c
 	build.call(v)
-	_layout_sheet(p, s, v)
+	_layout_sheet(s, v)
 
 
-func _layout_sheet(p: Control, s: ScrollContainer, v: Control):
-	await get_tree().process_frame
-	if not is_instance_valid(p):
-		return
-	var h = min(v.get_combined_minimum_size().y, size.y * 0.7)
-	s.custom_minimum_size = Vector2(0, h)
-	p.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	p.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	p.offset_left = 12
-	p.offset_right = -12
-	p.offset_bottom = -14
-	p.offset_top = -14
+func _layout_sheet(s: ScrollContainer, v: Control):
+	for i in 2:
+		await get_tree().process_frame
+		if not is_instance_valid(s):
+			return
+		s.custom_minimum_size = Vector2(0, min(v.get_combined_minimum_size().y, size.y - 150))
 
 
 func close_sheet():
@@ -296,12 +670,12 @@ func close_sheet():
 
 
 func toast(text: String, color := UI.TEXT):
-	var p = UI.panel(Color("1d2740"), 18, 22, 14, Color(1, 1, 1, 0.14))
-	p.add_child(UI.lbl(text, 24, color, "semi"))
+	var p = UI.panel(Color("1d2740"), 16, 20, 12, Color(1, 1, 1, 0.14))
+	p.add_child(UI.lbl(text, 22, color, "semi"))
 	var c = CenterContainer.new()
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	c.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	c.offset_top = top_sp.custom_minimum_size.y + 90
+	c.offset_top = 84
 	c.add_child(p)
 	overlay.add_child(c)
 	var tw = create_tween()
