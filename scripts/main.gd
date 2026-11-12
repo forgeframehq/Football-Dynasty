@@ -31,6 +31,7 @@ const SCREENS = {
 	"scouting": preload("res://scripts/screens/scouting.gd"),
 	"lists": preload("res://scripts/screens/lists.gd"),
 	"hub": preload("res://scripts/screens/hub.gd"),
+	"search": preload("res://scripts/screens/search.gd"),
 }
 const RAIL = [["inbox", "mail"], ["home", "house"], ["club", ""], ["manager", "user"], ["world", "globe"], ["search", "search"], ["options", "settings"]]
 const RAIL_W = 92
@@ -290,7 +291,7 @@ func _rail_key() -> String:
 	var groups = {"inbox": ["inbox"], "home": ["home"],
 		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists"],
 		"manager": ["board", "trophies", "jobs"], "world": ["table", "comps", "stats", "clubview"],
-		"search": ["transfers", "scouting", "player", "nego", "compare"]}
+		"search": ["search", "transfers", "scouting", "player", "nego", "compare"]}
 	if nm == "lists" or nm == "hub":
 		return str(stack[0].args.get("grp", "club"))
 	for k in groups:
@@ -547,7 +548,8 @@ func menu_items(key: String) -> Array:
 		a.append(_row("crown", "Top 50 Players", "Best in the world", func(): root("lists", {"kind": "top50", "grp": "world"})))
 		a.append(_row("sparkles", "Wonderkids", "Best aged 21 or under", func(): root("lists", {"kind": "wonderkids", "grp": "world"})))
 	elif key == "search":
-		a.append(_row("search", "Player Search", "Transfer market", func(): root("transfers")))
+		a.append(_row("search", "Player Search", "Every player, sortable", func(): root("search")))
+		a.append(_row("handshake", "Transfer Market", "Offers, shortlist, your deals", func(): root("transfers")))
 		a.append(_row("binoculars", "Scouting", "%d being watched" % s.scout.queue.size(), func(): root("scouting")))
 		a.append(_row("tags", "Bargains", "Good players, low prices", func(): root("lists", {"kind": "bargains", "grp": "search"})))
 		a.append(_row("clock", "Expiring Contracts", "Out of contract in June", func(): root("lists", {"kind": "expiring", "grp": "search"})))

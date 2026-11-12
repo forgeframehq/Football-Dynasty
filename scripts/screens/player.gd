@@ -2,6 +2,291 @@ extends "res://scripts/screens/screen.gd"
 # Player profile with attributes, contract, season stats and actions.
 
 
+const PAGES = ["Profile", "Personal", "Positions", "Contract", "Stats", "Manage"]
+const POS_XY = {"GK": [.5, .06], "CB": [.5, .2], "LB": [.14, .26], "RB": [.86, .26], "CDM": [.5, .37], "CM": [.5, .5], "LM": [.12, .52], "RM": [.88, .52],
+	"CAM": [.5, .65], "LW": [.15, .78], "RW": [.85, .78], "ST": [.5, .89]}
+
+var page := 0
+var sw = null
+
+
+class PosMap extends Control:
+	var p: Dictionary
+	var xy: Dictionary
+
+	func _draw():
+		var w = size.x
+		var h = size.y
+		draw_rect(Rect2(0, 0, w, h), Color("1f6b3f"))
+		var ln = Color(1, 1, 1, 0.5)
+		draw_rect(Rect2(6, 6, w - 12, h - 12), ln, false, 2.0)
+		draw_line(Vector2(6, h / 2), Vector2(w - 6, h / 2), ln, 2.0)
+		draw_arc(Vector2(w / 2, h / 2), h * 0.09, 0, TAU, 32, ln, 2.0)
+		draw_rect(Rect2(w * 0.28, 6, w * 0.44, h * 0.13), ln, false, 2.0)
+		draw_rect(Rect2(w * 0.28, h - 6 - h * 0.13, w * 0.44, h * 0.13), ln, false, 2.0)
+		for k in xy:
+			var f = G.fit(p, k)
+			var col = Color("7dff5a") if f >= 0.99 else (Color("c9d94a") if f >= 0.92 else (Color("f1b53a") if f >= 0.84 else Color(1, 1, 1, 0.28)))
+			var at = Vector2(xy[k][0] * w, (1.0 - xy[k][1]) * h)
+			draw_circle(at, 11 if f >= 0.99 else 9, col)
+			if f >= 0.99:
+				draw_arc(at, 13, 0, TAU, 24, Color.WHITE, 2.0)
+
+
+func _input(e: InputEvent):
+	# swipe left and right between the profile pages
+	if not is_visible_in_tree() or UI.main.sheet_node != null or UI.main.menu_node != null:
+		return
+	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+		if e.pressed:
+			sw = e.position
+		elif sw != null:
+			var d = e.position - sw
+			sw = null
+			if absf(d.x) > 110 and absf(d.x) > absf(d.y) * 2.2:
+				page = clampi(page + (1 if d.x < 0 else -1), 0, PAGES.size() - 1)
+				refresh()
+
+
+func _cell(text: String, val: String, col: Color, hi := false) -> Control:
+	var r = UI.panel(Color(UI.accent, 0.16) if hi else Color(1, 1, 1, 0.03), 4, 10, 3)
+	var h = UI.hb(8)
+	h.add_child(UI.lbl_fill(text, 20, UI.TEXT if hi else UI.MUTED))
+	var b = UI.panel(Color(col, 0.9), 4, 0, 0)
+	b.custom_minimum_size = Vector2(48, 28)
+	var l = UI.lbl(val, 20, Color("0a0e17"), "xbold")
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	b.add_child(l)
+	h.add_child(b)
+	r.add_child(h)
+	r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return r
+
+
+func _info(k: String, v: String, col := UI.TEXT) -> Control:
+	var b = UI.vb(-4)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var a = UI.lbl(v, 24, col, "bold")
+	a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	a.clip_text = true
+	var c = UI.lbl(k, 15, UI.MUTED)
+	c.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.add_child(a)
+	b.add_child(c)
+	return b
+
+
+func _page(p: Dictionary, own: bool, free: bool):
+	var s = G.s
+	var uc = G.uc()
+	var club = s.clubs[p.club] if not free else null
+	var known = G.OPS.knows(p) or p.get("loan", -1) == uc.id
+	var h = panes(12, 20)
+	var roles = []
+	for rid in G.RL.BY_POS[p.pos]:
+		roles.append([G.RL.suit(p, rid), rid])
+	roles.sort_custom(func(x, y): return x[0] > y[0])
+	var best_role = G.RL.ROLES[roles[0][1]]
+	var status = ["Key player", "Rotation", "Backup", "Prospect"][G.status_of(p)]
+	if page == 0:
+		var col = UI.vb(8)
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(col)
+		var top = UI.hb(10)
+		var card = UI.panel(Color(UI.ovr_color(p.ovr), 0.16), 12, 14, 8, UI.ovr_color(p.ovr))
+		card.custom_minimum_size = Vector2(190, 0)
+		var cv = UI.vb(-4)
+		cv.alignment = BoxContainer.ALIGNMENT_CENTER
+		var big = UI.lbl(str(p.ovr), 70, UI.ovr_color(p.ovr), "xbold")
+		big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cv.add_child(big)
+		var nm = UI.lbl((p.ln if p.cn == "" else p.cn).to_upper(), 22, UI.TEXT, "xbold")
+		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		nm.clip_text = true
+		cv.add_child(nm)
+		var pt = UI.lbl("Potential %s" % (str(p.pot) if known else G.OPS.pot_text(p)), 15, UI.MUTED)
+		pt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cv.add_child(pt)
+		card.add_child(cv)
+		top.add_child(card)
+		var info = UI.panel(UI.CARD, 12, 12, 8, UI.LINE)
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var iv = UI.vb(6)
+		iv.alignment = BoxContainer.ALIGNMENT_CENTER
+		var r1 = UI.hb(6)
+		r1.add_child(_info("%d/%d/%d" % [p.bd, p.bm, p.by], "%d yrs" % G.age(p)))
+		r1.add_child(_info("Value", G.money(G.value(p))))
+		r1.add_child(_info("Wage", "%s" % G.money(p.wage)))
+		iv.add_child(r1)
+		var r2 = UI.hb(6)
+		var nb = UI.hb(6)
+		nb.alignment = BoxContainer.ALIGNMENT_CENTER
+		nb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		nb.add_child(UI.flag(p.nat, 30))
+		nb.add_child(UI.lbl(p.nat, 20, UI.TEXT, "semi"))
+		r2.add_child(nb)
+		r2.add_child(_info("Contract expiry", "—" if free else "30/6/%d" % p.cend, UI.AMBER if (not free and p.cend <= s.season + 1) else UI.TEXT))
+		iv.add_child(r2)
+		iv.add_child(UI.divider())
+		var r3 = UI.hb(8)
+		r3.alignment = BoxContainer.ALIGNMENT_CENTER
+		if club != null:
+			r3.add_child(UI.badge(club, 30))
+			r3.add_child(UI.lbl("%s · %s" % [club.name, s.leagues[club.lg].name], 20, UI.TEXT, "semi"))
+		else:
+			r3.add_child(UI.lbl("Free agent", 20, UI.GREEN, "semi"))
+		r3.add_child(UI.chip(status.to_upper(), Color(UI.GREEN, 0.14), UI.GREEN, 15))
+		iv.add_child(r3)
+		info.add_child(iv)
+		top.add_child(info)
+		var pm = PosMap.new()
+		pm.p = p
+		pm.xy = POS_XY
+		pm.custom_minimum_size = Vector2(150, 176)
+		pm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		top.add_child(pm)
+		col.add_child(top)
+		var strip = UI.hb(8)
+		strip.add_child(UI.lbl_fill(best_role.n, 22, UI.TEXT, "bold"))
+		strip.add_child(UI.lbl("%s%s · %s foot · %d★ skills · %d★ weak foot" % [p.pos, (" / " + " / ".join(p.alt)) if p.alt.size() > 0 else "", "Left" if p.foot == "L" else "Right", p.sm, p.wf], 17, UI.MUTED))
+		col.add_child(strip)
+		var grid = UI.hb(8)
+		grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		var keys = best_role.k
+		for ci in 3:
+			var gv = UI.vb(3)
+			gv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			if p.pos == "GK":
+				for i in range(ci * 2, ci * 2 + 2):
+					gv.add_child(_cell(G.GK_STAT_NAMES[i], str(p.st[i]), UI.ovr_color(p.st[i])))
+			else:
+				for i in range(ci * 6, ci * 6 + 6):
+					gv.add_child(_cell(G.RL.ATTR[i], str(p.at[i]), UI.ovr_color(p.at[i]), i in keys))
+			if ci == 2:
+				gv.add_child(_cell("Condition", "%d%%" % int(p.cond), UI.cond_color(p.cond)))
+				gv.add_child(_cell("Morale", str(int(p.mor)), UI.cond_color(p.mor + 10)))
+			elif ci == 1:
+				gv.add_child(_cell("Form", "%.1f" % p.form if p.ss.ap > 0 else "-", UI.GREEN if p.form >= 7.0 else Color("9aa3b5")))
+				gv.add_child(_cell("Av. rating", "%.2f" % G.avg_rating(p) if p.ss.ap > 0 else "-", Color("9aa3b5")))
+			else:
+				gv.add_child(_cell("Apps", str(p.ss.ap), Color("9aa3b5")))
+				gv.add_child(_cell("Goals", str(p.ss.g), Color("9aa3b5")))
+			grid.add_child(gv)
+		col.add_child(UI.scroll(grid))
+	elif page == 1:
+		var a = pane(0, 8)
+		h.add_child(a[0])
+		var v = a[1]
+		v.add_child(UI.kv("Date of birth", "%d/%d/%d (%d)" % [p.bd, p.bm, p.by, G.age(p)]))
+		v.add_child(UI.kv("Nationality", p.nat))
+		v.add_child(UI.kv("Preferred foot", "Left" if p.foot == "L" else "Right"))
+		v.add_child(UI.kv("Skill moves · weak foot", "%d★ · %d★" % [p.sm, p.wf]))
+		v.add_child(UI.kv("Squad status", status))
+		v.add_child(UI.kv("Career", "%d apps · %d goals" % [p.cap, p.cg]))
+		v.add_child(UI.kv("Shirt number", str(p.get("num", "-"))))
+		var b = pane(0, 8)
+		h.add_child(b[0])
+		v = b[1]
+		var unhappy = p.get("unhappy", 0) > 0
+		var mood = "Wants to leave" if unhappy else ("Happy at the club" if p.mor >= 62 else ("Fairly content" if p.mor >= 42 else "Unsettled"))
+		var mc = UI.RED if unhappy or p.mor < 42 else (UI.GREEN if p.mor >= 62 else UI.AMBER)
+		var banner = UI.panel(Color(mc, 0.85), 8, 14, 8)
+		var bl = UI.lbl(mood, 24, Color("0a0e17"), "xbold")
+		bl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		banner.add_child(bl)
+		v.add_child(banner)
+		var lines = []
+		lines.append([p.ss.ap >= 3 or G.status_of(p) >= 2, "Getting the games his status calls for" if (p.ss.ap >= 3 or G.status_of(p) >= 2) else "Wants more time on the pitch"])
+		lines.append([p.cend > s.season + 1, "Settled on a long contract" if p.cend > s.season + 1 else "His contract is running down"])
+		lines.append([p.form >= 6.8 or p.ss.ap == 0, "Playing well" if p.form >= 6.8 else ("Yet to play this season" if p.ss.ap == 0 else "Out of form")])
+		if p.listed:
+			lines.append([false, "Knows he is on the transfer list"])
+		if p.inj > 0:
+			lines.append([false, "Injured for around %s" % G.inj_text(p.inj)])
+		for ln in lines:
+			var r = UI.hb(10)
+			r.add_child(UI.icon("check" if ln[0] else "x", 22, UI.GREEN if ln[0] else UI.AMBER))
+			r.add_child(UI.lbl_fill(ln[1], 20, UI.GREEN if ln[0] else UI.TEXT))
+			v.add_child(r)
+	elif page == 2:
+		var a = pane(0, 6)
+		h.add_child(a[0])
+		var v = a[1]
+		v.add_child(UI.caps("Position", 17, UI.accent))
+		v.add_child(UI.lbl("%s · natural" % p.pos, 24, UI.TEXT, "bold"))
+		if p.alt.size() > 0:
+			v.add_child(UI.lbl("Also plays: %s" % ", ".join(p.alt), 19, UI.MUTED))
+		v.add_child(UI.caps("Roles", 17, UI.accent))
+		for r in roles:
+			var rd = G.RL.ROLES[r[1]]
+			var rh = UI.hb(10)
+			rh.add_child(UI.lbl_fill(rd.n, 21, UI.TEXT, "semi"))
+			rh.add_child(UI.stars(40 + G.RL.stars(p, r[1]) * 12, 15))
+			v.add_child(rh)
+			v.add_child(UI.lbl_fill(rd.d, 15, UI.MUTED))
+		var pm = PosMap.new()
+		pm.p = p
+		pm.xy = POS_XY
+		pm.custom_minimum_size = Vector2(330, 0)
+		pm.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		pm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.add_child(pm)
+	elif page == 3:
+		var paper = UI.panel(Color("e2ddcf"), 6, 22, 16, Color("b9b29f"))
+		paper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		paper.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		var ink = Color("4a4020")
+		var pv = UI.vb(10)
+		var g = GridContainer.new()
+		g.columns = 2
+		g.add_theme_constant_override("h_separation", 30)
+		g.add_theme_constant_override("v_separation", 10)
+		for it in [["Club", club.name if club != null else "None"], ["Role", status], ["Wage (p/w)", G.money(p.wage)], ["Contract expiry", "—" if free else "30/6/%d" % p.cend],
+				["Release clause", G.money(p.rc) if p.get("rc", 0) > 0 else "None"], ["Loan", ("From %s" % s.clubs[p.loan].name) if p.get("loan", -1) >= 0 else "None"]]:
+			var b = UI.vb(-2)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.add_child(UI.lbl(it[0], 16, Color("8a8470")))
+			b.add_child(UI.lbl(str(it[1]), 24, ink, "bold"))
+			g.add_child(b)
+		pv.add_child(g)
+		paper.add_child(pv)
+		h.add_child(paper)
+		var a = pane(0, 8)
+		h.add_child(a[0])
+		var v = a[1]
+		v.add_child(UI.kv("Value", G.money(G.value(p))))
+		v.add_child(UI.kv("Transfer status", "Listed for sale" if p.listed else ("Not for sale" if (club != null and not own and G.TR.squad_rank(p) < 3) else "Open to offers")))
+		if not own and not free:
+			v.add_child(UI.kv("Asking price", "around %s" % G.money(G.TR.asking_price(p))))
+		v.add_child(UI.kv("Wants (if he moved)", "%s / wk" % G.money(G.wage_for(p.ovr, G.age(p)))))
+		var offers = 0
+		for o in s.offers:
+			if o.pid == p.id:
+				offers += 1
+		v.add_child(UI.kv("Transfer offers", str(offers) if offers > 0 else "None"))
+		v.add_child(UI.kv("Years left", str(max(0, p.cend - s.season - 1)) if not free else "-"))
+	else:
+		var a = pane(0, 8)
+		h.add_child(a[0])
+		var v = a[1]
+		v.add_child(UI.caps("Season %s" % G.season_name(), 17, UI.accent))
+		for it in [["Appearances", p.ss.ap], ["Goals", p.ss.g], ["Assists", p.ss.a], ["Man of the match", p.ss.mom], ["Clean sheets", p.ss.cs], ["Yellow cards", p.ss.yc], ["Red cards", p.ss.rc]]:
+			v.add_child(UI.kv(it[0], str(it[1])))
+		v.add_child(UI.kv("Average rating", "%.2f" % G.avg_rating(p) if p.ss.ap > 0 else "-"))
+		var b = pane(0, 8)
+		h.add_child(b[0])
+		v = b[1]
+		v.add_child(UI.caps("Career", 17, UI.accent))
+		v.add_child(UI.kv("Appearances", str(p.cap)))
+		v.add_child(UI.kv("Goals", str(p.cg)))
+		v.add_child(UI.caps("Match eligibility", 17, UI.accent))
+		v.add_child(UI.kv("Selection", "Available" if G.available(p) else "Unavailable", UI.GREEN if G.available(p) else UI.RED))
+		v.add_child(UI.kv("Injuries", "Out for %s" % G.inj_text(p.inj) if p.inj > 0 else "None"))
+		v.add_child(UI.kv("Suspensions", "%d match%s" % [p.susp, "" if p.susp == 1 else "es"] if p.susp > 0 else "None"))
+		v.add_child(UI.kv("Fitness", "%d%%" % int(p.cond), UI.cond_color(p.cond)))
+
+
 func build():
 	var s = G.s
 	if not s.players.has(args.pid):
@@ -21,122 +306,14 @@ func build():
 			s.shortlist.append(p.id)
 		refresh(), true)
 	body.add_child(UI.topbar(G.pname(p), true, null if own else star))
+	body.add_child(UI.margin(UI.seg(PAGES, page, func(i):
+		page = i
+		refresh(), 17), 20, 0, 20, 6))
+	if page < 5:
+		_page(p, own, free)
+		_bar(p)
+		return
 	var v = content(14)
-	# hero
-	var hero = UI.panel(UI.CARD, 28, 24, 22, Color(UI.ovr_color(p.ovr), 0.35))
-	var hh = UI.hb(20)
-	var ov = UI.vb(-6)
-	var big = UI.lbl(str(p.ovr), 104, UI.ovr_color(p.ovr), "xbold")
-	big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ov.add_child(big)
-	var ol = UI.caps("Overall", 18, UI.MUTED)
-	ol.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ov.add_child(ol)
-	hh.add_child(ov)
-	var hv = UI.vb(6)
-	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var full = UI.wrap(G.pfull(p), 30, UI.TEXT, "disp")
-	hv.add_child(full)
-	var ph = UI.hb(6)
-	ph.add_child(UI.pos(p.pos))
-	for a in p.alt:
-		ph.add_child(UI.chip(a, Color(1, 1, 1, 0.05), UI.MUTED, 18))
-	hv.add_child(ph)
-	hv.add_child(UI.lbl_fill("%s · %d yrs · %s foot" % [p.nat, G.age(p), "Left" if p.foot == "L" else "Right"], 21, UI.MUTED))
-	var ch = UI.hb(8)
-	if free:
-		ch.add_child(UI.lbl("Free agent", 22, UI.GREEN, "semi"))
-	else:
-		ch.add_child(UI.badge(s.clubs[p.club], 30))
-		ch.add_child(UI.lbl_fill(s.clubs[p.club].name, 22, UI.TEXT, "semi"))
-	hv.add_child(ch)
-	hh.add_child(hv)
-	var pv = UI.vb(-4)
-	var known = G.OPS.knows(p) or p.get("loan", -1) == uc.id
-	var pl = UI.lbl(str(p.pot) if known else G.OPS.pot_text(p), 48 if known else 34, UI.ovr_color(p.pot) if known else UI.MUTED, "xbold")
-	pl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pv.add_child(pl)
-	var pc = UI.caps("Potential", 16, UI.MUTED)
-	pc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pv.add_child(pc)
-	pv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	hh.add_child(pv)
-	hero.add_child(hh)
-	v.add_child(hero)
-	# status
-	var t = UI.hb(10)
-	t.add_child(UI.stat_tile("Value", G.money(G.value(p))))
-	t.add_child(UI.stat_tile("Wage / wk", G.money(p.wage)))
-	t.add_child(UI.stat_tile("Contract", "—" if free else "Jun %d" % p.cend, UI.AMBER if (not free and p.cend <= s.season + 1) else UI.TEXT))
-	v.add_child(t)
-	var t2 = UI.hb(10)
-	t2.add_child(UI.stat_tile("Fitness", "%d%%" % p.cond, UI.cond_color(p.cond)))
-	t2.add_child(UI.stat_tile("Morale", "%d" % p.mor, UI.cond_color(p.mor + 10)))
-	t2.add_child(UI.stat_tile("Form", "%.1f" % p.form, UI.GREEN if p.form >= 7.0 else UI.TEXT))
-	v.add_child(t2)
-	if p.inj > 0:
-		v.add_child(_note("bandage", "Injured — out for around %s." % G.inj_text(p.inj), UI.RED))
-	if p.susp > 0:
-		v.add_child(_note("square", "Suspended for %d match%s." % [p.susp, "" if p.susp == 1 else "es"], UI.RED))
-	# attributes
-	v.add_child(UI.section("Attributes", "%d★ skills · %d★ weak foot" % [p.sm, p.wf]))
-	var ac = UI.card()
-	var av = UI.vb(12)
-	var names = G.GK_STAT_NAMES if p.pos == "GK" else G.STAT_NAMES
-	for i in 6:
-		var r = UI.hb(14)
-		var nl = UI.caps(names[i], 22, UI.MUTED)
-		nl.custom_minimum_size = Vector2(56, 0)
-		r.add_child(nl)
-		r.add_child(UI.bar(p.st[i] / 99.0, UI.ovr_color(p.st[i]), 10))
-		var vl = UI.lbl(str(p.st[i]), 26, UI.ovr_color(p.st[i]), "disp")
-		vl.custom_minimum_size = Vector2(40, 0)
-		vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		r.add_child(vl)
-		av.add_child(r)
-	ac.add_child(av)
-	v.add_child(ac)
-	if p.pos != "GK":
-		var dc = UI.card()
-		var dv = UI.vb(14)
-		for grp in G.RL.ATTR_GROUPS:
-			var gv = UI.vb(6)
-			gv.add_child(UI.caps(grp[0], 19, UI.accent))
-			var grid = GridContainer.new()
-			grid.columns = 2
-			grid.add_theme_constant_override("h_separation", 28)
-			grid.add_theme_constant_override("v_separation", 6)
-			grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			for k in grp[1]:
-				var r = UI.hb(8)
-				r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				r.add_child(UI.lbl_fill(G.RL.ATTR[k], 22, UI.MUTED))
-				r.add_child(UI.lbl(str(p.at[k]), 24, UI.ovr_color(p.at[k]), "disp"))
-				grid.add_child(r)
-			gv.add_child(grid)
-			dv.add_child(gv)
-		dc.add_child(dv)
-		v.add_child(dc)
-		var best = []
-		for rid in G.RL.BY_POS[p.pos]:
-			best.append([G.RL.suit(p, rid), G.RL.ROLES[rid].n])
-		best.sort_custom(func(x, y): return x[0] > y[0])
-		v.add_child(UI.kv("Best roles", "%s · %s" % [best[0][1], best[1][1]] if best.size() > 1 else best[0][1]))
-	# season
-	v.add_child(UI.section("Season %s" % G.season_name(), "Career: %d apps · %d goals" % [p.cap, p.cg]))
-	var g1 = UI.hb(10)
-	g1.add_child(UI.stat_tile("Apps", str(p.ss.ap)))
-	g1.add_child(UI.stat_tile("Goals", str(p.ss.g)))
-	g1.add_child(UI.stat_tile("Assists", str(p.ss.a)))
-	g1.add_child(UI.stat_tile("Avg", "%.2f" % G.avg_rating(p) if p.ss.ap > 0 else "—"))
-	v.add_child(g1)
-	var g2 = UI.hb(10)
-	g2.add_child(UI.stat_tile("MOTM", str(p.ss.mom)))
-	g2.add_child(UI.stat_tile("Clean sh.", str(p.ss.cs)))
-	g2.add_child(UI.stat_tile("Yellows", str(p.ss.yc)))
-	g2.add_child(UI.stat_tile("Reds", str(p.ss.rc)))
-	v.add_child(g2)
 	# actions
 	v.add_child(UI.sp(0, 4))
 	var loaned_in = own and p.get("loan", -1) >= 0
@@ -215,6 +392,14 @@ func build():
 			v.add_child(_note("clock", "The transfer window is closed. You can approach %s when it reopens." % G.pname(p), UI.MUTED))
 
 
+	_bar(p)
+
+
+func _bar(p: Dictionary):
+	var s = G.s
+	var own = p.club == G.uc().id
+	var free = p.club < 0
+	var short = p.id in s.shortlist
 	# fixed action bar: the main things you can do with this player, always in reach
 	var bar = UI.hb(8)
 	var acts: Array = []

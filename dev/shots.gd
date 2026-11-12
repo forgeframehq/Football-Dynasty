@@ -84,8 +84,19 @@ func run(m):
 		main.root("lists", {"kind": "role", "rid": c.roles[9], "pos": c.slots[9][0], "grp": "search"})
 		await snap("list_role")
 	if want.call("player"):
+		main.root("search")
+		await snap("search")
+		main.stack[-1].view = 2
+		main.stack[-1].refresh()
+		await snap("search_attr")
 		main.root("player", {"pid": c.xi[9]})
 		await snap("player")
+		for pg in [1, 2, 3, 4, 5]:
+			main.stack[-1].page = pg
+			main.stack[-1].refresh()
+			await snap("player_p%d" % pg)
+		main.root("player", {"pid": G.s.clubs[2].xi[9]})
+		await snap("player_other")
 		main.root("clubview", {"cid": 2})
 		await snap("clubview")
 	if want.call("tactics2"):

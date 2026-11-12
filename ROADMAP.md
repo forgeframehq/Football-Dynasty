@@ -107,6 +107,7 @@ Options
 - [x] Fixed action bar on player pages; correct club under the player's name
 - [x] Lifestyle header showing current home, car and money
 - [ ] Transfers as a process: enquiry, club negotiation screen (fee, instalments, add-ons, sell-on), club accepts by message, then player and agent talks (wage, length, squad role, signing fee, agent fee, clauses), completion with news; rival bids; same in reverse for sales
-- [ ] Player profile as one dense page with a position map
+- [x] Player profile as six swipeable pages: profile with position map and all attributes, personal, positions and roles, contract, stats, manage
+- [x] Player Search as a dense sortable table with three views, filters and paging
 - [ ] Go through every screen: more depth, less blank space, practical layouts
 - [ ] Lifestyle: separate showroom screens, weekly money in and out
