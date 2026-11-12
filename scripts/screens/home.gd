@@ -47,7 +47,7 @@ func build():
 		var top = UI.hb(8)
 		top.add_child(UI.caps("Match day" if today else "Next match", 22, UI.accent))
 		top.add_child(UI.sp())
-		top.add_child(UI.caps(f.label if f.ko else "%s · Round %d" % [s.leagues[f.lg].name, f.rd], 20, UI.MUTED))
+		top.add_child(UI.caps(G.fx_caption(f), 20, UI.MUTED))
 		hv.add_child(top)
 		var mh = UI.hb(8)
 		mh.add_child(_side(hc))

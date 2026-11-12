@@ -85,7 +85,7 @@ func _row(f: Dictionary, cid: int, highlight: bool) -> Control:
 	var top = UI.hb(8)
 	top.add_child(UI.caps(G.fmt_date(f.day), 17, UI.DIM))
 	top.add_child(UI.sp())
-	top.add_child(UI.caps(f.label if f.ko else ("Round %d" % f.rd), 17, UI.DIM))
+	top.add_child(UI.caps(f.label if (f.ko or f.get("comp", "") != "") else ("Round %d" % f.rd), 17, UI.DIM))
 	v.add_child(top)
 	var h = UI.hb(10)
 	var hn = UI.lbl_fill(hc.name, 24, UI.TEXT if f.h == cid or cid < 0 else UI.MUTED, "semi" if f.h == cid else "body")

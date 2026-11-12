@@ -163,9 +163,21 @@ func back():
 	if sheet_node != null:
 		close_sheet()
 		return
-	if stack.size() <= 1:
+	if stack.size() == 0:
 		return
 	if stack[-1].has_method("can_leave") and not stack[-1].can_leave():
+		return
+	if stack.size() <= 1:
+		# nothing to pop: other tabs go Home, Home and the menu ask to leave
+		if cur_tab != "" and cur_tab != "home":
+			tab("home")
+		elif cur_tab == "home":
+			UI.confirm("Leave the game?", "Your career is saved automatically.", "Save & exit to menu", func():
+				G.save_game()
+				G.active = false
+				root("menu"))
+		elif stack[-1].sname == "menu":
+			get_tree().quit()
 		return
 	var top = stack.pop_back()
 	top.queue_free()

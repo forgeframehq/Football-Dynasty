@@ -9,6 +9,8 @@ const PRESS_MID = [0.98, 1.0, 1.03]
 const PRESS_DRAIN = [0.9, 1.0, 1.2]
 const TEMPO_SHOT = [0.94, 1.0, 1.06]
 const TEMPO_DRAIN = [0.95, 1.0, 1.1]
+const REF = [3.9, 4.2, 4.9]
+const SHOUTS = {"push": "Push forward", "calm": "Calm down", "waste": "Waste time", "demand": "Demand more"}
 
 const T_GOAL = ["GOAL! %s finds the net for %s!", "GOAL! %s makes no mistake — %s score!", "GOAL! A clinical finish from %s. %s celebrate!", "GOAL! %s buries it! The %s fans erupt!"]
 const T_GOAL_LONG = ["GOAL! What a strike from %s! An unstoppable effort from distance for %s!", "GOAL! %s lets fly from range and it flies in for %s!"]
@@ -34,6 +36,10 @@ var pens = null
 var motm := -1
 var rng: RandomNumberGenerator
 var pl: Dictionary
+var shots: Array = []      # [side, x, y, goal, xg]
+var momentum: Array = []   # per minute, + home / - away
+var carrier := -1          # pid on the ball (for the 2D view)
+var last_pass := -1
 
 
 func setup(f: Dictionary, lu_h: Dictionary, lu_a: Dictionary, det: bool):
@@ -50,29 +56,54 @@ func setup(f: Dictionary, lu_h: Dictionary, lu_a: Dictionary, det: bool):
 
 func _side(lu: Dictionary, home: bool) -> Dictionary:
 	var d = {"club": G.s.clubs[lu.club], "cid": lu.club, "home": home, "xi": lu.xi.duplicate(), "bench": lu.bench.duplicate(), "formation": lu.formation, "roles": [],
+		"rids": lu.rids.duplicate(), "slots": lu.slots.duplicate(true), "instr": lu.instr.duplicate(), "pk": lu.pk, "fk": lu.fk, "ck": lu.ck, "capt": lu.capt,
 		"ment": lu.ment, "press": lu.press, "tempo": lu.tempo, "att": 60.0, "mid": 60.0, "def": 60.0, "gk": 60.0, "goals": 0, "shots": 0, "sot": 0, "xg": 0.0,
-		"corners": 0, "fouls": 0, "yc": 0, "rc": 0, "poss": 0, "subs": 0, "scorers": [], "user": lu.user, "auto": not lu.user, "midp": 1.0, "ps": 0.25, "w0": [], "w1": [], "t0": 0.0, "t1": 0.0}
-	for sl in G.FORMATIONS[lu.formation]:
+		"corners": 0, "fouls": 0, "yc": 0, "rc": 0, "poss": 0, "subs": 0, "scorers": [], "user": lu.user, "auto": not lu.user, "midp": 1.0, "ps": 0.25,
+		"w0": [], "w1": [], "t0": 0.0, "t1": 0.0, "shout": "", "shout_until": 0, "demand_used": false, "boost": 1.0, "drain": 1.0}
+	for sl in d.slots:
 		d.roles.append(sl[0])
 	for pid in d.xi:
 		if pid >= 0:
 			_pm(pid, true)
 	for pid in d.bench:
 		_pm(pid, false)
+	if d.capt >= 0 and d.capt in d.xi and pl[d.capt].at[13] >= 75:
+		d.boost = 1.008
 	return d
 
 
 func _pm(pid: int, starter: bool):
-	pm[pid] = {"cond": float(pl[pid].cond), "g": 0, "a": 0, "yc": 0, "rc": 0, "sv": 0, "sh": 0, "on": starter, "tin": 0 if starter else -1, "tout": -1, "inj": 0, "r": 6.0}
+	var pp = pl[pid]
+	pm[pid] = {"rid": "", "sf": 1.0, "p0": pow(max(pp.at[0], 30) / 65.0, 1.3), "p1": pow((pp.at[4] * 0.6 + pp.at[5] * 0.4) / 65.0, 3.0), "cond": float(pp.cond), "g": 0, "a": 0, "yc": 0, "rc": 0, "sv": 0, "sh": 0, "on": starter, "tin": 0 if starter else -1, "tout": -1, "inj": 0, "r": 6.0}
 
 
-func set_formation(i: int, formation: String):
+func set_shape(i: int, slots: Array, rids: Array, instr = null):
 	var t = sd[i]
-	t.formation = formation
+	t.slots = slots.duplicate(true)
+	t.rids = rids.duplicate()
 	t.roles = []
-	for sl in G.FORMATIONS[formation]:
+	for sl in t.slots:
 		t.roles.append(sl[0])
+	if instr != null:
+		t.instr = instr.duplicate()
 	recalc(i)
+
+
+func shout(i: int, kind: String) -> bool:
+	var t = sd[i]
+	if kind == "demand":
+		if t.demand_used:
+			return false
+		t.demand_used = true
+	t.shout = kind
+	t.shout_until = minute + 12
+	recalc(i)
+	return true
+
+
+func live_rating(pid: int) -> float:
+	var q = pm[pid]
+	return clamp(6.3 + 0.95 * q.g + 0.55 * q.a + 0.12 * q.sv - 0.25 * q.yc - 1.4 * q.rc + 0.05 * q.sh, 4.0, 10.0)
 
 
 func recalc(i: int):
@@ -88,37 +119,65 @@ func recalc(i: int):
 	var w1 = []
 	var t0 = 0.0
 	var t1 = 0.0
+	var ins = t.instr
+	var wide_f = [0.9, 1.0, 1.08][ins.width]
+	var cen_f = [1.06, 1.0, 0.96][ins.width]
 	for k in 11:
-		var role = t.roles[k]
-		var w = ROLE_W[role]
-		wa += w[0]
-		wm += w[1]
-		wd += w[2]
 		var pid = t.xi[k]
 		if pid < 0:
 			w0.append(0.0)
 			w1.append(0.0)
 			continue
+		var role = t.roles[k]
+		var base = ROLE_W[role]
+		var rd = G.RL.ROLES[t.rids[k]]
 		var p = pl[pid]
-		var x0 = 0.0 if k == 0 else (w[0] * 0.75 + 0.14) * pow(max(p.st[1], 30) / 65.0, 1.3)
-		var x1 = 0.004 if k == 0 else (0.7 * w[0] + 0.5 * w[1] + 0.03) * pow(p.st[2] / 65.0, 3.0)
+		var q = pm[pid]
+		if q.rid != t.rids[k]:
+			q.rid = t.rids[k]
+			q.sf = 0.955 + 0.07 * G.RL.suit(p, q.rid)
+		var f = G.fit(p, role) * (0.86 + 0.14 * q.cond / 100.0) * (0.975 + 0.0005 * p.mor) * q.sf
+		var e = p.ovr * f
+		if k == 0:
+			t.gk = e
+			w0.append(0.0)
+			w1.append(0.004)
+			t1 += 0.004
+			continue
+		var aw = base[0] * rd.m[0] * (wide_f if G.RL.WIDE.has(role) else cen_f)
+		var mw = base[1] * rd.m[1]
+		var dw = base[2] * rd.m[2]
+		wa += aw
+		wm += mw
+		wd += dw
+		var st = p.st
+		a += aw * (0.65 * e + 0.35 * f * (st[1] + st[3] + st[0]) / 3.0)
+		m += mw * (0.65 * e + 0.35 * f * (st[2] + st[3]) / 2.0)
+		d += dw * (0.65 * e + 0.35 * f * (st[4] + st[5]) / 2.0)
+		var x0 = (base[0] * 0.75 + 0.14) * q.p0 * rd.sh
+		var x1 = (0.7 * base[0] + 0.5 * base[1] + 0.03) * q.p1 * rd["as"]
 		w0.append(x0)
 		w1.append(x1)
 		t0 += x0
 		t1 += x1
-		var f = G.fit(p, role) * (0.86 + 0.14 * pm[pid].cond / 100.0) * (0.975 + 0.0005 * p.mor)
-		var e = p.ovr * f
-		if role == "GK":
-			t.gk = e
-			continue
-		var st = p.st
-		a += w[0] * (0.65 * e + 0.35 * f * (st[1] + st[3] + st[0]) / 3.0)
-		m += w[1] * (0.65 * e + 0.35 * f * (st[2] + st[3]) / 2.0)
-		d += w[2] * (0.65 * e + 0.35 * f * (st[4] + st[5]) / 2.0)
-	var h = 1.03 if t.home else 1.0
-	t.att = max(20.0, a / wa * MENT[t.ment][0] * h)
-	t.mid = max(20.0, m / wm * PRESS_MID[t.press] * h)
-	t.def = max(20.0, d / wd * MENT[t.ment][1] * h)
+	var h = (1.03 if t.home else 1.0) * t.boost
+	var sa = 1.0
+	var sdf = 1.0
+	if t.shout == "push":
+		sa = 1.06
+		sdf = 0.95
+	elif t.shout == "calm":
+		sa = 0.98
+		sdf = 1.02
+	elif t.shout == "demand":
+		sa = 1.03
+		sdf = 1.03
+	var line_m = [0.97, 1.0, 1.035][ins.line]
+	var line_d = [1.035, 1.0, 0.97][ins.line]
+	var pass_m = [1.03, 1.0, 0.97][ins["pass"]]
+	t.att = max(20.0, a / max(0.01, wa) * pow(wa / REF[0], 0.35) * MENT[t.ment][0] * h * sa) if wa > 0.0 else 20.0
+	t.mid = max(20.0, m / max(0.01, wm) * pow(wm / REF[1], 0.35) * PRESS_MID[t.press] * h * line_m * pass_m) if wm > 0.0 else 20.0
+	t.def = max(20.0, d / max(0.01, wd) * pow(wd / REF[2], 0.35) * MENT[t.ment][1] * h * sdf * line_d * (0.99 if ins.counter else 1.0)) if wd > 0.0 else 20.0
 	t.midp = pow(t.mid, 2.6)
 	t.w0 = w0
 	t.w1 = w1
@@ -126,7 +185,11 @@ func recalc(i: int):
 	t.t1 = t1
 	if sd.size() == 2:
 		for j in 2:
-			sd[j].ps = clamp(0.252 * pow(sd[j].att / sd[1 - j].def, 2.1) * TEMPO_SHOT[sd[j].tempo], 0.05, 0.6)
+			var x = sd[j]
+			var ps = 0.282 * pow(x.att / sd[1 - j].def, 2.1) * TEMPO_SHOT[x.tempo] * [0.95, 1.0, 1.05][x.instr["pass"]]
+			if x.instr.counter:
+				ps *= 1.07 if x.mid < sd[1 - j].mid else 0.97
+			x.ps = clamp(ps, 0.05, 0.6)
 
 
 func nm(pid: int) -> String:
@@ -182,6 +245,14 @@ func step() -> Array:
 	ball_side = ai
 	var r = rng.randf()
 	var ps = at.ps
+	for j in 2:
+		var x = sd[j]
+		if x.shout != "":
+			if minute >= x.shout_until:
+				x.shout = ""
+				recalc(j)
+			elif x.shout == "waste" and x.goals > sd[1 - j].goals:
+				ps *= 0.78
 	if rng.randf() < 0.0028:
 		_shot(ai, out, true)
 	elif r < ps:
@@ -195,8 +266,11 @@ func step() -> Array:
 			ball_state = ""
 			adv = rng.randf_range(0.36, 0.6)
 		ball = Vector2(adv if ai == 0 else 1.0 - adv, rng.randf_range(0.15, 0.85))
+		carrier = -1
 		if detailed and rng.randf() < 0.07:
 			out.append(ev("info", ai, T_FILL[rng.randi() % T_FILL.size()] % at.club.name))
+	if detailed:
+		momentum.append((1 if ai == 0 else -1) * (3 if ball_state == "SHOT" or ball_state == "GOAL" else (2 if ball_state == "ATTACK" else 1)))
 	if rng.randf() < 0.24:
 		_foul(1 - ai if rng.randf() < 0.62 else ai, out)
 	if rng.randf() < 0.0022:
@@ -232,66 +306,109 @@ func _pick(t: Dictionary, mode: int, exclude := -1) -> int:
 	return -1
 
 
+func _best_at(t: Dictionary, idx: int, pref: int) -> int:
+	if pref >= 0 and pref in t.xi:
+		return pref
+	var b = -1
+	var bs = -1
+	for k in range(1, 11):
+		if t.xi[k] >= 0 and pl[t.xi[k]].at[idx] > bs:
+			bs = pl[t.xi[k]].at[idx]
+			b = t.xi[k]
+	return b
+
+
 func _shot(ai: int, out: Array, pen: bool):
 	var at = sd[ai]
 	var df = sd[1 - ai]
 	var sh = _pick(at, 0)
 	if sh < 0:
 		return
-	var p = pl[sh]
 	var q = 0.77
 	var kind = "pen"
+	var asst = -1
+	var loc = Vector2(0.89, 0.5)
+	var gkr = max(30.0, df.gk)
 	if pen:
-		# best finisher on the pitch takes it
-		var bs = -1
-		for k in range(1, 11):
-			if at.xi[k] >= 0 and pl[at.xi[k]].st[1] > bs:
-				bs = pl[at.xi[k]].st[1]
-				sh = at.xi[k]
-		p = pl[sh]
+		sh = _best_at(at, 17, at.pk)
+		q = clamp(0.74 + (pl[sh].at[17] - 70) * 0.004, 0.6, 0.9)
 		if detailed:
 			out.append(ev("info", ai, "PENALTY to %s! %s steps up..." % [at.club.name, nm(sh)]))
 	else:
 		var r = rng.randf()
-		if r < 0.12:
-			q = 0.38
-			kind = "big"
-		elif r < 0.55:
-			q = 0.11
-			kind = "box"
+		if r < 0.05:
+			kind = "fk"
+			sh = _best_at(at, 16, at.fk)
+			q = 0.065 * pow(pl[sh].at[16] / 70.0, 2.2) * 72.0 / gkr
+			loc = Vector2(rng.randf_range(0.72, 0.8), rng.randf_range(0.3, 0.7))
+		elif r < 0.15:
+			kind = "corner"
+			asst = _best_at(at, 3, at.ck)
+			var bw = -1.0
+			for k in range(1, 11):
+				var c = at.xi[k]
+				if c >= 0 and c != asst:
+					var w = pow(pl[c].at[2] / 60.0, 3.0) * (1.0 if at.roles[k] in ["CB", "ST"] else 0.45) * rng.randf()
+					if w > bw:
+						bw = w
+						sh = c
+			q = 0.095 * pow(pl[sh].at[2] / 72.0, 1.5) * pow((pl[asst].at[3] if asst >= 0 else 65) / 70.0, 0.8) * 72.0 / gkr
+			at.corners += 1
+			loc = Vector2(rng.randf_range(0.9, 0.95), rng.randf_range(0.42, 0.58))
 		else:
-			q = 0.035
-			kind = "long"
-		var se = (0.5 * p.st[1] + 0.5 * p.ovr) * (0.86 + 0.14 * pm[sh].cond / 100.0)
-		q = min(0.9, q * pow(se / max(30.0, df.gk), 1.3))
+			var p = pl[sh]
+			var skill = p.at[0]
+			if r < 0.26:
+				q = 0.38
+				kind = "big"
+				loc = Vector2(rng.randf_range(0.88, 0.93), rng.randf_range(0.42, 0.58))
+			elif r < 0.6:
+				q = 0.11
+				kind = "box"
+				loc = Vector2(rng.randf_range(0.82, 0.9), rng.randf_range(0.32, 0.68))
+			else:
+				q = 0.035
+				kind = "long"
+				skill = p.at[1]
+				loc = Vector2(rng.randf_range(0.7, 0.78), rng.randf_range(0.28, 0.72))
+			var se = (0.5 * skill + 0.5 * p.ovr) * (0.86 + 0.14 * pm[sh].cond / 100.0)
+			q *= pow(se / gkr, 1.3)
+		q = min(0.9, q)
 	at.shots += 1
 	at.xg += q
 	pm[sh].sh += 1
 	ball_state = "SHOT"
-	ball = Vector2(0.93 if ai == 0 else 0.07, rng.randf_range(0.38, 0.62))
+	carrier = sh
+	if ai == 1:
+		loc = Vector2(1.0 - loc.x, 1.0 - loc.y)
+	ball = loc
 	var gk = df.xi[0]
-	if rng.randf() < q:
+	var scored = rng.randf() < q
+	shots.append([ai, loc.x, loc.y, scored, q])
+	if scored:
 		at.goals += 1
 		at.sot += 1
 		pm[sh].g += 1
 		at.scorers.append({"pid": sh, "m": minute, "pen": pen})
-		var asst = -1
-		if not pen and rng.randf() < 0.72:
+		if kind in ["big", "box", "long"] and rng.randf() < 0.75:
 			asst = _pick(at, 1, sh)
-			if asst >= 0:
-				pm[asst].a += 1
+		if asst >= 0:
+			pm[asst].a += 1
 		ball_state = "GOAL"
+		last_pass = asst
 		if detailed:
 			var tx = ""
-			if pen:
-				tx = "GOAL! %s sends the keeper the wrong way from the spot!" % nm(sh)
-			elif kind == "long":
-				tx = T_GOAL_LONG[rng.randi() % T_GOAL_LONG.size()] % [nm(sh), at.club.name]
-			else:
-				tx = T_GOAL[rng.randi() % T_GOAL.size()] % [nm(sh), at.club.name]
+			match kind:
+				"pen": tx = "GOAL! %s sends the keeper the wrong way from the spot!" % nm(sh)
+				"fk": tx = "GOAL! What a free kick from %s — up and over the wall for %s!" % [nm(sh), at.club.name]
+				"corner": tx = "GOAL! %s rises highest from the corner and powers it home for %s!" % [nm(sh), at.club.name]
+				"long": tx = T_GOAL_LONG[rng.randi() % T_GOAL_LONG.size()] % [nm(sh), at.club.name]
+				_: tx = T_GOAL[rng.randi() % T_GOAL.size()] % [nm(sh), at.club.name]
 			if asst >= 0:
 				tx += " Assist: %s." % nm(asst)
-			out.append(ev("goal", ai, tx, sh))
+			var e = ev("goal", ai, tx, sh)
+			e["a"] = asst
+			out.append(e)
 		else:
 			events.append({"m": minute, "t": "goal", "s": ai, "x": "", "p": sh})
 		return
@@ -303,7 +420,15 @@ func _shot(ai: int, out: Array, pen: bool):
 		if not pen and rng.randf() < 0.4:
 			at.corners += 1
 		if detailed:
-			var tx = "SAVED! %s keeps out %s's penalty!" % [nm(gk) if gk >= 0 else "The keeper", nm(sh)] if pen else _save_text(sh, gk)
+			var tx = ""
+			if pen:
+				tx = "SAVED! %s keeps out %s's penalty!" % [nm(gk) if gk >= 0 else "The keeper", nm(sh)]
+			elif kind == "fk":
+				tx = "%s curls the free kick on target — %s tips it away." % [nm(sh), nm(gk) if gk >= 0 else "the keeper"]
+			elif kind == "corner":
+				tx = "%s meets the corner with a header — saved by %s." % [nm(sh), nm(gk) if gk >= 0 else "the keeper"]
+			else:
+				tx = _save_text(sh, gk)
 			out.append(ev("save", ai, tx, sh))
 	elif r3 < 0.62 and not pen:
 		if rng.randf() < 0.35:
@@ -315,6 +440,10 @@ func _shot(ai: int, out: Array, pen: bool):
 			var tx = ""
 			if pen:
 				tx = "MISSED! %s puts the penalty wide!" % nm(sh)
+			elif kind == "fk":
+				tx = "%s's free kick clears the wall — and the bar." % nm(sh)
+			elif kind == "corner":
+				tx = "%s gets up well at the corner but heads over." % nm(sh)
 			elif kind == "big":
 				tx = T_BIG[rng.randi() % T_BIG.size()] % nm(sh)
 			else:
@@ -334,6 +463,8 @@ func _foul(i: int, out: Array):
 	var t = sd[i]
 	t.fouls += 1
 	var r = rng.randf()
+	if t.shout == "calm":
+		r *= 2.0
 	if r >= 0.16:
 		return
 	var pid = _pick(t, 2)

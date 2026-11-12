@@ -64,4 +64,11 @@ func run(m):
 	await tap(toks[9].global_position + Vector2(66, 40))
 	await tap(main.stack[-1].pitch.get_children()[10].global_position + Vector2(66, 40))
 	print("xi swapped: ", before[9] == c.xi[10] and before[10] == c.xi[9])
+	var old = c.slots[9].duplicate()
+	var tk = main.stack[-1].pitch.get_children()[9]
+	var from = tk.global_position + Vector2(70, 40)
+	await drag(from, from + Vector2(-160, 190))
+	print("slot 9 moved: ", old, " -> ", c.slots[9], " shape ", c.formation, " role ", c.roles[9])
+	main.back()
+	print("system back from tactics tab -> ", main.cur_tab, " (expect home)")
 	main.get_tree().quit()

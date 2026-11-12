@@ -96,6 +96,32 @@ func build():
 		av.add_child(r)
 	ac.add_child(av)
 	v.add_child(ac)
+	if p.pos != "GK":
+		var dc = UI.card()
+		var dv = UI.vb(14)
+		for grp in G.RL.ATTR_GROUPS:
+			var gv = UI.vb(6)
+			gv.add_child(UI.caps(grp[0], 19, UI.accent))
+			var grid = GridContainer.new()
+			grid.columns = 2
+			grid.add_theme_constant_override("h_separation", 28)
+			grid.add_theme_constant_override("v_separation", 6)
+			grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			for k in grp[1]:
+				var r = UI.hb(8)
+				r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				r.add_child(UI.lbl_fill(G.RL.ATTR[k], 22, UI.MUTED))
+				r.add_child(UI.lbl(str(p.at[k]), 24, UI.ovr_color(p.at[k]), "disp"))
+				grid.add_child(r)
+			gv.add_child(grid)
+			dv.add_child(gv)
+		dc.add_child(dv)
+		v.add_child(dc)
+		var best = []
+		for rid in G.RL.BY_POS[p.pos]:
+			best.append([G.RL.suit(p, rid), G.RL.ROLES[rid].n])
+		best.sort_custom(func(x, y): return x[0] > y[0])
+		v.add_child(UI.kv("Best roles", "%s · %s" % [best[0][1], best[1][1]] if best.size() > 1 else best[0][1]))
 	# season
 	v.add_child(UI.section("Season %s" % G.season_name(), "Career: %d apps · %d goals" % [p.cap, p.cg]))
 	var g1 = UI.hb(10)

@@ -13,7 +13,10 @@ static func run(node: Node):
 		if a.begins_with("club="):
 			cid = int(a.substr(5))
 	var t0 = Time.get_ticks_msec()
-	G.new_game("Tester", cid)
+	if "load" in args:
+		print("loaded old save: ", G.load_game(), " v", G.s.v, " clubs ", G.s.clubs.size(), " user ", G.uc().name, " formation ", G.uc().formation)
+	else:
+		G.new_game("Tester", cid)
 	print("new game ms: ", Time.get_ticks_msec() - t0, " players: ", G.s.players.size(), " fixtures: ", G.s.fixtures.size())
 	var c = G.uc()
 	print("club: ", c.name, " rep ", snapped(c.rep, 0.1), " budget ", G.money(c.budget), " obj ", G.s.user.obj)

@@ -3,16 +3,19 @@ extends Control
 
 var p = null
 var role := ""
+var rname := ""
 var c1 := Color.WHITE
 var c2 := Color.BLACK
 var selected := false
 var cond := 100.0
 var fitv := 1.0
+var stars := 0
+var captain := false
 
 
 func _init():
-	custom_minimum_size = Vector2(132, 112)
-	size = Vector2(132, 112)
+	custom_minimum_size = Vector2(140, 128)
+	size = Vector2(140, 128)
 
 
 func _draw():
@@ -30,15 +33,14 @@ func _draw():
 	if p == null:
 		_text(font, role, cx, cy + 10, 26, Color(1, 1, 1, 0.5))
 		return
-	var tc = UI.on_color(c1)
-	_text(font, str(p.ovr), cx, cy + 12, 34, tc)
-	# fitness arc
+	_text(font, str(p.ovr), cx, cy + 12, 34, UI.on_color(c1))
 	draw_arc(Vector2(cx, cy), r + 5, -PI / 2, -PI / 2 + TAU * cond / 100.0, 40, UI.cond_color(cond), 3, true)
-	# role tag
+	if captain:
+		draw_circle(Vector2(cx + r - 2, cy - r + 6), 11, UI.GOLD)
+		_text(font, "C", cx + r - 2, cy - r + 13, 18, Color("0a0e17"))
 	var rc = UI.LINE_COL[G.LINE.get(role, 2)]
 	var warn = fitv < 0.9
-	var tag = role
-	var tw = semi.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x + 14
+	var tw = semi.get_string_size(role, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x + 14
 	var tr = Rect2(cx - tw / 2.0, cy + r - 6, tw, 22)
 	var sb = StyleBoxFlat.new()
 	sb.bg_color = UI.RED if warn else Color("0b111c")
@@ -46,13 +48,16 @@ func _draw():
 	sb.border_color = rc
 	sb.set_border_width_all(0 if warn else 1)
 	draw_style_box(sb, tr)
-	_text(semi, tag, cx, tr.position.y + 17, 17, Color.WHITE if warn else rc)
+	_text(semi, role, cx, tr.position.y + 17, 17, Color.WHITE if warn else rc)
 	var nm = G.pname(p)
 	if nm.length() > 13:
 		nm = p.ln if p.cn == "" else p.cn
 	if nm.length() > 13:
 		nm = nm.substr(0, 12) + "…"
-	_text(UI.fonts["semi"], nm, cx, size.y - 4, 19, Color.WHITE, true)
+	_text(UI.fonts["semi"], nm, cx, 108, 19, Color.WHITE, true)
+	if rname != "":
+		var col = UI.GREEN if stars >= 4 else (UI.AMBER if stars == 3 else UI.RED)
+		_text(semi, rname.to_upper(), cx, 125, 14, col, true)
 
 
 func _text(font: Font, text: String, cx: float, y: float, fs: int, col: Color, shadow := false):

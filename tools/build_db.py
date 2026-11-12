@@ -297,6 +297,94 @@ USL Dunkerque;Dunkerque;USLD;0055A4;FFFFFF;Marcel-Tribut
 """
 
 
+# Rest-of-Europe leagues: the strongest clubs join as continental opponents and transfer targets
+ROE = [
+    ("Eredivisie", "Eredivisie", "Netherlands"), ("Liga Portugal", "Liga Portugal", "Portugal"), ("Trendyol Süper Lig", "Süper Lig", "Türkiye"),
+    ("1A Pro League", "Belgian Pro League", "Belgium"), ("Scottish Premiership", "Scottish Premiership", "Scotland"),
+    ("Ö. Bundesliga", "Austrian Bundesliga", "Austria"), ("Brack Super League", "Swiss Super League", "Switzerland"),
+    ("SUPERLIGA", "Romanian SuperLiga", "Romania"), ("Hellas Liga", "Super League Greece", "Greece"), ("Česká Liga", "Czech First League", "Czechia"),
+    ("Ukrayina Liha", "Ukrainian Premier League", "Ukraine"), ("Liga Hrvatska", "HNL", "Croatia"), ("Ekstraklasa", "Ekstraklasa", "Poland"),
+    ("Allsvenskan", "Allsvenskan", "Sweden"), ("Eliteserien", "Eliteserien", "Norway"), ("Liga Cyprus", "Cypriot First Division", "Cyprus"),
+    ("Magyar Liga", "NB I", "Hungary"), ("Liga Bulgaria", "Bulgarian First League", "Bulgaria"), ("Liga Azerbaijan", "Azerbaijan Premier League", "Azerbaijan"),
+]
+ROE_CLUBS = 64
+ROE_META = """
+Fenerbahçe;Fenerbahçe;FEN;FFED00;163962
+FC Porto;FC Porto;FCP;00428C;FFFFFF
+Galatasaray;Galatasaray;GAL;A90432;FDB912
+SL Benfica;Benfica;SLB;E83030;FFFFFF
+Sporting CP;Sporting CP;SPO;008057;FFFFFF
+PSV;PSV;PSV;ED1C24;FFFFFF
+Olympiacos FC;Olympiacos;OLY;D2232A;FFFFFF
+Beşiktaş;Beşiktaş;BJK;000000;FFFFFF
+Ajax;Ajax;AJX;D2122E;FFFFFF
+AEK Athens;AEK Athens;AEK;FFD200;000000
+Trabzonspor;Trabzonspor;TS;7C162E;4FA4D9
+Feyenoord;Feyenoord;FEY;E2001A;FFFFFF
+SC Braga;SC Braga;SCB;D1232A;FFFFFF
+Panathinaikos;Panathinaikos;PAO;007A3D;FFFFFF
+Club Brugge;Club Brugge;BRU;0A4DA2;000000
+Celtic;Celtic;CEL;018749;FFFFFF
+Slavia Praha;Slavia Praha;SLA;D2232A;FFFFFF
+PAOK FC;PAOK;PAOK;000000;FFFFFF
+KRC Genk;KRC Genk;GNK;0055A4;FFFFFF
+AZ;AZ Alkmaar;AZ;D2122E;FFFFFF
+Rangers;Rangers;RAN;1B458F;FFFFFF
+R. Union St.-G.;Union Saint-Gilloise;USG;FFE500;0A4DA2
+N.E.C. Nijmegen;NEC Nijmegen;NEC;D2122E;007A3D
+FC Twente;FC Twente;TWE;D2122E;FFFFFF
+Dynamo Kyiv;Dynamo Kyiv;DYN;FFFFFF;0A4DA2
+RSC Anderlecht;Anderlecht;AND;5B2D82;FFFFFF
+Shakhtar Donetsk;Shakhtar Donetsk;SHA;F58113;000000
+Sparta Praha;Sparta Praha;SPA;8A1538;FFFFFF
+FK Bodø/Glimt;Bodø/Glimt;BOD;FFE500;000000
+Viktoria Plzeň;Viktoria Plzeň;PLZ;D2122E;0A4DA2
+PFC Ludogorets;Ludogorets;LUD;007A3D;FFFFFF
+Dinamo Zagreb;Dinamo Zagreb;DZG;0A4DA2;FFFFFF
+Lech Poznań;Lech Poznań;LPO;0A4DA2;FFFFFF
+Başakşehir;Başakşehir;IBFK;F58113;1B2A49
+BSC Young Boys;Young Boys;YB;FFE500;000000
+KAA Gent;KAA Gent;GNT;0A4DA2;FFFFFF
+FC Famalicão;Famalicão;FAM;0A4DA2;FFFFFF
+RB Salzburg;RB Salzburg;RBS;FFFFFF;D2122E
+FC Utrecht;FC Utrecht;UTR;D2122E;FFFFFF
+Ferencvárosi TC;Ferencváros;FTC;007A3D;FFFFFF
+Viking FK;Viking FK;VIK;0A2A66;FFFFFF
+Arouca;Arouca;ARO;FFE500;0A4DA2
+Qarabağ FK;Qarabağ;QAR;000000;FFFFFF
+Standard Liège;Standard Liège;STL;D2122E;FFFFFF
+Çorum Futbol Kulübü;Çorum FK;COR;D2122E;000000
+Hearts;Hearts;HEA;8A1538;FFFFFF
+Univ. Craiova;Universitatea Craiova;UCV;0A4DA2;FFFFFF
+Estoril Praia;Estoril Praia;EST;FFE500;0A4DA2
+Widzew Łódź;Widzew Łódź;WID;D2122E;FFFFFF
+Hajduk Split;Hajduk Split;HAJ;FFFFFF;0A4DA2
+FC Lugano;FC Lugano;LUG;000000;FFFFFF
+KV Mechelen;KV Mechelen;MEC;FFE500;D2122E
+Omonia FC;Omonia;OMO;007A3D;FFFFFF
+Samsunspor;Samsunspor;SMS;D2122E;FFFFFF
+Servette FC;Servette;SER;8A1538;FFFFFF
+LASK;LASK;LASK;000000;FFFFFF
+Vitória SC;Vitória SC;VSC;FFFFFF;000000
+Raków;Raków Częstochowa;RAK;D2122E;0A4DA2
+Górnik Zabrze;Górnik Zabrze;GOR;0A4DA2;D2122E
+STVV;Sint-Truiden;STV;FFE500;0A4DA2
+APOEL FC;APOEL;APO;FFE500;0A4DA2
+Konyaspor;Konyaspor;KON;007A3D;FFFFFF
+SK Rapid;Rapid Wien;RAP;007A3D;FFFFFF
+FC Basel 1893;FC Basel;BAS;D2122E;0A4DA2
+"""
+PALETTE = ["D2122E", "0A4DA2", "007A3D", "F58113", "5B2D82", "FFD200", "1B2A49", "8A1538"]
+
+
+def attrs(r):
+    g = lambda k: int(r[k] or 0)
+    return [g("attacking_finishing"), g("power_long_shots"), g("attacking_heading_accuracy"), g("attacking_crossing"), g("attacking_short_passing"),
+            g("mentality_vision"), g("skill_dribbling"), (g("movement_acceleration") + g("movement_sprint_speed")) // 2, g("power_stamina"), g("power_strength"),
+            (g("defending_standing_tackle") + g("defending_sliding_tackle")) // 2, (g("defending_awareness") + g("mentality_interceptions")) // 2,
+            g("mentality_positioning"), g("mentality_composure"), g("mentality_aggression"), g("skill_long_passing"), g("skill_fk_accuracy"), g("mentality_penalties")]
+
+
 def main():
     src = sys.argv[1]
     out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), "..", "data", "db.json")
@@ -306,18 +394,38 @@ def main():
         meta[n] = (disp, short, c1, c2, stad)
     rows = [r for r in csv.DictReader(open(src, encoding="utf-8")) if r["gender"].startswith("Men")]
     lg_index = {l[0]: i for i, l in enumerate(LEAGUES)}
-    leagues = [{"name": l[1], "short": l[2], "country": l[3], "tier": l[4]} for l in LEAGUES]
+    leagues = [{"name": l[1], "short": l[2], "country": l[3], "tier": l[4], "roe": False} for l in LEAGUES]
+    # pick the strongest rest-of-Europe clubs
+    roe_names = {l[0] for l in ROE}
+    by_club = collections.defaultdict(list)
+    for r in rows:
+        if r["league"] in roe_names:
+            by_club[(r["league"], r["club"])].append(int(r["overall_rating"]))
+    rank = sorted(by_club, key=lambda k: -sum(sorted(by_club[k], reverse=True)[:16]) / min(16, len(by_club[k])))[:ROE_CLUBS]
+    roe_keep = set(rank)
+    for l in ROE:
+        if any(k[0] == l[0] for k in roe_keep):
+            lg_index[l[0]] = len(leagues)
+            leagues.append({"name": l[1], "short": l[1][:3].upper(), "country": l[2], "tier": 1, "roe": True})
+    for line in ROE_META.strip().splitlines():
+        n, disp, short, c1, c2 = line.split(";")
+        meta[n] = (disp, short, c1, c2, "")
     clubs, club_index, players = [], {}, []
     missing = set()
+    # main-league clubs first so their ids never change when the rest-of-Europe list does
+    rows.sort(key=lambda r: 1 if r["league"] in roe_names else 0)
     for r in rows:
         if r["league"] not in lg_index:
             continue
         key = (r["league"], r["club"])
+        if r["league"] in roe_names and key not in roe_keep:
+            continue
         if key not in club_index:
             m = meta.get(r["club"])
             if not m:
                 missing.add(r["club"])
-                m = (r["club"], r["club"][:3].upper(), "3A64A3", "FFFFFF", "")
+                h = sum(ord(ch) for ch in r["club"])
+                m = (r["club"], "".join(ch for ch in r["club"] if ch.isalpha())[:3].upper(), PALETTE[h % 8], "FFFFFF" if h % 3 else "000000", "")
             club_index[key] = len(clubs)
             clubs.append({"name": m[0], "short": m[1], "lg": lg_index[r["league"]], "c1": m[2], "c2": m[3], "stadium": m[4]})
         y, mo, d = (int(x) for x in r["birthdate"].split("-"))
@@ -327,7 +435,7 @@ def main():
             int(r["overall_rating"]),
             int(r["pace"]), int(r["shooting"]), int(r["passing"]), int(r["dribbling"]), int(r["defending"]), int(r["physicality"]),
             r["preferred_foot"][:1], int(r["skill_moves"]), int(r["weak_foot"]),
-        ])
+        ] + attrs(r))
     # name pools for generated youth players
     firsts, lasts = collections.defaultdict(collections.Counter), collections.defaultdict(collections.Counter)
     for r in rows:

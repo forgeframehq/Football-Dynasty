@@ -49,6 +49,8 @@ func build():
 		var country = ""
 		for i in raw.leagues.size():
 			var l = raw.leagues[i]
+			if l.get("roe", false):
+				continue
 			if l.country != country:
 				country = l.country
 				v.add_child(UI.sp(0, 4))

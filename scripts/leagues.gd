@@ -157,6 +157,8 @@ static func generate_fixtures():
 	s.fixtures = []
 	s.playoffs = []
 	for lg in s.leagues:
+		if lg.roe:
+			continue
 		var ids = lg.clubs.duplicate()
 		ids.shuffle()
 		var n = ids.size()
@@ -305,6 +307,8 @@ static func rollover():
 	for lg in s.leagues:
 		var t = table(lg.id)
 		tables.append(t)
+		if lg.roe:
+			continue
 		champs[lg.id] = s.clubs[t[0]].name
 		var ts = top_scorer(lg.id)
 		review.leagues.append({"lg": lg.id, "champ": t[0], "scorer": G.pname(ts) if ts != null else "", "goals": ts.ss.g if ts != null else 0, "scorer_club": s.clubs[ts.club].short if ts != null else ""})
@@ -358,7 +362,7 @@ static func rollover():
 		var t = tables[lg.id]
 		for i in t.size():
 			var c = s.clubs[t[i]]
-			var tierf = [1.0, 0.22, 0.07, 0.03][s.leagues[c.lg].tier - 1]
+			var tierf = 0.12 if lg.roe else [1.0, 0.22, 0.07, 0.03][s.leagues[c.lg].tier - 1]
 			var base = 900000.0 * pow(1.2, c.rep - 60.0)
 			c.budget = G.nice(max(0.0, c.budget) * 0.6 + base * 0.6 + 40000000.0 * tierf * (1.0 - float(i) / t.size()))
 	s.season += 1

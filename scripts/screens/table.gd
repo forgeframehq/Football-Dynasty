@@ -89,6 +89,8 @@ static func pick_league(cb: Callable):
 	var build_sheet = func(v):
 		var country = ""
 		for l in G.s.leagues:
+			if l.roe:
+				continue
 			if l.country != country:
 				country = l.country
 				v.add_child(UI.caps(country, 20, UI.GOLD))

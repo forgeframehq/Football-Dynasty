@@ -49,8 +49,16 @@ func run(m):
 	var ms = main.stack[-1]
 	ms._kickoff()
 	ms.speed = 2
-	await main.get_tree().create_timer(5.0).timeout
+	await main.get_tree().create_timer(6.0).timeout
 	await snap("match_live")
+	for tb in [1, 2, 3]:
+		ms.tab = tb
+		ms._build_tabs()
+		ms._refresh_tab()
+		await snap("match_tab%d" % tb)
+	ms.tab = 0
+	ms._build_tabs()
+	ms._refresh_tab()
 	ms._team_sheet()
 	await snap("match_team")
 	ms.sub_out = 9
@@ -62,6 +70,8 @@ func run(m):
 	ms.lower.get_child(0).scroll_vertical = 600
 	await snap("match_ft2")
 	G.apply_match(ms.sim)
+	for o in ms.others:
+		G.apply_match(o)
 	G.play_day_fixtures()
 	for i in 6:
 		var f = G.user_fixture_today()
@@ -80,8 +90,13 @@ func run(m):
 	main.tab("tactics")
 	main.stack[-1].sc.scroll_vertical = 900
 	await snap("tactics2")
-	main.stack[-1]._pick_formation()
-	await snap("tactics_formation")
+	main.stack[-1].sc.scroll_vertical = 1700
+	await snap("tactics3")
+	main.stack[-1]._pick_role(9)
+	await snap("tactics_role")
+	main.close_sheet()
+	main.stack[-1]._presets()
+	await snap("tactics_presets")
 	main.close_sheet()
 	main.open("player", {"pid": G.uc().players[3]})
 	await snap("player")

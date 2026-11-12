@@ -4,7 +4,9 @@ extends Node
 const ME = preload("res://scripts/match_engine.gd")
 const LG = preload("res://scripts/leagues.gd")
 const TR = preload("res://scripts/transfers.gd")
+const RL = preload("res://scripts/roles.gd")
 
+const SAVE_V = 2
 const SAVE_PATH = "user://career.sav"
 const META_PATH = "user://career.meta"
 const LINE = {"GK": 0, "CB": 1, "LB": 1, "RB": 1, "CDM": 2, "CM": 2, "CAM": 2, "LM": 2, "RM": 2, "LW": 3, "RW": 3, "ST": 3}
@@ -27,6 +29,7 @@ const FORMATIONS = {
 	"3-4-3": [["GK", .5, .05], ["CB", .25, .22], ["CB", .5, .2], ["CB", .75, .22], ["LM", .1, .52], ["CM", .37, .47], ["CM", .63, .47], ["RM", .9, .52], ["LW", .18, .8], ["ST", .5, .87], ["RW", .82, .8]],
 	"5-3-2": [["GK", .5, .05], ["LB", .08, .34], ["CB", .28, .22], ["CB", .5, .2], ["CB", .72, .22], ["RB", .92, .34], ["CM", .27, .54], ["CDM", .5, .46], ["CM", .73, .54], ["ST", .36, .84], ["ST", .64, .84]],
 }
+const AI_INSTR = {"width": 1, "line": 1, "pass": 1, "counter": false}
 const AI_FORMATIONS = ["4-3-3", "4-2-3-1", "4-4-2", "4-2-3-1", "4-3-3", "3-5-2", "5-3-2", "3-4-3", "4-1-2-1-2", "4-5-1", "4-4-2"]
 const FIT_PAIRS = [["CB", "CDM", .9], ["CB", "LB", .86], ["CB", "RB", .86], ["LB", "RB", .9], ["LB", "LM", .9], ["RB", "RM", .9], ["LB", "LW", .82], ["RB", "RW", .82],
 	["CDM", "CM", .94], ["CM", "CAM", .93], ["CDM", "CAM", .84], ["CM", "LM", .86], ["CM", "RM", .86], ["CAM", "LM", .88], ["CAM", "RM", .88], ["CAM", "LW", .88], ["CAM", "RW", .88], ["CAM", "ST", .87],
@@ -230,41 +233,106 @@ func new_game(mname: String, club_id: int):
 	set_date()
 	for i in raw.leagues.size():
 		var l = raw.leagues[i]
-		s.leagues.append({"id": i, "name": l.name, "short": l.short, "country": l.country, "tier": int(l.tier), "clubs": []})
+		s.leagues.append({"id": i, "name": l.name, "short": l.short, "country": l.country, "tier": int(l.tier), "clubs": [], "roe": l.get("roe", false)})
 	for i in raw.clubs.size():
 		var c = raw.clubs[i]
-		s.clubs.append({"id": i, "name": c.name, "short": c.short, "lg": int(c.lg), "c1": c.c1, "c2": c.c2, "stadium": c.stadium, "players": [], "xi": [], "bench": [],
-			"formation": AI_FORMATIONS[rng.randi() % AI_FORMATIONS.size()], "ment": 2, "press": 1, "tempo": 1, "rep": 60.0, "budget": 0, "wage_budget": 0, "t": new_table(), "form": [], "spent": 0, "earned": 0})
+		s.clubs.append(raw_club(i, c))
 		s.leagues[int(c.lg)].clubs.append(i)
 	var prng = RandomNumberGenerator.new()
 	for r in raw.players:
-		var pid = int(r[0])
-		prng.seed = pid * 7919 + 13
-		var p = {"id": pid, "fn": r[1], "ln": r[2], "cn": r[3], "club": int(r[4]), "pos": r[5], "alt": (r[6].split(" ", false) if r[6] != "" else []), "nat": r[7],
-			"by": int(r[8]), "bm": int(r[9]), "bd": int(r[10]), "ovr": int(r[11]), "pot": 0, "st": [int(r[12]), int(r[13]), int(r[14]), int(r[15]), int(r[16]), int(r[17])],
-			"foot": r[18], "sm": int(r[19]), "wf": int(r[20]), "wage": 0, "cend": 0, "cond": 100, "mor": 70, "inj": 0, "susp": 0, "ycs": 0, "listed": false, "form": 6.5, "ss": new_stats(), "cg": 0, "cap": 0}
-		p.alt = Array(p.alt)
-		var a = age(p)
-		p.pot = gen_potential(p.ovr, a, prng)
-		p.wage = wage_for(p.ovr, a)
-		p.cend = season + 1 + (prng.randi() % 2 if a >= 32 else prng.randi() % 4)
-		s.players[pid] = p
-		s.clubs[p.club].players.append(pid)
+		add_raw_player(r, prng)
 	for c in s.clubs:
-		ensure_squad(c)
-		c.rep = calc_rep(c)
-		c.formation = best_formation(c)
-		c.budget = nice(900000.0 * pow(1.2, c.rep - 60.0))
-		c.wage_budget = nice(squad_wages(c) * 1.15)
+		init_club(c)
 	s.user = {"name": mname, "club": club_id, "rep": 0.0, "conf": 60.0, "obj": {}, "p": 0, "w": 0, "d": 0, "l": 0, "trophies": [], "sacked": false, "jobs": []}
 	var mc = uc()
 	s.user.rep = clamp(mc.rep - 25.0, 20.0, 70.0)
 	s.user.obj = LG.objective(mc)
-	auto_pick(mc)
+	init_user_tactics(mc)
 	LG.generate_fixtures()
+	ensure_state()
 	active = true
 	msg("Welcome to %s" % mc.name, "The board welcomes you as the new manager of %s.\n\nSeason objective: %s.\n\nYou have a transfer budget of %s and the transfer window is open until 31 August. Set up your tactics, shape the squad and press Continue when you are ready." % [mc.name, s.user.obj.text, money(mc.budget)], "board")
 	save_game()
+
+
+func raw_club(i: int, c: Dictionary) -> Dictionary:
+	return {"id": i, "name": c.name, "short": c.short, "lg": int(c.lg), "c1": c.c1, "c2": c.c2, "stadium": c.stadium, "players": [], "xi": [], "bench": [],
+		"formation": "4-3-3", "ment": 2, "press": 1, "tempo": 1, "rep": 60.0, "budget": 0, "wage_budget": 0, "t": new_table(), "form": [], "spent": 0, "earned": 0}
+
+
+func add_raw_player(r: Array, prng: RandomNumberGenerator):
+	var p = raw_player(r)
+	prng.seed = p.id * 7919 + 13
+	var a = age(p)
+	p.pot = gen_potential(p.ovr, a, prng)
+	p.wage = wage_for(p.ovr, a)
+	p.cend = s.season + 1 + (prng.randi() % 2 if a >= 32 else prng.randi() % 4)
+	s.players[p.id] = p
+	s.clubs[p.club].players.append(p.id)
+
+
+func init_club(c: Dictionary):
+	ensure_squad(c)
+	c.rep = calc_rep(c)
+	c.formation = best_formation(c)
+	c.budget = nice(900000.0 * pow(1.2, c.rep - 60.0))
+	c.wage_budget = nice(squad_wages(c) * 1.15)
+
+
+func ensure_state():
+	# idempotent: brings older saves up to date and fills in defaults for newer features
+	var raw = DB.load_db()
+	for l in s.leagues:
+		if not l.has("roe"):
+			l["roe"] = false
+	if s.leagues.size() < raw.leagues.size():
+		var by_id = {}
+		for r in raw.players:
+			by_id[int(r[0])] = r
+		for pid in s.players:
+			var p = s.players[pid]
+			if not p.has("at"):
+				if by_id.has(pid):
+					var at = []
+					for i in range(21, 39):
+						at.append(int(by_id[pid][i]))
+					p["at"] = at
+				else:
+					p["at"] = RL.derive_attrs(p.pos, p.ovr, p.st, rng)
+		var first_new = s.clubs.size()
+		for i in range(s.leagues.size(), raw.leagues.size()):
+			var l = raw.leagues[i]
+			s.leagues.append({"id": i, "name": l.name, "short": l.short, "country": l.country, "tier": int(l.tier), "clubs": [], "roe": l.get("roe", false)})
+		for i in range(first_new, raw.clubs.size()):
+			s.clubs.append(raw_club(i, raw.clubs[i]))
+			s.leagues[int(raw.clubs[i].lg)].clubs.append(i)
+		var prng = RandomNumberGenerator.new()
+		for r in raw.players:
+			if int(r[4]) >= first_new and not s.players.has(int(r[0])):
+				add_raw_player(r, prng)
+		for i in range(first_new, s.clubs.size()):
+			init_club(s.clubs[i])
+	for pid in s.players:
+		var p = s.players[pid]
+		if not p.has("at"):
+			p["at"] = RL.derive_attrs(p.pos, p.ovr, p.st, rng)
+	if not s.has("recov"):
+		s["recov"] = {}
+	var c = uc()
+	if not c.has("slots") or c.slots.size() != 11:
+		if not FORMATIONS.has(c.formation):
+			c.formation = "4-3-3"
+		init_user_tactics(c)
+	s.v = SAVE_V
+
+
+func raw_player(r: Array) -> Dictionary:
+	var at = []
+	for i in range(21, 39):
+		at.append(int(r[i]))
+	return {"id": int(r[0]), "fn": r[1], "ln": r[2], "cn": r[3], "club": int(r[4]), "pos": r[5], "alt": Array(r[6].split(" ", false)) if r[6] != "" else [], "nat": r[7],
+		"by": int(r[8]), "bm": int(r[9]), "bd": int(r[10]), "ovr": int(r[11]), "pot": 0, "st": [int(r[12]), int(r[13]), int(r[14]), int(r[15]), int(r[16]), int(r[17])],
+		"foot": r[18], "sm": int(r[19]), "wf": int(r[20]), "at": at, "wage": 0, "cend": 0, "cond": 100, "mor": 70, "inj": 0, "susp": 0, "ycs": 0, "listed": false, "form": 6.5, "ss": new_stats(), "cg": 0, "cap": 0}
 
 
 func gen_potential(ovr: int, a: int, r: RandomNumberGenerator) -> int:
@@ -310,6 +378,7 @@ func gen_player(club_id: int, pos: String, a: int, ovr: int, pot: int, nat: Stri
 		"by": cur.year - a - (1 if cur.month < 7 else 0), "bm": rng.randi_range(7, 12), "bd": rng.randi_range(1, 28), "ovr": ovr, "pot": max(pot, ovr), "st": st,
 		"foot": "L" if rng.randf() < 0.24 else "R", "sm": rng.randi_range(2, 3), "wf": rng.randi_range(2, 4), "wage": 0, "cend": s.season + rng.randi_range(2, 4),
 		"cond": 100, "mor": 70, "inj": 0, "susp": 0, "ycs": 0, "listed": false, "form": 6.5, "ss": new_stats(), "cg": 0, "cap": 0}
+	p["at"] = RL.derive_attrs(pos, ovr, st, rng)
 	p.wage = wage_for(ovr, age(p))
 	s.players[pid] = p
 	if club_id >= 0:
@@ -339,8 +408,61 @@ func ensure_squad(c: Dictionary):
 
 # ---------------------------------------------------------------- lineups
 
-func pick_xi(c: Dictionary, formation: String) -> Dictionary:
-	var slots = FORMATIONS[formation]
+func slots_of(c: Dictionary) -> Array:
+	if c.has("slots") and c.slots.size() == 11:
+		return c.slots
+	return FORMATIONS[c.formation]
+
+
+func set_formation(c: Dictionary, fname: String):
+	# applies a stock formation to the user's club (copies the slots so they can be customised)
+	c.formation = fname
+	c.slots = FORMATIONS[fname].duplicate(true)
+	c.roles = []
+	for sl in c.slots:
+		c.roles.append(RL.BY_POS[sl[0]][0])
+
+
+func init_user_tactics(c: Dictionary):
+	set_formation(c, c.formation)
+	if not c.has("instr"):
+		c.instr = {"width": 1, "line": 1, "pass": 1, "counter": false}
+	if not c.has("presets"):
+		c.presets = [null, null, null]
+	for k in ["pk", "fk", "ck", "capt"]:
+		if not c.has(k):
+			c[k] = -1
+	auto_pick(c)
+	auto_roles(c)
+
+
+func make_preset(c: Dictionary) -> Dictionary:
+	return {"formation": c.formation, "slots": c.slots.duplicate(true), "roles": c.roles.duplicate(), "instr": c.instr.duplicate(), "ment": c.ment, "press": c.press, "tempo": c.tempo}
+
+
+func apply_preset(c: Dictionary, pr: Dictionary):
+	c.formation = pr.formation
+	c.slots = pr.slots.duplicate(true)
+	c.roles = pr.roles.duplicate()
+	c.instr = pr.instr.duplicate()
+	c.ment = pr.ment
+	c.press = pr.press
+	c.tempo = pr.tempo
+	for i in 11:
+		if c.xi[i] >= 0:
+			c.roles[i] = RL.valid(c.roles[i], c.slots[i][0])
+
+
+func auto_roles(c: Dictionary):
+	var sl = slots_of(c)
+	for i in 11:
+		if c.xi[i] >= 0:
+			c.roles[i] = RL.best(s.players[c.xi[i]], sl[i][0])
+		else:
+			c.roles[i] = RL.BY_POS[sl[i][0]][0]
+
+
+func pick_xi(c: Dictionary, slots: Array) -> Dictionary:
 	var avail = []
 	for pid in c.players:
 		var p = s.players[pid]
@@ -406,8 +528,8 @@ func best_formation(c: Dictionary) -> String:
 	var best = "4-3-3"
 	var bs = -1.0
 	for f in FORMATIONS.keys():
-		var xi = pick_xi(c, f).xi
 		var slots = FORMATIONS[f]
+		var xi = pick_xi(c, slots).xi
 		var t = 0.0
 		for i in 11:
 			if xi[i] >= 0:
@@ -420,7 +542,7 @@ func best_formation(c: Dictionary) -> String:
 
 
 func auto_pick(c: Dictionary):
-	var r = pick_xi(c, c.formation)
+	var r = pick_xi(c, slots_of(c))
 	c.xi = r.xi
 	c.bench = r.bench
 
@@ -432,7 +554,7 @@ func fix_lineup() -> Array:
 	if c.xi.size() != 11:
 		auto_pick(c)
 		return changes
-	var slots = FORMATIONS[c.formation]
+	var slots = slots_of(c)
 	var bench2 = []
 	for pid in c.bench:
 		if pid in c.players and available(s.players[pid]) and not (pid in c.xi) and not (pid in bench2):
@@ -483,7 +605,10 @@ func lineup(cid: int, opp: int) -> Dictionary:
 	var c = s.clubs[cid]
 	if cid == s.user.club:
 		fix_lineup()
-		return {"club": cid, "xi": c.xi, "bench": c.bench, "formation": c.formation, "ment": c.ment, "press": c.press, "tempo": c.tempo, "user": true}
+		for i in 11:
+			c.roles[i] = RL.valid(c.roles[i], c.slots[i][0])
+		return {"club": cid, "xi": c.xi, "bench": c.bench, "formation": c.formation, "ment": c.ment, "press": c.press, "tempo": c.tempo, "user": true,
+			"slots": c.slots, "rids": c.roles, "instr": c.instr, "pk": c.pk, "fk": c.fk, "ck": c.ck, "capt": c.capt}
 	var r = lu_cache.get(cid, null)
 	if r != null:
 		for pid in r.xi:
@@ -500,19 +625,25 @@ func lineup(cid: int, opp: int) -> Dictionary:
 				r = null
 				break
 	if r == null or r.day < s.day - 28:
-		r = pick_xi(c, c.formation)
+		r = pick_xi(c, FORMATIONS[c.formation])
 		r["day"] = s.day
+		var rids = []
+		var fs = FORMATIONS[c.formation]
+		for i in 11:
+			rids.append(RL.best(s.players[r.xi[i]], fs[i][0]) if r.xi[i] >= 0 else RL.BY_POS[fs[i][0]][0])
+		r["rids"] = rids
 		lu_cache[cid] = r
 	var d = c.rep - s.clubs[opp].rep
 	var ment = 3 if d >= 4 else (1 if d <= -6 else 2)
-	return {"club": cid, "xi": r.xi, "bench": r.bench, "formation": c.formation, "ment": ment, "press": c.press, "tempo": c.tempo, "user": false}
+	return {"club": cid, "xi": r.xi, "bench": r.bench, "formation": c.formation, "ment": ment, "press": c.press, "tempo": c.tempo, "user": false,
+		"slots": FORMATIONS[c.formation], "rids": r.rids, "instr": AI_INSTR, "pk": -1, "fk": -1, "ck": -1, "capt": -1}
 
 
 func team_ratings(cid: int) -> Dictionary:
 	# quick attack / midfield / defence summary for display
 	var c = s.clubs[cid]
-	var xi = c.xi if cid == s.user.club and c.xi.size() == 11 else pick_xi(c, c.formation).xi
-	var slots = FORMATIONS[c.formation]
+	var slots = slots_of(c)
+	var xi = c.xi if cid == s.user.club and c.xi.size() == 11 else pick_xi(c, slots).xi
 	var sum = [0.0, 0.0, 0.0, 0.0]
 	var n = [0, 0, 0, 0]
 	for i in 11:
@@ -552,6 +683,12 @@ func next_user_fixture():
 			if best == null or f.day < best.day:
 				best = f
 	return best
+
+
+func fx_caption(f: Dictionary) -> String:
+	if f.get("comp", "") != "" or f.ko:
+		return f.label
+	return "%s · Round %d" % [s.leagues[f.lg].name, f.rd]
 
 
 func club_fixtures(cid: int) -> Array:
@@ -792,6 +929,12 @@ func change_ovr(p: Dictionary, ch: int):
 		else:
 			if rng.randf() < (0.8 if (i == 0 or i == 5) else 0.45):
 				p.st[i] = max(20, p.st[i] - 1)
+	for i in p.at.size():
+		if ch > 0:
+			if rng.randf() < 0.45:
+				p.at[i] = min(99, p.at[i] + 1)
+		elif rng.randf() < (0.7 if (i == 7 or i == 8) else 0.3):
+			p.at[i] = max(10, p.at[i] - 1)
 	if p.pot < p.ovr:
 		p.pot = p.ovr
 
@@ -810,7 +953,7 @@ func refresh_jobs():
 	var u = s.user
 	var cands = []
 	for c in s.clubs:
-		if c.id != u.club and c.rep <= u.rep + 26.5 and c.rep >= u.rep + 13:
+		if c.id != u.club and not s.leagues[c.lg].roe and c.rep <= u.rep + 26.5 and c.rep >= u.rep + 13:
 			cands.append(c.id)
 	cands.shuffle()
 	u.jobs = cands.slice(0, 4)
@@ -818,6 +961,11 @@ func refresh_jobs():
 
 func take_job(cid: int):
 	var u = s.user
+	var old = uc()
+	old.formation = best_formation(old)
+	old.erase("slots")
+	old.erase("roles")
+	lu_cache.erase(old.id)
 	u.club = cid
 	u.conf = 60.0
 	u.sacked = false
@@ -826,7 +974,7 @@ func take_job(cid: int):
 	s.negos = {}
 	var c = uc()
 	u.obj = LG.objective(c)
-	auto_pick(c)
+	init_user_tactics(c)
 	msg("Welcome to %s" % c.name, "You have been appointed manager of %s.\n\nObjective: %s." % [c.name, u.obj.text], "board")
 	save_game()
 
@@ -861,6 +1009,7 @@ func load_game() -> bool:
 	s = d
 	set_date()
 	build_index()
+	ensure_state()
 	lu_cache = {}
 	active = true
 	return true
