@@ -40,95 +40,83 @@ func build():
 		_appoint()
 
 
+func _ink(text: String, size: int, font := "body", col := Color("15161a")) -> Label:
+	var l = UI.wrap(text, size, col, font)
+	return l
+
+
 func _appoint():
+	# newspaper front page announcing the appointment
 	var s = G.s
 	var c = G.uc()
-	var c1 = Color(c.c1)
-	var c2 = Color(c.c2)
-	if c1.get_luminance() < 0.08:
-		c1 = c1.lightened(0.18)
-	var holder = UI.vb(12)
+	var u = s.user
+	var holder = UI.vb(10)
 	holder.alignment = BoxContainer.ALIGNMENT_CENTER
-	var m = UI.margin(holder, 40, 20, 40, 20)
+	var m = UI.margin(holder, 40, 14, 40, 14)
 	m.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(m)
-	var tv = UI.panel(Color("05070b"), 10, 10, 10, Color(1, 1, 1, 0.18))
-	tv.custom_minimum_size = Vector2(820, 410)
-	tv.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var inner = Control.new()
-	inner.clip_contents = true
-	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tv.add_child(inner)
-	# sponsor wall
-	var wall = GridContainer.new()
-	wall.columns = 6
-	wall.add_theme_constant_override("h_separation", 4)
-	wall.add_theme_constant_override("v_separation", 4)
-	wall.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for i in 30:
-		var k = (i + int(i / 6)) % 3
-		var col = c1 if k == 0 else (Color("10151f") if k == 1 else c2.darkened(0.1))
-		var cell = UI.panel(col, 0, 0, 0)
-		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		cell.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		if k == 1:
-			var t = UI.vb(-8)
-			t.alignment = BoxContainer.ALIGNMENT_CENTER
-			var a = UI.lbl("FOOTBALL", 19, UI.TEXT, "xbold")
-			a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			var b = UI.lbl("DYNASTY", 19, UI.GOLD, "xbold")
-			b.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			t.add_child(a)
-			t.add_child(b)
-			cell.add_child(t)
-		elif k == 2:
-			cell.add_child(UI.center(UI.badge(c, 44)))
-		wall.add_child(cell)
-	inner.add_child(wall)
-	var sil = Sil.new()
-	sil.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sil.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	sil.offset_left = 90
-	sil.offset_right = 430
-	sil.offset_top = -372
-	sil.offset_bottom = -46
-	inner.add_child(sil)
-	var tag = UI.panel(Color("f5c518"), 0, 18, 6)
-	tag.add_child(UI.lbl("BREAKING NEWS", 26, Color("0a0e17"), "xbold"))
-	tag.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	tag.offset_left = -230
-	tag.offset_top = 14
-	tag.offset_right = 0
-	tag.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	inner.add_child(tag)
-	var ticker = UI.panel(Color("f5c518"), 0, 16, 6)
-	ticker.add_child(UI.lbl_fill("%s APPOINT %s AS MANAGER" % [c.name.to_upper(), str(s.user.name).to_upper()], 30, Color("0a0e17"), "xbold"))
-	ticker.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	ticker.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	inner.add_child(ticker)
-	holder.add_child(tv)
-	var foot = UI.hb(18)
-	foot.alignment = BoxContainer.ALIGNMENT_CENTER
-	var lg = UI.vb(-10)
-	lg.add_child(UI.lbl("FOOTBALL", 26, UI.TEXT, "xbold"))
-	lg.add_child(UI.lbl("DYNASTY", 26, UI.GOLD, "xbold"))
-	foot.add_child(lg)
-	foot.add_child(UI.badge(c, 64))
-	var lv = UI.vb(-4)
-	lv.add_child(UI.lbl(s.leagues[c.lg].name, 24, UI.TEXT, "bold"))
-	lv.add_child(UI.lbl("%s · season %s" % [s.leagues[c.lg].country, G.season_name()], 17, UI.MUTED))
-	foot.add_child(lv)
-	foot.add_child(UI.sp(40, 0))
-	var bt = UI.btn("Meet the board", func(): UI.main.root("intro", {"kind": "board"}), "gold", "chevron-right", 58)
-	bt.custom_minimum_size = Vector2(280, 58)
-	foot.add_child(bt)
-	holder.add_child(foot)
-	tv.modulate.a = 0.0
-	tv.scale = Vector2(0.94, 0.94)
-	tv.pivot_offset = Vector2(410, 205)
+	var paper = UI.panel(Color("efe7d6"), 4, 26, 16, Color("cfc5ae"))
+	paper.custom_minimum_size = Vector2(880, 0)
+	paper.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	paper.get_theme_stylebox("panel").shadow_color = Color(0, 0, 0, 0.6)
+	paper.get_theme_stylebox("panel").shadow_size = 24
+	var pv = UI.vb(4)
+	paper.add_child(pv)
+	var top = UI.hb(8)
+	top.add_child(UI.lbl(G.fmt_date(s.day, true).to_upper(), 14, Color("5b564b"), "semi"))
+	top.add_child(UI.sp())
+	top.add_child(UI.lbl("%s EDITION · €2" % s.leagues[c.lg].country.to_upper(), 14, Color("5b564b"), "semi"))
+	pv.add_child(top)
+	var mast = UI.lbl("THE FOOTBALL GAZETTE", 50, Color("15161a"), "xbold")
+	mast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pv.add_child(mast)
+	var rule = ColorRect.new()
+	rule.color = Color("15161a")
+	rule.custom_minimum_size = Vector2(0, 4)
+	pv.add_child(rule)
+	var kicker = UI.hb(8)
+	kicker.add_child(UI.chip("EXCLUSIVE", Color(c.c1) if Color(c.c1).get_luminance() < 0.6 else Color("15161a"), Color.WHITE, 15))
+	kicker.add_child(UI.lbl(s.leagues[c.lg].name.to_upper(), 15, Color("5b564b"), "semi"))
+	pv.add_child(kicker)
+	var surname = str(u.name).split(" ")[-1].to_upper()
+	pv.add_child(_ink("%s APPOINT %s" % [c.name.to_upper(), surname], 58, "xbold"))
+	pv.add_child(_ink("New manager %s takes charge at %s with the board demanding: %s" % [u.name, c.stadium if c.stadium != "" else c.name, s.user.obj.text.to_lower()], 21, "semi", Color("3a372f")))
+	var cols_ = UI.hb(18)
+	var art = UI.vb(6)
+	art.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	art.add_child(_ink("%s have named %s as their new manager, the club confirmed last night. The %d-year-old from %s arrives with a %s licence and a reputation still to be made at this level." % [c.name, u.name, int(u.get("age", 38)), u.nat, G.OPS.BADGES[u.badge]], 17))
+	art.add_child(_ink("Supporters will expect a fast start. The transfer window is open and the new manager has %s to spend. A club source said: \"He knows what this club demands.\"" % G.money(c.budget), 17))
+	cols_.add_child(art)
+	var side = UI.panel(Color(c.c1), 2, 12, 10)
+	side.custom_minimum_size = Vector2(220, 0)
+	var sv = UI.vb(4)
+	sv.alignment = BoxContainer.ALIGNMENT_CENTER
+	sv.add_child(UI.center(UI.badge(c, 86)))
+	var fg = UI.on_color(Color(c.c1))
+	var cn = UI.lbl(c.short, 30, fg, "xbold")
+	cn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sv.add_child(cn)
+	var f = G.next_user_fixture()
+	if f != null:
+		var fl = UI.wrap("First up: %s (%s), %s" % [s.clubs[f.a if f.h == c.id else f.h].name, "H" if f.h == c.id else "A", G.fmt_date(f.day)], 15, Color(fg, 0.85), "semi")
+		fl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sv.add_child(fl)
+	side.add_child(sv)
+	cols_.add_child(side)
+	pv.add_child(cols_)
+	holder.add_child(paper)
+	var bt = UI.btn("Meet the board", func(): UI.main.root("intro", {"kind": "board"}), "gold", "chevron-right", 54)
+	bt.custom_minimum_size = Vector2(300, 54)
+	bt.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	holder.add_child(bt)
+	paper.pivot_offset = Vector2(440, 200)
+	paper.rotation = -0.5
+	paper.scale = Vector2(0.2, 0.2)
+	paper.modulate.a = 0.0
 	var tw = create_tween().set_parallel(true)
-	tw.tween_property(tv, "modulate:a", 1.0, 0.5)
-	tw.tween_property(tv, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(paper, "rotation", -0.012, 0.7).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(paper, "scale", Vector2.ONE, 0.7).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(paper, "modulate:a", 1.0, 0.3)
 	UI.sfx("sting_news", -6.0)
 	UI.sfx("vo_news", -2.0)
 

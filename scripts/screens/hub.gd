@@ -422,6 +422,26 @@ func _philosophy(v: Control):
 		v.add_child(p)
 
 
+func _pic(nm: String, w: float, h: float) -> Control:
+	var path = "res://assets/life/%s.jpg" % nm
+	var p = UI.panel(Color("14171f"), 10, 0, 0)
+	p.custom_minimum_size = Vector2(w, h)
+	p.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if ResourceLoader.exists(path):
+		var t = TextureRect.new()
+		t.texture = load(path)
+		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		p.add_child(t)
+	if w <= 0:
+		p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	else:
+		p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return p
+
+
 func _buy(lf: Dictionary, cost: int, what: String, apply: Callable):
 	if lf.cash < cost:
 		UI.sfx("error", -8.0)
@@ -471,11 +491,14 @@ func _life(v: Control):
 		cc.add_child(UI.wrap("Fluency takes about five months and gives Motivation +1.", 17, UI.DIM))
 	cc.add_child(UI.btn("Give €25K to a local cause", func(): _buy(lf, 25000, "a donation the fans noticed", func():
 		u["fans"] = min(100.0, float(u.get("fans", 55.0)) + 3.0)), "secondary", "heart", 50))
-	var hv = _card(v, "Home")
+	var hv = _card(v, "Home · %s" % HOMES[lf.home][0])
+	hv.add_child(_pic("home_%d" % (lf.home + 1), 0, 190))
 	for i in HOMES.size():
 		var owned = i <= lf.home
+		if i < lf.home:
+			continue
 		var r = UI.hb(10)
-		r.add_child(UI.icon("house", 22, UI.GOLD if i == lf.home else (UI.DIM if owned else UI.MUTED)))
+		r.add_child(_pic("home_%d" % (i + 1), 80, 50))
 		var tv = UI.vb(-4)
 		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tv.add_child(UI.lbl(HOMES[i][0], 21, UI.TEXT if not owned or i == lf.home else UI.DIM, "semi"))
@@ -493,9 +516,15 @@ func _life(v: Control):
 		elif not owned:
 			r.add_child(UI.lbl(G.money(HOMES[i][1]), 18, UI.DIM, "disp"))
 		hv.add_child(r)
-	var cv = _card(v, "Garage")
+	var cv = _card(v, "Garage · %s" % CARS[lf.car][0])
+	if lf.car > 0:
+		cv.add_child(_pic("car_%d" % lf.car, 0, 190))
 	for i in CARS.size():
+		if i < lf.car:
+			continue
 		var r = UI.hb(10)
+		if i > 0:
+			r.add_child(_pic("car_%d" % i, 80, 50))
 		r.add_child(UI.lbl_fill(CARS[i][0], 21, UI.TEXT if i >= lf.car else UI.DIM, "semi"))
 		if i == lf.car:
 			r.add_child(UI.chip("DRIVING", Color(UI.GOLD, 0.16), UI.GOLD, 15))
@@ -511,6 +540,7 @@ func _life(v: Control):
 	for i in BIZ.size():
 		var own = i in lf.biz
 		var r = UI.hb(10)
+		r.add_child(_pic("biz_%d" % (i + 1), 80, 50))
 		var tv = UI.vb(-4)
 		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tv.add_child(UI.lbl(BIZ[i][0], 21, UI.TEXT, "semi"))
@@ -566,6 +596,7 @@ func _invest(v: Control):
 			if pr.k == i:
 				n += 1
 		var r = UI.hb(10)
+		r.add_child(_pic("prop_%d" % (i + 1), 80, 50))
 		var tv = UI.vb(-4)
 		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tv.add_child(UI.lbl("%s%s" % [PROPS[i][0], " × %d" % n if n > 0 else ""], 21, UI.TEXT, "semi"))
