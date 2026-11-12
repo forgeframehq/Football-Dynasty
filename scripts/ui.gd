@@ -43,6 +43,39 @@ func _ready():
 		f.close()
 
 
+var music_pl: AudioStreamPlayer = null
+var music_i := 0
+
+
+func music_tracks() -> Array:
+	# drop tracks into assets/music as track_1.mp3, track_2.mp3, ... and they play in order
+	var a = []
+	for i in range(1, 13):
+		var path = "res://assets/music/track_%d.mp3" % i
+		if ResourceLoader.exists(path):
+			a.append(path)
+	return a
+
+
+func music(on: bool):
+	var tr = music_tracks()
+	if tr.is_empty():
+		return
+	if music_pl == null:
+		music_pl = AudioStreamPlayer.new()
+		music_pl.volume_db = -20.0
+		add_child(music_pl)
+		music_pl.finished.connect(func():
+			music_i += 1
+			music(true))
+	if on and G.settings.get("music", true):
+		if not music_pl.playing:
+			music_pl.stream = load(tr[music_i % tr.size()])
+			music_pl.play()
+	else:
+		music_pl.stop()
+
+
 func _stream(nm: String):
 	for ext in ["mp3", "wav"]:
 		var path = "res://assets/sfx/%s.%s" % [nm, ext]

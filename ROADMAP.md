@@ -87,3 +87,15 @@ Options
 - [ ] Legends mode (retired players return as coaches or scouts)
 - [ ] Family, holidays, legacy items (statue, stand), property abroad, owner while managing elsewhere
 - [ ] Images for homes, cars, businesses and property; sponsor logos; manager portraits
+- [x] Social feed with posts, reactions and effects
+- [x] Newspaper front page for the appointment, trophy images, sponsor logos, app icon
+- [x] Music player: put track_1.mp3, track_2.mp3, ... in assets/music
+
+## World system (agreed, not built)
+- Start flow: Continent > Nation > Competition > Club with a step bar, then choose up to five playable nations (the club's nation is locked on)
+- Three tiers: playable (full simulation), background (real clubs and players, results estimated), placeholder (generated clubs and players)
+- Placeholder players can be scouted and bought, but must not be a wonderkid loophole: cap their potential, make it uncertain until scouted in person, and price the good ones fairly
+- Generated names drawn from real players of that nationality; nations generated only when first opened
+- A background nation can be made playable between seasons; placeholder nations cannot
+- Dataset check (men): full squads exist for England (4 divisions), Spain, Germany (3), Italy, France (2 each), Argentina (30 clubs), USA (30), Saudi Arabia, Belgium, Netherlands, Portugal, Turkey, Poland, Mexico, Denmark, South Korea, China, Sweden, Norway, Switzerland, Scotland, Austria, Ireland, India, Australia; partial for Greece, Czechia, Ukraine, Croatia, Cyprus and single clubs elsewhere; 40 South American clubs from the continental cups; 164 nationalities, 78 with 20 or more players
+- Needs: nation and continent table, open-source flag set, continent pictures

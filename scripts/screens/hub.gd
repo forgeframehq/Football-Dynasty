@@ -1128,7 +1128,7 @@ func _status(v: Control):
 	wv.add_child(UI.kv("Players", str(s.players.size())))
 	wv.add_child(UI.kv("Free agents", str(s.free.size())))
 	wv.add_child(UI.kv("Save slot", str(G.slot + 1)))
-	wv.add_child(UI.kv("Version", "0.4"))
+	wv.add_child(UI.kv("Version", "0.5"))
 
 
 func _manual(v: Control):

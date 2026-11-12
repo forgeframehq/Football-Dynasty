@@ -67,6 +67,7 @@ func _ready():
 		return
 	_build()
 	root("menu")
+	UI.music(true)
 	if "--uitest" in ua:
 		dev = load("res://dev/uitest.gd").new()
 		dev.run(self)
@@ -572,6 +573,13 @@ func menu_items(key: String) -> Array:
 		a.append(_row("crown", "Hall of Fame", "Honours and scrapbook", func(): root("hub", {"kind": "fame", "grp": "options"})))
 		a.append(_row("pencil", "Editor", "On" if G.settings.get("editor", false) else "Off", func(): root("hub", {"kind": "editor", "grp": "options"})))
 		a.append(_row("book-open", "Manual", "How to play", func(): root("hub", {"kind": "manual", "grp": "options"})))
+		if not UI.music_tracks().is_empty():
+			var mus = G.settings.get("music", true)
+			a.append(_row("volume-2" if mus else "volume-x", "Music", "On" if mus else "Off", func():
+				G.settings["music"] = not mus
+				G.save_settings()
+				UI.music(not mus)
+				open_menu("options")))
 		a.append(_row("log-out", "Exit to Menu", "Saves first", func():
 			G.save_game()
 			G.active = false

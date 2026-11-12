@@ -96,7 +96,7 @@ func build():
 		G.save_settings()
 		refresh()))
 	v.add_child(UI.sp(0, 16))
-	v.add_child(UI.lbl("v0.4 · personal build · not for distribution", 16, UI.DIM))
+	v.add_child(UI.lbl("v0.5 · personal build · not for distribution", 16, UI.DIM))
 	if not G.ui.get("sting", false):
 		G.ui["sting"] = true
 		UI.sfx("sting_start", -10.0)
