@@ -1,320 +1,393 @@
 extends "res://scripts/screens/screen.gd"
-# Club campus: a 3D view of the stadium and facilities that grows as they are upgraded.
+# Club city: an isometric town built from sprites. Pan, pinch to zoom, tap a facility to upgrade it.
 
-const MODEL_FILE = {"stadium": "stadium", "training": "training_ground", "academy": "youth_academy", "medical": "medical_centre", "scouting": "scouting_office", "commercial": "commercial_building"}
-const SPOT = {"stadium": Vector3(0, 0, -105), "training": Vector3(74, 0, 78), "academy": Vector3(-82, 0, 70), "medical": Vector3(-88, 0, 205), "scouting": Vector3(0, 0, 250), "commercial": Vector3(88, 0, 205)}
-const MODEL_SCALE = {"stadium": 1.0, "training": 0.5, "academy": 0.62, "medical": 1.45, "scouting": 1.6, "commercial": 1.2}
+const FILE = {"stadium": "stadium", "training": "training_ground", "academy": "youth_academy", "medical": "medical_centre", "scouting": "scouting_office", "commercial": "commercial_building"}
+const PLOT = {"stadium": [2, 2, 2], "commercial": [4, 3, 1], "scouting": [4, 1, 1], "medical": [0, 3, 1], "training": [1, 4, 1], "academy": [0, 4, 1]}
+const GRID = 6
+const A = 150.0          # half tile width
+const B = 96.0           # half tile height (matches the art's 0.64 slope)
+const P = 1.16           # plot pitch in tiles (the rest is road)
+# filler buildings per town stage (stadium level); used when the city art is present
+const TOWN = [["farm_field", "trees", "terraced_houses", "park", "farm_field", "trees"], ["terraced_houses", "semi_detached", "shops", "pub", "park", "trees"],
+	["semi_detached", "apartments_low", "shops", "cafe", "supermarket", "park"], ["apartments_low", "apartments_modern", "hotel", "office_block", "supermarket", "cafe"],
+	["apartments_modern", "residential_tower", "hotel", "office_block", "apartments_modern", "shops"]]
+const SHADER = """
+shader_type canvas_item;
+uniform vec3 club = vec3(0.2, 0.4, 0.9);
+void fragment() {
+	vec4 c = texture(TEXTURE, UV);
+	float mx = max(c.r, max(c.g, c.b));
+	float mn = min(c.r, min(c.g, c.b));
+	float d = mx - mn;
+	float hue = 0.0;
+	if (d > 0.0001) {
+		if (mx == c.r) { hue = mod((c.g - c.b) / d, 6.0); }
+		else if (mx == c.g) { hue = (c.b - c.r) / d + 2.0; }
+		else { hue = (c.r - c.g) / d + 4.0; }
+	}
+	hue *= 60.0;
+	float sat = mx > 0.0 ? d / mx : 0.0;
+	float m = smoothstep(203.0, 213.0, hue) * (1.0 - smoothstep(244.0, 256.0, hue)) * smoothstep(0.4, 0.56, sat) * smoothstep(0.16, 0.28, mx);
+	vec3 t = clamp(club * clamp(mx / 0.8, 0.2, 1.25), 0.0, 1.0);
+	COLOR = vec4(mix(c.rgb, t, m), c.a);
+}
+"""
 
-static var mesh_cache: Dictionary = {}
+static var shader_res: Shader = null
 
-var cam: Camera3D
-var view: SubViewportContainer
-var chips: Dictionary = {}
+var wrap: Control
+var world: Control
+var zoom := 0.62
+var sel := ""
+var dragging := false
+var moved := 0.0
+var touches: Dictionary = {}
+var pinch0 := 0.0
+var zoom0 := 1.0
+var cam := Vector2.ZERO   # world point at the centre of the view
+var inited := false
+
+
+class Ground extends Control:
+	var g = 6
+	var a = 150.0
+	var b = 96.0
+	var p = 1.16
+	var plots: Dictionary = {}
+
+	func iso(u: float, v: float) -> Vector2:
+		return Vector2((u - v) * a, (u + v) * b)
+
+	func quad(u0: float, v0: float, u1: float, v1: float, col: Color):
+		draw_colored_polygon(PackedVector2Array([iso(u0, v0), iso(u1, v0), iso(u1, v1), iso(u0, v1)]), col)
+
+	func _draw():
+		# the control covers the whole map so it is never culled; draw relative to the map origin
+		draw_set_transform(-position)
+		var ext = g * p
+		quad(-1.6, -1.6, ext + 1.4, ext + 1.4, Color("2f6b45"))
+		quad(-0.5, -0.5, ext + 0.34, ext + 0.34, Color("3a7d50"))
+		var road = Color("3b4252")
+		var rw = p - 1.0
+		for k in range(0, g + 1):
+			var r0 = k * p - rw
+			quad(r0, -rw, r0 + rw, ext, road)
+			quad(-rw, r0, ext, r0 + rw, road)
+		# lane markings
+		for k in range(0, g + 1):
+			var m = k * p - rw / 2.0
+			var t = -rw
+			while t < ext:
+				draw_line(iso(m, t), iso(m, t + 0.12), Color(1, 1, 1, 0.28), 2.0)
+				draw_line(iso(t, m), iso(t + 0.12, m), Color(1, 1, 1, 0.28), 2.0)
+				t += 0.3
+		for key in plots:
+			var pl = plots[key]
+			var n = pl[2]
+			var u0 = pl[0] * p
+			var v0 = pl[1] * p
+			var span = (n - 1) * p + 1.0
+			quad(u0, v0, u0 + span, v0 + span, Color("8b8f99") if n > 1 else Color("44895a"))
+
+	static func tree(ci: CanvasItem, at: Vector2, s: float):
+		ci.draw_set_transform(at + Vector2(0, 4), 0.0, Vector2(1.0, 0.5))
+		ci.draw_circle(Vector2.ZERO, 16 * s, Color(0, 0, 0, 0.22))
+		ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		ci.draw_rect(Rect2(at + Vector2(-2 * s, -14 * s), Vector2(4 * s, 16 * s)), Color("5b4636"))
+		ci.draw_circle(at + Vector2(0, -24 * s), 17 * s, Color("2f7a3f"))
+		ci.draw_circle(at + Vector2(-5 * s, -30 * s), 11 * s, Color("46a05a"))
+
+
+class Trees extends Control:
+	var seed_v := 1
+	var a = 150.0
+	var b = 96.0
+
+	func _draw():
+		var rng = RandomNumberGenerator.new()
+		rng.seed = seed_v
+		var off = Vector2(170, 70)
+		var pts = []
+		for i in 7:
+			var u = rng.randf_range(0.12, 0.88)
+			var v = rng.randf_range(0.12, 0.88)
+			pts.append(Vector2((u - v) * a, (u + v) * b) + off)
+		pts.sort_custom(func(x, y): return x.y < y.y)
+		for pt in pts:
+			Ground.tree(self, pt, rng.randf_range(0.9, 1.5))
 
 
 func build():
 	var c = G.uc()
 	G.OPS.ensure(c)
-	body.add_child(UI.topbar("Club", true, UI.chip(G.money(c.budget), Color(UI.GREEN, 0.14), UI.GREEN, 22)))
-	view = SubViewportContainer.new()
-	view.stretch = true
-	view.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	view.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var vp = SubViewport.new()
-	vp.own_world_3d = true
-	vp.msaa_3d = Viewport.MSAA_2X
-	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	view.add_child(vp)
-	vp.add_child(_world(c))
-	var wrap = Control.new()
+	body.add_child(UI.topbar("Club City", true, UI.chip(G.money(c.budget), Color(UI.GREEN, 0.14), UI.GREEN, 20)))
+	UI.main.t_sub = "Stadium %s · drag to move, pinch to zoom, tap a building" % G.OPS._thousands(G.OPS.capacity(c))
+	wrap = Control.new()
 	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	wrap.clip_contents = true
-	view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	wrap.add_child(view)
+	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
+	wrap.gui_input.connect(_wrap_input)
 	body.add_child(wrap)
-	chips = {}
-	for k in G.OPS.FAC:
-		var ch = _chip(c, k)
-		wrap.add_child(ch)
-		chips[k] = ch
-	# footer: construction status
-	var foot = UI.panel(UI.CARD, 22, 20, 14, UI.LINE)
-	var fh = UI.hb(12)
+	world = Control.new()
+	world.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(world)
+	var ground = Ground.new()
+	ground.plots = PLOT
+	ground.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ground.position = Vector2(-2600, -700)
+	ground.size = Vector2(5200, 3200)
+	world.add_child(ground)
+	if shader_res == null:
+		shader_res = Shader.new()
+		shader_res.code = SHADER
+	var mat = ShaderMaterial.new()
+	mat.shader = shader_res
+	var cc = Color(c.c1)
+	if cc.get_luminance() < 0.06:
+		cc = Color(0.14, 0.14, 0.16)
+	mat.set_shader_parameter("club", Vector3(cc.r, cc.g, cc.b))
+	# collect sprites, then draw back to front
+	var items: Array = []
+	var taken = {}
+	for k in PLOT:
+		var pl = PLOT[k]
+		for i in pl[2]:
+			for j in pl[2]:
+				taken[Vector2i(pl[0] + i, pl[1] + j)] = true
+		items.append({"k": k, "u": pl[0], "v": pl[1], "n": pl[2], "file": "%s_level_%d" % [FILE[k], c.fac[k]]})
+	var stage = clampi(c.fac.stadium, 1, 5) - 1
+	for i in GRID:
+		for j in GRID:
+			if taken.has(Vector2i(i, j)):
+				continue
+			var h = (i * 7 + j * 13 + c.id * 3) % 6
+			var nm = TOWN[stage][h]
+			if i == 4 and j == 2:
+				nm = "fan_plaza"
+			elif (i == 3 and j == 1) or (i == 2 and j == 4):
+				nm = "car_park_full" if G.user_fixture_today() != null else "car_park_empty"
+			items.append({"k": "", "u": i, "v": j, "n": 1, "file": nm})
+	items.sort_custom(func(x, y): return x.u + x.v + x.n * 2 < y.u + y.v + y.n * 2)
+	for it in items:
+		var span = (it.n - 1) * P + 1.0
+		var anchor = ground.iso(it.u * P + span, it.v * P + span)
+		var path = "res://assets/iso/%s.png" % it.file
+		if ResourceLoader.exists(path):
+			var k = span * 2.0 * A / 600.0
+			var t = TextureRect.new()
+			t.texture = load(path)
+			t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			t.stretch_mode = TextureRect.STRETCH_SCALE
+			t.size = Vector2(640, 640) * k
+			t.position = anchor - Vector2(320, 620) * k
+			t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if it.k != "":
+				t.material = mat
+			world.add_child(t)
+		elif it.k == "":
+			var tr = Trees.new()
+			tr.seed_v = it.u * 31 + it.v * 17 + 5
+			tr.position = ground.iso(it.u * P, it.v * P) - Vector2(170, 70)
+			tr.size = Vector2(340, 300)
+			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			world.add_child(tr)
+		if it.k != "":
+			var top = ground.iso(it.u * P + span * 0.5, it.v * P + span * 0.5)
+			world.add_child(_chip(c, it.k, top - Vector2(0, 150 * span if ResourceLoader.exists(path) else 30)))
+	# overlay controls
+	var zb = UI.vb(8)
+	zb.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	zb.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	zb.position = Vector2(16, -16)
+	for z in [["plus", 1.25], ["minus", 0.8]]:
+		var bt = UI.panel(Color("0b111c"), 14, 12, 12, Color(1, 1, 1, 0.16))
+		bt.add_child(UI.icon(z[0], 26, UI.TEXT))
+		var f = z[1]
+		UI.tap(bt, func(): _zoom(zoom * f, wrap.size / 2.0), true)
+		zb.add_child(bt)
+	wrap.add_child(zb)
 	if c.build != null:
-		fh.add_child(UI.icon("clock", 28, UI.AMBER))
-		var fv = UI.vb(0)
-		fv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		fv.add_child(UI.lbl("Building: %s level %d" % [G.OPS.FAC_NAME[c.build.key], c.fac[c.build.key] + 1], 25, UI.TEXT, "semi"))
-		fv.add_child(UI.lbl("%d days to go" % max(0, c.build.done - G.s.day), 20, UI.MUTED))
-		fh.add_child(fv)
-	else:
-		fh.add_child(UI.icon("sparkles", 28, UI.accent))
-		fh.add_child(UI.wrap("Tap a facility to upgrade it. One project can be built at a time.", 22, UI.MUTED))
-	foot.add_child(fh)
-	body.add_child(UI.margin(foot, 20, 10, 20, 16))
-	_place.call_deferred()
-	wrap.resized.connect(_place)
+		var st = UI.panel(Color("0b111c"), 14, 14, 8, Color(UI.AMBER, 0.6))
+		var sh = UI.hb(8)
+		sh.add_child(UI.icon("hammer", 22, UI.AMBER))
+		sh.add_child(UI.lbl("Building: %s level %d · %d days to go" % [G.OPS.FAC_NAME[c.build.key], c.fac[c.build.key] + 1, max(0, c.build.done - G.s.day)], 19, UI.TEXT, "semi"))
+		st.add_child(sh)
+		st.position = Vector2(16, 12)
+		wrap.add_child(st)
+	if sel != "":
+		wrap.add_child(_detail(c, sel))
+	if not inited:
+		inited = true
+		cam = ground.iso(3.0 * P, 3.0 * P)
+	wrap.resized.connect(_apply)
+	_apply.call_deferred()
 
 
-func _chip(c: Dictionary, k: String) -> Control:
-	var l = c.fac[k]
+func _chip(c: Dictionary, k: String, at: Vector2) -> Control:
 	var building = c.build != null and c.build.key == k
-	var p = UI.panel(Color("0b111cee"), 14, 12, 8, UI.AMBER if building else Color(1, 1, 1, 0.25))
-	var h = UI.hb(8)
-	h.add_child(UI.icon(G.OPS.FAC_ICON[k], 24, UI.AMBER if building else UI.accent))
+	var p = UI.panel(Color("0b111c"), 12, 12, 6, Color(UI.AMBER if building else (UI.accent if sel == k else Color(1, 1, 1, 0.25)), 0.9))
 	var v = UI.vb(-2)
-	v.add_child(UI.lbl(G.OPS.FAC_NAME[k].to_upper(), 19, UI.TEXT, "disp"))
-	if k == "stadium":
-		v.add_child(UI.lbl(G.OPS._thousands(G.OPS.capacity(c)), 17, UI.GOLD, "semi"))
+	var l = UI.lbl(G.OPS.FAC_NAME[k].to_upper(), 20, UI.TEXT, "disp")
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(l)
+	if building:
+		var bl = UI.caps("Building · %d days" % max(0, c.build.done - G.s.day), 15, UI.AMBER)
+		bl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(bl)
+	elif k == "stadium":
+		var cl = UI.caps(G.OPS._thousands(G.OPS.capacity(c)) + " seats", 15, UI.GOLD)
+		cl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(cl)
 	else:
 		var sh = UI.hb(1)
+		sh.alignment = BoxContainer.ALIGNMENT_CENTER
 		for i in 5:
-			sh.add_child(UI.icon("star-f", 14, UI.GOLD if i < l else Color(1, 1, 1, 0.15)))
+			sh.add_child(UI.icon("star-f", 14, UI.GOLD if i < c.fac[k] else Color(1, 1, 1, 0.18)))
 		v.add_child(sh)
-	h.add_child(v)
-	p.add_child(h)
-	UI.tap(p, func(): _sheet(k), true)
+	p.add_child(v)
+	p.position = at - Vector2(70, 30)
+	p.custom_minimum_size = Vector2(140, 0)
+	UI.tap(p, func():
+		sel = "" if sel == k else k
+		refresh(), true)
 	return p
 
 
-func _place():
-	if cam == null or not is_instance_valid(cam) or view == null:
-		return
-	await get_tree().process_frame
-	if not is_instance_valid(view):
-		return
-	for k in chips:
-		var ch = chips[k]
-		var wp = SPOT[k] + Vector3(0, 46 if k == "stadium" else 30, 0)
-		var sp = cam.unproject_position(wp)
-		ch.reset_size()
-		ch.position = Vector2(clamp(sp.x - ch.size.x / 2.0, 6, view.size.x - ch.size.x - 6), clamp(sp.y - ch.size.y, 6, view.size.y - ch.size.y - 6))
-
-
-func _sheet(k: String):
-	var c = G.uc()
+func _detail(c: Dictionary, k: String) -> Control:
 	var l = c.fac[k]
-	var build_sheet = func(v):
-		var sh = UI.hb(2)
-		for i in 5:
-			sh.add_child(UI.icon("star-f", 26, UI.GOLD if i < l else Color(1, 1, 1, 0.15)))
-		v.add_child(sh)
-		v.add_child(UI.kv("Now (level %d)" % l, G.OPS.effect_text(k, l)))
-		if l < 5:
-			v.add_child(UI.kv("Level %d" % (l + 1), G.OPS.effect_text(k, l + 1), UI.GREEN))
-			v.add_child(UI.kv("Cost", G.money(G.OPS.upgrade_cost(c, k))))
-			v.add_child(UI.kv("Build time", "%d days" % G.OPS.upgrade_days(c, k)))
-			v.add_child(UI.sp(0, 4))
-			if c.build != null:
-				v.add_child(UI.wrap("Builders are busy with the %s (%d days left)." % [G.OPS.FAC_NAME[c.build.key].to_lower(), max(0, c.build.done - G.s.day)], 22, UI.AMBER))
+	var p = UI.panel(Color("0f1522"), 18, 16, 14, Color(UI.accent, 0.6))
+	p.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
+	p.offset_left = -400
+	p.offset_right = -14
+	p.offset_top = 12
+	p.offset_bottom = -12
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	var v = UI.vb(8)
+	p.add_child(UI.scroll(v))
+	var head = UI.hb(8)
+	head.add_child(UI.lbl_fill(G.OPS.FAC_NAME[k].to_upper(), 28, UI.TEXT, "xbold"))
+	var x = UI.panel(Color(1, 1, 1, 0.07), 12, 8, 8)
+	x.add_child(UI.icon("x", 22, UI.MUTED))
+	UI.tap(x, func():
+		sel = ""
+		refresh(), true)
+	head.add_child(x)
+	v.add_child(head)
+	var sh = UI.hb(2)
+	for i in 5:
+		sh.add_child(UI.icon("star-f", 22, UI.GOLD if i < l else Color(1, 1, 1, 0.15)))
+	v.add_child(sh)
+	var nxt = min(5, l + 1)
+	var path = "res://assets/iso/%s_level_%d.png" % [FILE[k], nxt]
+	if ResourceLoader.exists(path):
+		var t = TextureRect.new()
+		t.texture = load(path)
+		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		t.custom_minimum_size = Vector2(0, 190)
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(t)
+		var cap = UI.caps("Level %d" % nxt if l < 5 else "Top level", 16, UI.accent)
+		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(cap)
+	v.add_child(UI.caps("Now · level %d" % l, 16, UI.MUTED))
+	v.add_child(UI.wrap(G.OPS.effect_text(k, l), 20, UI.TEXT))
+	if l < 5:
+		v.add_child(UI.caps("After the upgrade", 16, UI.MUTED))
+		v.add_child(UI.wrap(G.OPS.effect_text(k, l + 1), 20, UI.GREEN))
+		v.add_child(UI.kv("Cost", G.money(G.OPS.upgrade_cost(c, k))))
+		v.add_child(UI.kv("Build time", "%d days" % G.OPS.upgrade_days(c, k)))
+		if c.build != null:
+			v.add_child(UI.wrap("Builders are busy with the %s (%d days left)." % [G.OPS.FAC_NAME[c.build.key].to_lower(), max(0, c.build.done - G.s.day)], 19, UI.AMBER))
+		else:
+			v.add_child(UI.btn("Upgrade", func():
+				var err = G.OPS.start_upgrade(k)
+				if err != "":
+					UI.sfx("error", -8.0)
+					UI.toast(err, UI.RED)
+				else:
+					UI.sfx("cash", -8.0)
+					UI.toast("Work has started on the %s" % G.OPS.FAC_NAME[k].to_lower(), UI.GREEN)
+					refresh(), "primary", "trending-up", 56))
+	else:
+		v.add_child(UI.wrap("This facility is at the highest level.", 20, UI.GOLD))
+	return p
+
+
+# ---------------------------------------------------------------- camera
+
+func _apply():
+	if world == null or not is_instance_valid(world):
+		return
+	world.scale = Vector2(zoom, zoom)
+	var view = wrap.size - Vector2(400 if sel != "" else 0, 0)
+	world.position = view / 2.0 - cam * zoom
+
+
+func _zoom(z: float, about: Vector2):
+	var before = (about - world.position) / zoom
+	zoom = clamp(z, 0.34, 1.6)
+	var view = wrap.size - Vector2(400 if sel != "" else 0, 0)
+	cam = before - (about - view / 2.0) / zoom
+	_apply()
+
+
+func _wrap_input(e: InputEvent):
+	if e is InputEventMouseButton:
+		if e.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_zoom(zoom * 1.1, e.position)
+		elif e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_zoom(zoom / 1.1, e.position)
+		elif e.button_index == MOUSE_BUTTON_LEFT:
+			if e.pressed:
+				dragging = true
+				moved = 0.0
 			else:
-				v.add_child(UI.btn("Upgrade for %s" % G.money(G.OPS.upgrade_cost(c, k)), func():
-					var err = G.OPS.start_upgrade(k)
-					UI.close_sheet()
-					if err != "":
-						UI.toast(err, UI.RED)
-					else:
-						UI.toast("Work has started on the %s" % G.OPS.FAC_NAME[k].to_lower(), UI.GREEN)
-						refresh(), "primary", "trending-up"))
+				if dragging and moved < 14 and touches.size() < 2:
+					_tap_world(e.position)
+				dragging = false
+	elif e is InputEventMouseMotion and dragging and touches.size() < 2:
+		moved += e.relative.length()
+		cam -= e.relative / zoom
+		_apply()
+	elif e is InputEventMagnifyGesture:
+		_zoom(zoom * e.factor, e.position)
+
+
+func _input(e: InputEvent):
+	if not is_visible_in_tree():
+		return
+	if e is InputEventScreenTouch:
+		if e.pressed:
+			touches[e.index] = e.position
 		else:
-			v.add_child(UI.wrap("This facility is at the highest level.", 22, UI.GOLD))
-	UI.sheet(G.OPS.FAC_NAME[k], build_sheet)
+			touches.erase(e.index)
+		if touches.size() == 2:
+			var pts = touches.values()
+			pinch0 = pts[0].distance_to(pts[1])
+			zoom0 = zoom
+			moved = 99.0
+	elif e is InputEventScreenDrag:
+		touches[e.index] = e.position
+		if touches.size() == 2 and pinch0 > 10:
+			var pts = touches.values()
+			var mid = (pts[0] + pts[1]) / 2.0 - wrap.global_position
+			_zoom(zoom0 * pts[0].distance_to(pts[1]) / pinch0, mid)
 
 
-# ---------------------------------------------------------------- 3D world
-
-func _mat(col: Color, rough := 0.9) -> StandardMaterial3D:
-	var m = StandardMaterial3D.new()
-	m.albedo_color = col
-	m.roughness = rough
-	return m
-
-
-func _box(parent: Node3D, size: Vector3, pos: Vector3, col: Color) -> MeshInstance3D:
-	var mi = MeshInstance3D.new()
-	var b = BoxMesh.new()
-	b.size = size
-	mi.mesh = b
-	mi.material_override = _mat(col)
-	mi.position = pos + Vector3(0, size.y / 2.0, 0)
-	parent.add_child(mi)
-	return mi
-
-
-func _world(c: Dictionary) -> Node3D:
-	var root = Node3D.new()
-	var env = Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("16281f")
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("cfd8ff")
-	env.ambient_light_energy = 0.5
-	var we = WorldEnvironment.new()
-	we.environment = env
-	root.add_child(we)
-	var sun = DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-52, 38, 0)
-	sun.light_energy = 0.95
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 900
-	root.add_child(sun)
-	cam = Camera3D.new()
-	cam.fov = 36
-	cam.far = 3000
-	root.add_child(cam)
-	cam.look_at_from_position(Vector3(0, 610, 600), Vector3(0, 0, 76), Vector3.UP)
-	_box(root, Vector3(1600, 2, 1600), Vector3(0, -2.2, 0), Color("1c3526"))
-	_box(root, Vector3(900, 1, 1100), Vector3(0, -1.2, 70), Color("2a5237"))
-	# roads
-	for r in [[Vector3(14, 0.4, 1100), Vector3(-8, -0.3, 70)], [Vector3(900, 0.4, 12), Vector3(0, -0.3, 150)], [Vector3(900, 0.4, 12), Vector3(0, -0.3, 8)]]:
-		_box(root, r[0], r[1], Color("3a4150"))
-	var c1 = Color(c.c1)
-	var c2 = Color(c.c2)
-	for k in G.OPS.FAC:
-		var l = c.fac[k]
-		var node = _model(k, l, c1, c2)
-		if node == null:
-			node = _generated(k, l, c1, c2)
-		node.position = SPOT[k]
-		root.add_child(node)
-		if c.build != null and c.build.key == k:
-			# crane marks the building site
-			var crane = Node3D.new()
-			_box(crane, Vector3(2, 46, 2), Vector3.ZERO, Color("f6ad3c"))
-			_box(crane, Vector3(34, 2, 2), Vector3(12, 44, 0), Color("f6ad3c"))
-			crane.position = SPOT[k] + Vector3(38 if k != "stadium" else 80, 0, 30)
-			root.add_child(crane)
-	# neighbourhood around the campus
-	var props = [["city_block_1", -150, -250, 0], ["city_block_2", -75, -255, 0], ["city_block_3", 75, -255, 0], ["city_block_1", 150, -250, 0], ["city_block_2", 0, -262, 0],
-		["city_block_3", -178, -150, 90], ["city_block_2", 178, -150, -90], ["city_block_1", -182, -55, 90], ["city_block_3", 182, -55, -90],
-		["city_block_2", -178, 130, 90], ["city_block_1", 178, 130, -90], ["city_block_1", -170, 305, 90], ["city_block_3", 170, 305, -90],
-		["car_park", 96, 322, 0], ["car_park", -96, 322, 0], ["city_block_2", 0, 345, 180]]
-	for pr in props:
-		var node = _glb("res://assets/models/%s.glb" % pr[0], 1.0, c1, c2)
-		if node != null:
-			node.position = Vector3(pr[1], 0, pr[2])
-			node.rotation_degrees.y = pr[3]
-			root.add_child(node)
-	var has_tc = ResourceLoader.exists("res://assets/models/tree_cluster.glb")
-	# trees
-	var rng = RandomNumberGenerator.new()
-	rng.seed = 7 + c.id
-	var cone = CylinderMesh.new()
-	cone.top_radius = 0.0
-	cone.bottom_radius = 5.0
-	cone.height = 13.0
-	cone.radial_segments = 6
-	var tm = [_mat(Color("24633a")), _mat(Color("2c7445")), _mat(Color("1e5231"))]
-	for i in 60:
-		var p = Vector3(rng.randf_range(-140, 140), 0, rng.randf_range(-215, 285))
-		var ok = true
-		for k in SPOT:
-			var d = Vector2(p.x - SPOT[k].x, p.z - SPOT[k].z)
-			if abs(d.x) < (118 if k == "stadium" else 50) and abs(d.y) < (96 if k == "stadium" else 44):
-				ok = false
-		if not ok or abs(p.x + 8) < 14 or abs(p.z - 150) < 12 or abs(p.z - 8) < 12:
-			continue
-		if has_tc and i % 2 == 0:
-			var tc = _glb("res://assets/models/tree_cluster.glb", rng.randf_range(0.9, 1.4), c1, c2)
-			tc.position = p
-			tc.rotation_degrees.y = rng.randf_range(0, 360)
-			root.add_child(tc)
-			continue
-		var t = MeshInstance3D.new()
-		t.mesh = cone
-		t.material_override = tm[i % 3]
-		var sc = rng.randf_range(0.7, 1.3)
-		t.scale = Vector3(sc, sc, sc)
-		t.position = p + Vector3(0, 6.5 * sc, 0)
-		root.add_child(t)
-	return root
-
-
-func _model(k: String, l: int, c1: Color, c2: Color) -> Node3D:
-	return _glb("res://assets/models/%s_level_%d.glb" % [MODEL_FILE[k], l], MODEL_SCALE[k], c1, c2)
-
-
-func _glb(path: String, sc: float, c1: Color, c2: Color) -> Node3D:
-	if not ResourceLoader.exists(path):
-		return null
-	var scene = load(path)
-	if scene == null:
-		return null
-	var inst = scene.instantiate()
-	var holder = Node3D.new()
-	holder.add_child(inst)
-	inst.rotation_degrees.x = -90
-	holder.scale = Vector3(sc, sc, sc)
-	var seat1 = c1 if c1.get_luminance() < 0.85 else c2
-	var seat2 = c2 if _far(c2, seat1) and c2.get_luminance() < 0.9 else seat1.darkened(0.3)
-	for mi in inst.find_children("*", "MeshInstance3D", true, false):
-		var key = path + ":" + mi.name
-		if not mesh_cache.has(key):
-			var st = SurfaceTool.new()
-			st.create_from(mi.mesh, 0)
-			st.deindex()
-			st.generate_normals()
-			mesh_cache[key] = st.commit()
-		mi.mesh = mesh_cache[key]
-		var m = StandardMaterial3D.new()
-		m.roughness = 0.9
-		var nm = String(mi.name).to_lower()
-		if nm.begins_with("blue2"):
-			m.albedo_color = seat2
-		elif nm.begins_with("blue"):
-			m.albedo_color = seat1
-		elif nm.begins_with("glass"):
-			m.albedo_color = Color("7fb6d9")
-			m.roughness = 0.2
-			m.metallic = 0.3
-		elif nm.begins_with("light") or nm.begins_with("rooflight"):
-			m.albedo_color = Color("fff6cf")
-			m.emission_enabled = true
-			m.emission = Color("fff1b0")
-			m.emission_energy_multiplier = 0.6
-		else:
-			m.vertex_color_use_as_albedo = true
-			m.vertex_color_is_srgb = true
-		mi.material_override = m
-	return holder
-
-
-func _far(a: Color, b: Color) -> bool:
-	return Vector3(a.r - b.r, a.g - b.g, a.b - b.b).length() > 0.3
-
-
-func _generated(k: String, l: int, c1: Color, c2: Color) -> Node3D:
-	# simple code-built stand-ins until model files exist for this facility
-	var n = Node3D.new()
-	var tint = c1 if c1.get_luminance() < 0.85 else c2
-	n.scale = Vector3(0.78, 0.78, 0.78)
-	_box(n, Vector3(96, 0.8, 80), Vector3(0, -0.4, 0), Color("353d4c"))
-	match k:
-		"academy":
-			_box(n, Vector3(50, 0.6, 34), Vector3(-18, 0.4, 16), Color("3f9a57"))
-			_box(n, Vector3(30 + l * 7, 7 + l * 2.5, 20), Vector3(14, 0.4, -18), Color("b9c2d0"))
-			_box(n, Vector3(32 + l * 7, 1.5, 22), Vector3(14, 7.4 + l * 2.5, -18), tint)
-			if l >= 3:
-				_box(n, Vector3(30, 0.6, 22), Vector3(26, 0.4, 20), Color("46a860"))
-		"medical":
-			var h = 9 + l * 4.0
-			_box(n, Vector3(34 + l * 6, h, 28), Vector3(0, 0.4, 0), Color("c5ccd8"))
-			_box(n, Vector3(16, 1.2, 4.5), Vector3(0, h + 0.5, 0), Color("e23b4a"))
-			_box(n, Vector3(4.5, 1.2, 16), Vector3(0, h + 0.5, 0), Color("e23b4a"))
-			if l >= 4:
-				_box(n, Vector3(20, h * 0.6, 20), Vector3(34, 0.4, 14), Color("aab3c2"))
-		"scouting":
-			_box(n, Vector3(30 + l * 4, 8 + l * 3.0, 24), Vector3(0, 0.4, 0), Color("2b3650"))
-			_box(n, Vector3(31 + l * 4, 1.2, 25), Vector3(0, 8.4 + l * 3.0, 0), tint)
-			var mast = _box(n, Vector3(1.6, 14 + l * 4.0, 1.6), Vector3(10, 8 + l * 3.0, 0), Color("c9d2e0"))
-			mast.name = "mast"
-		"commercial":
-			for i in min(l, 3):
-				var h = 22 + l * 9.0 - i * 10.0
-				_box(n, Vector3(20, h, 20), Vector3(-26 + i * 26, 0.4, 0), Color("4f86b8") if i % 2 == 0 else Color("3a668f"))
-				_box(n, Vector3(21, 1.4, 21), Vector3(-26 + i * 26, h + 0.4, 0), tint)
-		_:
-			_box(n, Vector3(60, 0.6, 40), Vector3(0, 0.4, 0), Color("3f9a57"))
-			_box(n, Vector3(20 + l * 6, 6 + l * 2.0, 14), Vector3(0, 0.4, -30), Color("e7ebf2"))
-	return n
+func _tap_world(at: Vector2):
+	var w = (at - world.position) / zoom
+	var u = (w.x / A + w.y / B) / 2.0
+	var v = (w.y / B - w.x / A) / 2.0
+	for k in PLOT:
+		var pl = PLOT[k]
+		var span = (pl[2] - 1) * P + 1.0
+		# the building rises above its base, so accept a band above it too
+		if u >= pl[0] * P - 0.35 and u <= pl[0] * P + span and v >= pl[1] * P - 0.35 and v <= pl[1] * P + span:
+			UI.sfx("click", -16.0)
+			sel = "" if sel == k else k
+			refresh()
+			return
+	if sel != "":
+		sel = ""
+		refresh()

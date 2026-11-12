@@ -27,8 +27,14 @@ def prep(path):
     m = lab == big
     cols = np.where(m.any(0))[0]
     bot = np.array([np.where(m[:, x])[0].max() for x in cols])
-    xb, yb = int(cols[bot.argmax()]), int(bot.max())
     w = cols.max() - cols.min() + 1
+    # bottom corner = where the two lower edges of the base meet (robust to rounded or clipped tips)
+    L = (cols > cols.min() + 0.08 * w) & (cols < cols.min() + 0.35 * w)
+    R = (cols < cols.max() - 0.08 * w) & (cols > cols.max() - 0.35 * w)
+    a1, b1 = np.polyfit(cols[L], bot[L], 1)
+    a2, b2 = np.polyfit(cols[R], bot[R], 1)
+    xb = (b2 - b1) / (a1 - a2)
+    yb = a1 * xb + b1
     top = int(np.where(m.any(1))[0].min())
     k = min(BASE_W / w, (AY - 8) / (yb - top + 1))
     im = Image.fromarray(a)

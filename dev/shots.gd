@@ -77,9 +77,14 @@ func run(m):
 		for lv in [1, 3, 5]:
 			for k in G.OPS.FAC:
 				c.fac[k] = lv
-			c.build = {"key": "training", "done": G.s.day + 40, "cost": 0} if lv == 3 else {}
+			c.build = {"key": "training", "done": G.s.day + 40, "cost": 0} if lv == 3 else null
 			main.root("campus")
 			await snap("city%d" % lv)
+			if lv == 3:
+				main.stack[-1].sel = "stadium"
+				main.stack[-1].zoom = 1.0
+				main.stack[-1].refresh()
+				await snap("city_sel")
 	if want.call("match"):
 		for i in 8:
 			if G.user_fixture_today() != null:
