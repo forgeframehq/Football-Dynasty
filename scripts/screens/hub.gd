@@ -486,7 +486,32 @@ func _life(v: Control):
 		net += HOMES[i][1]
 	for i in lf.car + 1:
 		net += CARS[i][1]
-	_note(v, "Your own money and life away from the pitch. You are paid %s a week. Homes and cars raise your standing in the game; a business pays you every week; learning the language and giving to local causes win over the dressing room and the fans." % G.money(G.OPS.salary()))
+	var hero = UI.hb(12)
+	hero.set_meta("span", true)
+	for it in [["home_%d" % (lf.home + 1), "Home", HOMES[lf.home][0], HOMES[lf.home][2]], ["car_%d" % max(1, lf.car), "Driving", CARS[lf.car][0], "Provided by the club" if lf.car == 0 else "Yours, paid in full"]]:
+		var hp = UI.panel(UI.CARD, 16, 10, 10, UI.LINE)
+		hp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var hh2 = UI.hb(12)
+		hh2.add_child(_pic(it[0], 190, 112))
+		var hv2 = UI.vb(-2)
+		hv2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hv2.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		hv2.add_child(UI.caps(it[1], 16, UI.accent))
+		hv2.add_child(UI.lbl_fill(it[2], 26, UI.TEXT, "disp"))
+		hv2.add_child(UI.lbl_fill(it[3], 16, UI.MUTED))
+		hh2.add_child(hv2)
+		hp.add_child(hh2)
+		hero.add_child(hp)
+	var mp = UI.panel(UI.CARD, 16, 14, 10, UI.LINE)
+	mp.custom_minimum_size = Vector2(250, 0)
+	var mv = UI.vb(-2)
+	mv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mv.add_child(UI.caps("In the bank", 16, UI.accent))
+	mv.add_child(UI.lbl(G.money(lf.cash), 34, UI.GREEN, "xbold"))
+	mv.add_child(UI.lbl("%s a week in · net worth %s" % [G.money(G.OPS.salary() + int(lf.income)), G.money(net)], 15, UI.MUTED))
+	mp.add_child(mv)
+	hero.add_child(mp)
+	v.add_child(hero)
 	var o = _card(v, "Your money")
 	o.add_child(UI.lbl(G.money(lf.cash), 44, UI.GREEN, "xbold"))
 	o.add_child(UI.kv("Weekly salary", G.money(G.OPS.salary())))
@@ -510,11 +535,10 @@ func _life(v: Control):
 		cc.add_child(UI.wrap("Fluency takes about five months and gives Motivation +1.", 17, UI.DIM))
 	cc.add_child(UI.btn("Give €25K to a local cause", func(): _buy(lf, 25000, "a donation the fans noticed", func():
 		u["fans"] = min(100.0, float(u.get("fans", 55.0)) + 3.0)), "secondary", "heart", 50))
-	var hv = _card(v, "Home · %s" % HOMES[lf.home][0])
-	hv.add_child(_pic("home_%d" % (lf.home + 1), 0, 190))
+	var hv = _card(v, "Property showroom")
 	for i in HOMES.size():
 		var owned = i <= lf.home
-		if i < lf.home:
+		if i <= lf.home:
 			continue
 		var r = UI.hb(10)
 		r.add_child(_pic("home_%d" % (i + 1), 80, 50))
@@ -535,11 +559,9 @@ func _life(v: Control):
 		elif not owned:
 			r.add_child(UI.lbl(G.money(HOMES[i][1]), 18, UI.DIM, "disp"))
 		hv.add_child(r)
-	var cv = _card(v, "Garage · %s" % CARS[lf.car][0])
-	if lf.car > 0:
-		cv.add_child(_pic("car_%d" % lf.car, 0, 190))
+	var cv = _card(v, "Car showroom")
 	for i in CARS.size():
-		if i < lf.car:
+		if i <= lf.car:
 			continue
 		var r = UI.hb(10)
 		if i > 0:

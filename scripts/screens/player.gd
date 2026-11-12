@@ -215,6 +215,34 @@ func build():
 			v.add_child(_note("clock", "The transfer window is closed. You can approach %s when it reopens." % G.pname(p), UI.MUTED))
 
 
+	# fixed action bar: the main things you can do with this player, always in reach
+	var bar = UI.hb(8)
+	var acts: Array = []
+	if own:
+		acts.append(["New contract", "handshake", "primary", func(): UI.main.open("nego", {"pid": p.id, "mode": "renew"})])
+	elif free:
+		acts.append(["Offer contract", "handshake", "primary", func(): UI.main.open("nego", {"pid": p.id, "mode": "free"})])
+	elif G.window_open():
+		acts.append(["Make offer", "handshake", "primary", func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"})])
+	acts.append(["Compare", "users", "secondary", func(): _compare(p)])
+	acts.append(["Similar", "search", "secondary", func(): UI.main.open("lists", {"kind": "similar", "pid": p.id, "grp": "search"})])
+	if not own:
+		acts.append(["Shortlisted" if short else "Shortlist", "star", "secondary", func():
+			if p.id in s.shortlist:
+				s.shortlist.erase(p.id)
+			else:
+				s.shortlist.append(p.id)
+			refresh()])
+	for a in acts:
+		var b = UI.btn(a[0], a[3], a[2], a[1], 50)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.add_child(b)
+	body.add_child(UI.margin(bar, 20, 2, 20, 8))
+	if UI.main.uses_chrome():
+		UI.main.t_sub = "%s · %s · %d yrs · %s" % [s.clubs[p.club].name if p.club >= 0 else "Free agent", p.pos, G.age(p), p.nat]
+		UI.main.refresh_nav.call_deferred()
+
+
 func _scout_btn(v: Control, p: Dictionary):
 	if G.OPS.knows(p):
 		return

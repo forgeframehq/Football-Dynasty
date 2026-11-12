@@ -99,3 +99,14 @@ Options
 - A background nation can be made playable between seasons; placeholder nations cannot
 - Dataset check (men): full squads exist for England (4 divisions), Spain, Germany (3), Italy, France (2 each), Argentina (30 clubs), USA (30), Saudi Arabia, Belgium, Netherlands, Portugal, Turkey, Poland, Mexico, Denmark, South Korea, China, Sweden, Norway, Switzerland, Scotland, Austria, Ireland, India, Australia; partial for Greece, Czechia, Ukraine, Croatia, Cyprus and single clubs elsewhere; 40 South American clubs from the continental cups; 164 nationalities, 78 with 20 or more players
 - Needs: nation and continent table, open-source flag set, continent pictures
+
+## Polish pass (from phone feedback, 12 Nov)
+- [x] True full screen, drawing under the camera cut-out
+- [x] Three columns per page so pages are fuller
+- [x] Player quick card when tapping a player in Tactics
+- [x] Fixed action bar on player pages; correct club under the player's name
+- [x] Lifestyle header showing current home, car and money
+- [ ] Transfers as a process: enquiry, club negotiation screen (fee, instalments, add-ons, sell-on), club accepts by message, then player and agent talks (wage, length, squad role, signing fee, agent fee, clauses), completion with news; rival bids; same in reverse for sales
+- [ ] Player profile as one dense page with a position map
+- [ ] Go through every screen: more depth, less blank space, practical layouts
+- [ ] Lifestyle: separate showroom screens, weekly money in and out

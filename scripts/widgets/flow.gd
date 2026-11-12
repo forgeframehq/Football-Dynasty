@@ -6,7 +6,7 @@ extends Container
 var cols := 0
 var sep := 14
 var gap := 18
-var min_col := 430.0
+var min_col := 370.0
 var max_w := 0.0
 var _h := 0.0
 var paged := false

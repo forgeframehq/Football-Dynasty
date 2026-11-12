@@ -193,7 +193,7 @@ func _captain(v: Control, c: Dictionary):
 
 
 func _squad_list(v: Control, c: Dictionary):
-	var hint = "Tap two players to swap them. Drag a name onto the pitch. Tap a role to change it." if sel == null else "Now tap the player to swap with."
+	var hint = "Tap a player for his details. Drag a name onto the pitch to swap. Tap a role to change it." if sel == null else "Now tap the player to swap with."
 	v.add_child(UI.lbl(hint, 16, UI.DIM if sel == null else UI.accent))
 	_head(v, "Starting XI", "Role")
 	for i in 11:
@@ -321,7 +321,8 @@ func _place():
 		return
 	for t in tokens:
 		var sl = t.get_meta("slot")
-		var p = pitch.pt(0.05 + sl[2] * 0.88, sl[1])
+		var yy = 0.03 if sl[0] == "GK" else 0.1 + sl[2] * 0.83
+		var p = pitch.pt(yy, sl[1])
 		t.position = p - Vector2(t.size.x / 2.0, 30)
 
 
@@ -366,7 +367,7 @@ func _drop(i: int, centre: Vector2):
 	var m = 14.0
 	var w = clamp((centre.x - m) / (pitch.size.x - 2 * m), 0.06, 0.94)
 	var u = clamp(1.0 - (centre.y - m) / (pitch.size.y - 2 * m), 0.0, 1.0)
-	var y = clamp((u - 0.05) / 0.88, 0.17, 0.9)
+	var y = clamp((u - 0.1) / 0.83, 0.17, 0.9)
 	var pos = G.RL.zone_pos(w, y)
 	c.slots[i] = [pos, snapped(w, 0.01), snapped(y, 0.01)]
 	c.roles[i] = G.RL.best(G.s.players[c.xi[i]], pos) if c.xi[i] >= 0 else G.RL.BY_POS[pos][0]
@@ -382,8 +383,71 @@ func _shape_name(slots: Array) -> String:
 	return "%d-%d-%d" % [n[1], n[2], n[3]]
 
 
+func _quick(kind: String, i: int):
+	# quick card for a player: who he is and how he is doing, then what to do with him
+	var c = G.uc()
+	var p = G.s.players[c.xi[i]] if kind == "xi" else G.s.players[i]
+	var build_sheet = func(v):
+		var top = UI.hb(12)
+		top.add_child(UI.ovr(p.ovr, 34))
+		var tv = UI.vb(-3)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl(G.pfull(p), 26, UI.TEXT, "bold"))
+		var alts = p.get("alt", [])
+		tv.add_child(UI.lbl("%s%s · %d yrs · %s · %s foot" % [p.pos, (" / " + " / ".join(alts)) if typeof(alts) == TYPE_ARRAY and alts.size() > 0 else "", G.age(p), p.nat, "Left" if str(p.foot).begins_with("L") else "Right"], 17, UI.MUTED))
+		top.add_child(tv)
+		top.add_child(UI.flag(p.nat, 44))
+		v.add_child(top)
+		var t1 = UI.hb(8)
+		t1.add_child(UI.stat_tile("Fitness", "%d%%" % int(p.cond), UI.cond_color(p.cond)))
+		t1.add_child(UI.stat_tile("Morale", str(int(p.mor)), UI.cond_color(p.mor + 10)))
+		t1.add_child(UI.stat_tile("Form", "%.1f" % p.form if p.ss.ap > 0 else "-"))
+		t1.add_child(UI.stat_tile("Apps / Goals", "%d / %d" % [p.ss.ap, p.ss.g]))
+		v.add_child(t1)
+		var g = GridContainer.new()
+		g.columns = 3
+		g.add_theme_constant_override("h_separation", 18)
+		g.add_theme_constant_override("v_separation", 4)
+		var names = ["Pace", "Shooting", "Passing", "Dribbling", "Defending", "Physical"]
+		for k in 6:
+			var r = UI.hb(8)
+			r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			r.add_child(UI.lbl_fill(names[k], 19, UI.MUTED))
+			r.add_child(UI.lbl(str(int(p.st[k])), 21, UI.ovr_color(int(p.st[k])), "disp"))
+			g.add_child(r)
+		v.add_child(g)
+		v.add_child(UI.kv("Best role", G.RL.ROLES[G.RL.best(p, p.pos)].n))
+		v.add_child(UI.kv("Wage · contract", "%s / wk · June %d" % [G.money(p.wage), p.cend]))
+		if p.inj > 0:
+			v.add_child(UI.kv("Injured", "back in %s" % G.inj_text(p.inj), UI.RED))
+		var bh = UI.hb(8)
+		var b1 = UI.btn("Swap", func():
+			UI.close_sheet()
+			sel = {"k": kind, "i": i}
+			refresh(), "primary", "repeat", 54)
+		b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bh.add_child(b1)
+		if kind == "xi":
+			var b2 = UI.btn("Role", func():
+				UI.close_sheet()
+				_pick_role(i), "secondary", "target", 54)
+			b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			bh.add_child(b2)
+		var pid = p.id
+		var b3 = UI.btn("Full profile", func():
+			UI.close_sheet()
+			UI.main.open("player", {"pid": pid}), "secondary", "user", 54)
+		b3.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bh.add_child(b3)
+		v.add_child(bh)
+	UI.sheet(G.pname(p), build_sheet)
+
+
 func _tap(kind: String, i: int):
 	var c = G.uc()
+	if sel == null and tab == 0 and (kind != "xi" or c.xi[i] >= 0):
+		_quick(kind, i)
+		return
 	if sel == null:
 		if kind != "xi" and not G.available(G.s.players[i]):
 			UI.toast("%s is unavailable" % G.pname(G.s.players[i]), UI.RED)

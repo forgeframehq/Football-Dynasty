@@ -466,8 +466,12 @@ func _pick_nat():
 
 
 func _start():
-	var full = ("%s %s" % [fn, ln]).strip_edges()
-	prof.name = full if full != "" else "Manager"
+	var parts = []
+	for w in [fn, ln]:
+		w = w.strip_edges()
+		if w != "" and not (w.to_lower() in parts.map(func(x): return x.to_lower())):
+			parts.append(w.substr(0, 1).to_upper() + w.substr(1))
+	prof.name = " ".join(parts) if parts.size() > 0 else "Manager"
 	G.slot = args.get("slot", 0)
 	G.new_game(prof, pick)
 	G.s.user["age"] = age
