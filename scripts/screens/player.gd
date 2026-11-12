@@ -139,6 +139,12 @@ func build():
 	# actions
 	v.add_child(UI.sp(0, 4))
 	if own:
+		v.add_child(UI.section("Squad status", "affects how he reacts to being left out"))
+		v.add_child(UI.seg(["Key", "Rotation", "Backup", "Prospect"], G.status_of(p), func(i):
+			p["status"] = i
+			refresh(), 20))
+	v.add_child(UI.btn("Compare with…", func(): _compare(p), "secondary", "users", 68))
+	if own:
 		v.add_child(UI.btn("Offer new contract", func(): UI.main.open("nego", {"pid": p.id, "mode": "renew"}), "primary", "handshake"))
 		var hb2 = UI.hb(10)
 		var lb = UI.btn("Unlist" if p.listed else "Transfer list", func():
@@ -160,6 +166,22 @@ func build():
 			v.get_child(v.get_child_count() - 1).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		else:
 			v.add_child(_note("clock", "The transfer window is closed. You can approach %s when it reopens." % G.pname(p), UI.MUTED))
+
+
+func _compare(p: Dictionary):
+	var build_sheet = func(v):
+		var pool = []
+		for pid in G.uc().players + G.s.shortlist:
+			if pid != p.id and G.s.players.has(pid):
+				pool.append(G.s.players[pid])
+		pool.sort_custom(func(a, b): return (0 if G.LINE[a.pos] == G.LINE[p.pos] else 1) * 1000 - a.ovr < (0 if G.LINE[b.pos] == G.LINE[p.pos] else 1) * 1000 - b.ovr)
+		v.add_child(UI.caps("Your squad and shortlist", 19, UI.DIM))
+		for q in pool:
+			var qid = q.id
+			v.add_child(UI.player_row(q, func():
+				UI.close_sheet()
+				UI.main.open("compare", {"a": p.id, "b": qid})))
+	UI.sheet("Compare %s with" % G.pname(p), build_sheet)
 
 
 func _note(icon_name: String, text: String, color: Color) -> Control:

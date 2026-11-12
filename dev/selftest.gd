@@ -49,6 +49,7 @@ static func run(node: Node):
 		print("user: ", rv.user)
 		for l in rv.leagues:
 			print("  ", G.s.leagues[l.lg].name, ": ", G.s.clubs[l.champ].name, " | top scorer ", l.scorer, " (", l.scorer_club, ") ", l.goals)
+		print("  cups: ", rv.cups.map(func(x): return x[0] + ": " + G.s.clubs[x[1]].name))
 		print("  ups: ", rv.ups.map(func(x): return G.s.clubs[x[0]].name))
 		print("  downs: ", rv.downs.map(func(x): return G.s.clubs[x[0]].name))
 		print("  players: ", G.s.players.size(), " free: ", G.s.free.size(), " inbox: ", G.s.inbox.size(), " news: ", G.s.news.size())

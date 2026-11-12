@@ -5,6 +5,7 @@ const ME = preload("res://scripts/match_engine.gd")
 const LG = preload("res://scripts/leagues.gd")
 const TR = preload("res://scripts/transfers.gd")
 const RL = preload("res://scripts/roles.gd")
+const CP = preload("res://scripts/comps.gd")
 
 const SAVE_V = 2
 const SAVE_PATH = "user://career.sav"
@@ -318,6 +319,13 @@ func ensure_state():
 			p["at"] = RL.derive_attrs(p.pos, p.ovr, p.st, rng)
 	if not s.has("recov"):
 		s["recov"] = {}
+	if not s.has("comps"):
+		s["comps"] = []
+		if s.day < ymd(s.season, 8, 10):
+			CP.setup_season()
+	for cl in s.clubs:
+		if cl.players.size() > 0 and not s.players[cl.players[0]].has("num"):
+			number_squad(cl)
 	var c = uc()
 	if not c.has("slots") or c.slots.size() != 11:
 		if not FORMATIONS.has(c.formation):
@@ -434,6 +442,50 @@ func init_user_tactics(c: Dictionary):
 			c[k] = -1
 	auto_pick(c)
 	auto_roles(c)
+
+
+const STATUS = ["Key player", "Rotation", "Backup", "Prospect"]
+const NUM_PREF = {"GK": [1, 13, 12], "RB": [2, 22], "LB": [3, 23], "CB": [4, 5, 6, 15], "CDM": [6, 4, 16], "CM": [8, 6, 14, 18], "CAM": [10, 8, 20], "RM": [7, 17], "RW": [7, 17, 11], "LM": [11, 21], "LW": [11, 7, 21], "ST": [9, 19, 10]}
+
+
+func status_of(p: Dictionary) -> int:
+	var st = p.get("status", -1)
+	if st >= 0:
+		return st
+	if p.club < 0:
+		return 2
+	var rank = TR.squad_rank(p)
+	if age(p) <= 20 and rank >= 14:
+		return 3
+	if rank < 11:
+		return 0
+	return 1 if rank < 18 else 2
+
+
+func give_number(c: Dictionary, p: Dictionary):
+	var used = {}
+	for pid in c.players:
+		if pid != p.id:
+			used[s.players[pid].get("num", 0)] = true
+	for n in NUM_PREF[p.pos]:
+		if not used.has(n):
+			p["num"] = n
+			return
+	for n in range(12, 100):
+		if not used.has(n):
+			p["num"] = n
+			return
+	p["num"] = 99
+
+
+func number_squad(c: Dictionary):
+	var arr = []
+	for pid in c.players:
+		s.players[pid]["num"] = 0
+		arr.append(s.players[pid])
+	arr.sort_custom(func(a, b): return a.ovr > b.ovr)
+	for p in arr:
+		give_number(c, p)
 
 
 func make_preset(c: Dictionary) -> Dictionary:
@@ -749,7 +801,7 @@ func apply_match(sim):
 		var res = "D"
 		if t.goals > o.goals: res = "W"
 		elif t.goals < o.goals: res = "L"
-		if not f.ko:
+		if not f.ko and f.get("comp", "") == "":
 			var tb = c.t
 			tb.p += 1
 			tb.gf += t.goals
@@ -769,8 +821,12 @@ func apply_match(sim):
 		for pid in c.players:
 			var p = s.players[pid]
 			if not sim.pm.has(pid) or sim.pm[pid].tin < 0:
-				if c.id == ucid and p.ovr >= c.rep - 2 and available(p):
-					p.mor = max(25, p.mor - 1)
+				if c.id == ucid and available(p) and not f.get("fr", false):
+					var stt = status_of(p)
+					if stt == 0:
+						p.mor = max(20, p.mor - 2)
+					elif stt == 1 and p.mor > 45:
+						p.mor -= 1
 				continue
 			var q = sim.pm[pid]
 			p.cond = int(q.cond)
@@ -805,6 +861,8 @@ func apply_match(sim):
 			s.players[t.xi[0]].ss.cs += 1
 	if sim.motm >= 0:
 		s.players[sim.motm].ss.mom += 1
+	if f.get("comp", "") != "":
+		CP.on_result(f)
 	if involved:
 		var ui = 0 if f.h == ucid else 1
 		var t = sim.sd[ui]
@@ -873,6 +931,7 @@ func start_of_day():
 		TR.daily()
 	TR.expire_offers()
 	LG.update_playoffs()
+	CP.daily()
 	if cur.day == 1 and (cur.month == 9 or cur.month == 2):
 		msg("Transfer window closed", "The transfer window has closed. You can still sign free agents and agree new contracts with your own players.")
 	if cur.day == 1 and cur.month == 1:

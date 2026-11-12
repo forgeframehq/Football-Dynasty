@@ -186,6 +186,7 @@ static func generate_fixtures():
 			for m in rounds[r]:
 				s.fixtures.append({"id": s.fixtures.size(), "lg": lg.id, "rd": r + 1, "day": days[r], "h": m[0], "a": m[1], "hg": -1, "ag": -1, "played": false, "ko": false, "label": ""})
 	G.build_index()
+	G.CP.setup_season()
 
 
 static func add_ko(lg: int, h: int, a: int, day: int, label: String) -> int:
@@ -312,6 +313,12 @@ static func rollover():
 		champs[lg.id] = s.clubs[t[0]].name
 		var ts = top_scorer(lg.id)
 		review.leagues.append({"lg": lg.id, "champ": t[0], "scorer": G.pname(ts) if ts != null else "", "goals": ts.ss.g if ts != null else 0, "scorer_club": s.clubs[ts.club].short if ts != null else ""})
+	var cups = []
+	for comp in s.get("comps", []):
+		if comp.winner >= 0:
+			cups.append([comp.name, comp.winner])
+	review["cups"] = cups
+	G.CP.qualify(tables)
 	s.champs.push_front({"season": s.season, "c": champs})
 	# user review
 	var pos = tables[old_lg].find(ucl.id) + 1

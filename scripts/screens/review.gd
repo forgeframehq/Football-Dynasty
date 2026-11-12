@@ -47,6 +47,19 @@ func build():
 		h.add_child(UI.icon("trophy", 28, UI.GOLD))
 		r.add_child(h)
 		v.add_child(r)
+	if rv.get("cups", []).size() > 0:
+		v.add_child(UI.section("Cup winners"))
+		var cc = UI.card()
+		var cv = UI.vb(8)
+		for x in rv.cups:
+			var wc = s.clubs[x[1]]
+			var h = UI.hb(10)
+			h.add_child(UI.badge(wc, 32))
+			h.add_child(UI.lbl_fill(wc.name, 23, UI.TEXT if wc.id == s.user.club else UI.MUTED, "semi"))
+			h.add_child(UI.caps(x[0], 18, UI.GOLD))
+			cv.add_child(h)
+		cc.add_child(cv)
+		v.add_child(cc)
 	v.add_child(UI.section("Promoted"))
 	v.add_child(_moves(rv.ups, UI.GREEN))
 	v.add_child(UI.section("Relegated"))

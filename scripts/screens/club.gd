@@ -12,6 +12,7 @@ func build():
 	var v = content(12)
 	var items = [
 		["list-ordered", "League table", "%s in the %s" % [G.LG.ordinal(G.LG.position(c.id)), G.s.leagues[c.lg].name], func(): UI.main.open("table", {"lg": c.lg})],
+		["trophy", "Competitions", "Cups and European football", func(): UI.main.open("comps")],
 		["calendar", "Fixtures & results", "Your season schedule", func(): UI.main.open("fixtures")],
 		["chart-bar", "Player stats", "Top scorers, assists and ratings", func(): UI.main.open("stats", {"lg": c.lg})],
 		["wallet", "Finances", "%s budget · %s/wk wages" % [G.money(c.budget), G.money(G.squad_wages(c))], func(): UI.main.open("finances")],

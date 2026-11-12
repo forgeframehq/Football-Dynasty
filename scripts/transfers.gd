@@ -129,6 +129,8 @@ static func move(p: Dictionary, to_id: int, fee: int, wage: int, years: int):
 	tc.budget -= fee
 	tc.spent += fee
 	p.club = to_id
+	p.erase("status")
+	G.give_number(tc, p)
 	p.wage = wage
 	p.cend = s.season + years
 	p.listed = false
