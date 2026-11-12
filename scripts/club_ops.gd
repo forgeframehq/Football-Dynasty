@@ -222,6 +222,7 @@ static func weekly():
 				lf.study = ""
 	lf.settled = min(100.0, float(lf.settled) + 1.5 + lf.home * 0.8)
 	invest_week(lf)
+	G.SOC.weekly()
 	var tv = int(c.wage_budget * 0.05)
 	var price = [46, 30, 20, 15][clampi(tier - 1, 0, 3)]
 	var fill = clamp(0.55 + (c.rep - 55.0) * 0.012 + (0.1 if c.form.count("W") >= 3 else 0.0), 0.35, 0.98)

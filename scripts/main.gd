@@ -519,6 +519,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("target", "Board Confidence", "%d%% · %s" % [int(s.user.conf), s.user.obj.text], func(): root("board")))
 		a.append(_row("trophy", "Trophy Cabinet", "%d won" % s.user.trophies.size(), func(): root("trophies")))
 		a.append(_row("briefcase", "Jobs", "%d club%s interested" % [s.user.jobs.size(), "" if s.user.jobs.size() == 1 else "s"], func(): root("jobs")))
+		a.append(_row("megaphone", "Social", "%s followers" % G.OPS._thousands(G.SOC.data().followers), func(): root("hub", {"kind": "social", "grp": "manager"})))
 		a.append(_row("house", "Lifestyle", "%s in the bank" % G.money(G.OPS.life().cash), func(): root("hub", {"kind": "life", "grp": "manager"})))
 		a.append(_row("trending-up", "Investments", "Savings, property, shares", func(): root("hub", {"kind": "invest", "grp": "manager"})))
 		a.append(_row("landmark", "Club Ownership", "Buy shares in clubs", func(): root("hub", {"kind": "owner", "grp": "manager"})))

@@ -244,6 +244,7 @@ func msg(title: String, body: String, kind := "info", ref = null, important := f
 		stop_flag = true
 
 
+const SOC = preload("res://scripts/social.gd")
 const DERBIES = [["Manchester United", "Manchester City"], ["Liverpool", "Everton"], ["Arsenal", "Tottenham"], ["Liverpool", "Manchester United"], ["Chelsea", "Arsenal"],
 	["Newcastle", "Sunderland"], ["Aston Villa", "Birmingham"], ["Real Madrid", "Barcelona"], ["Real Madrid", "Atlético"], ["Sevilla", "Betis"], ["Athletic", "Real Sociedad"],
 	["Milan", "Inter"], ["Roma", "Lazio"], ["Juventus", "Torino"], ["Juventus", "Inter"], ["Napoli", "Roma"], ["Bayern", "Dortmund"], ["Dortmund", "Schalke"],
@@ -974,6 +975,11 @@ func apply_match(sim):
 			uc().budget += int(sp.win)
 		if pts == 3:
 			OPS.life().cash += int(OPS.salary() * 0.25)
+		if not f.get("fr", false):
+			var star = t.club.short
+			if sim.motm >= 0 and s.players.has(sim.motm) and s.players[sim.motm].club == t.club.id:
+				star = pname(s.players[sim.motm])
+			SOC.on_result(t.club, o.club, t.goals, o.goals, star, is_derby(f.h, f.a))
 		if is_derby(f.h, f.a):
 			u.fans = clamp(u.fans + (pts - 1.2) * 3.0, 0.0, 100.0)
 			if pts == 3:

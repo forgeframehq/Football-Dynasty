@@ -5,7 +5,7 @@ extends "res://scripts/screens/screen.gd"
 const TITLES = {"dressing": "Dressing Room", "fans": "Fans", "sponsors": "Sponsors", "request": "Board Request", "report": "Team Report",
 	"tcentre": "Transfer Centre", "awards": "Awards", "scores": "Live Scores", "standards": "League Standards", "timeline": "Career Timeline",
 	"philosophy": "Philosophy", "status": "Game Status", "manual": "Manual", "achieve": "Achievements", "fame": "Hall of Fame",
-	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Identity", "analysis": "Match Analysis", "life": "Lifestyle", "contract": "My Contract", "invest": "Investments", "owner": "Club Ownership", "press": "Press Conference", "doc": "Season Documentary"}
+	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Identity", "analysis": "Match Analysis", "life": "Lifestyle", "contract": "My Contract", "invest": "Investments", "owner": "Club Ownership", "press": "Press Conference", "doc": "Season Documentary", "social": "Social"}
 const QUESTIONS = [["How confident are you of a result?", [["We will win. I have no doubt.", "bold"], ["We respect them, and we are ready.", "calm"], ["I only talk about my own team.", "flat"]]],
 	["Your star player has been quiet lately. Is he under pressure?", [["He is the best in the league. Watch him.", "bold"], ["Form comes and goes. He has my trust.", "calm"], ["Next question.", "flat"]]],
 	["The fans are asking for more attacking football.", [["They will get goals, I promise.", "bold"], ["We play to win, in whatever way it takes.", "calm"], ["The fans do not pick the team.", "cold"]]],
@@ -141,6 +141,25 @@ func _fans(v: Control):
 		fv.add_child(UI.lbl("Favourites emerge once the season is under way.", 18, UI.DIM))
 
 
+func _logo(name_: String, h: float) -> Control:
+	var idx = -1
+	for i in SPONSORS.size():
+		if SPONSORS[i][0] == name_:
+			idx = i
+	var path = "res://assets/sponsors/sponsor_%02d.png" % (idx + 1)
+	if idx < 0 or not ResourceLoader.exists(path):
+		return UI.lbl(name_.to_upper(), 30, UI.TEXT, "xbold")
+	var t = TextureRect.new()
+	t.texture = load(path)
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	t.custom_minimum_size = Vector2(h * 4.0, h)
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	t.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return t
+
+
 func _offers() -> Array:
 	var s = G.s
 	var c = G.uc()
@@ -164,7 +183,7 @@ func _sponsors(v: Control):
 	_note(v, "Your shirt sponsor pays every week on top of the club's commercial income. A win-bonus deal pays less each week and more when you win. Deals run for one season; a better commercial building brings bigger offers.")
 	var cv = _card(v, "Current shirt sponsor")
 	if cur != null and cur.season == s.season:
-		cv.add_child(UI.lbl(cur.name.to_upper(), 40, UI.TEXT, "xbold"))
+		cv.add_child(_logo(cur.name, 70))
 		cv.add_child(UI.kv("Sector", cur.sector))
 		cv.add_child(UI.kv("Weekly", G.money(cur.weekly), UI.GREEN))
 		cv.add_child(UI.kv("Per win", G.money(cur.win), UI.GREEN))
@@ -176,7 +195,7 @@ func _sponsors(v: Control):
 		var tv = UI.vb(-2)
 		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tv.add_child(UI.caps("%s · %s" % [o.type, o.sector], 16, UI.accent))
-		tv.add_child(UI.lbl(o.name.to_upper(), 32, UI.TEXT, "xbold"))
+		tv.add_child(_logo(o.name, 44))
 		tv.add_child(UI.lbl("%s a week · %s per win" % [G.money(o.weekly), G.money(o.win)], 19, UI.MUTED))
 		h.add_child(tv)
 		h.add_child(UI.chip("SIGN", UI.accent, UI.on_color(UI.accent), 20))
@@ -705,6 +724,85 @@ func _owner(v: Control):
 		ov.add_child(UI.btn("Raise the wage budget by 10%", func():
 			c.wage_budget = int(c.wage_budget * 1.1)
 			refresh(), "secondary", "", 46))
+
+
+func _social(v: Control):
+	var s = G.s
+	var u = s.user
+	var c = G.uc()
+	var d = G.SOC.data()
+	var can = d.last < s.day
+	var head = UI.card(18, 12)
+	head.set_meta("span", true)
+	var hh = UI.hb(14)
+	hh.add_child(UI.lbl("@%s" % str(u.name).to_lower().replace(" ", "_"), 24, UI.TEXT, "bold"))
+	hh.add_child(UI.lbl("%s followers" % G.OPS._thousands(d.followers), 20, UI.accent, "disp"))
+	hh.add_child(UI.sp())
+	if d.trend != "":
+		hh.add_child(UI.chip("TRENDING " + d.trend, Color(UI.accent, 0.16), UI.accent, 17))
+	head.add_child(hh)
+	v.add_child(head)
+	var comp = _card(v, "New post" if can else "You have posted today")
+	if can:
+		var le = UI.input(q, "Write something…", func(t): q = t)
+		le.custom_minimum_size = Vector2(0, 54)
+		comp.add_child(le)
+		comp.add_child(UI.btn("Post", func():
+			if q.strip_edges() == "":
+				return
+			var r = G.SOC.post(q.strip_edges())
+			q = ""
+			UI.sfx("message", -8.0)
+			UI.toast(r, UI.accent)
+			refresh(), "primary", "megaphone", 48))
+		comp.add_child(UI.caps("Or pick one", 15, UI.DIM))
+		var best = null
+		for pid in c.xi:
+			if pid >= 0 and (best == null or s.players[pid].form > best.form):
+				best = s.players[pid]
+		var nf = G.next_user_fixture()
+		var quick = [["Thank you to every fan who backs this team. We feel it.", "good"], ["We go again. Heads up, work hard, together.", "good"]]
+		if best != null:
+			quick.append(["%s has been brilliant in training. Proud of him." % G.pname(best), "good"])
+		if nf != null:
+			var on = s.clubs[nf.a if nf.h == c.id else nf.h].name
+			quick.append(["%s next. They know what's coming." % on, "neutral"])
+		for qk in quick:
+			var txt = qk[0]
+			var tn = qk[1]
+			var b = UI.panel(Color(1, 1, 1, 0.05), 10, 12, 7, Color(1, 1, 1, 0.1))
+			b.add_child(UI.wrap(txt, 17, UI.TEXT))
+			UI.tap(b, func():
+				var r = G.SOC.post(txt, tn)
+				UI.sfx("message", -8.0)
+				UI.toast(r, UI.accent)
+				refresh(), true)
+			comp.add_child(b)
+	else:
+		comp.add_child(UI.wrap("One post a day keeps the board calm. Come back tomorrow.", 18, UI.MUTED))
+	for p in d.posts.slice(0, 40):
+		var col = UI.accent if p.mine else (UI.GOLD if p.kind == "press" else UI.LINE)
+		var pc = UI.panel(UI.CARD, 14, 14, 10, Color(col, 0.6) if p.mine or p.kind == "press" else UI.LINE)
+		var pv = UI.vb(4)
+		var ph = UI.hb(8)
+		ph.add_child(UI.lbl(str(p.who), 19, UI.TEXT, "bold"))
+		ph.add_child(UI.lbl_fill("@%s · %s" % [p.handle, G.fmt_date(p.day).substr(4)], 15, UI.DIM))
+		pv.add_child(ph)
+		pv.add_child(UI.wrap(str(p.text), 19, UI.TEXT))
+		var st = UI.hb(14)
+		st.add_child(UI.icon("heart", 16, UI.RED))
+		st.add_child(UI.lbl(G.OPS._thousands(int(p.likes)), 15, UI.MUTED))
+		st.add_child(UI.icon("repeat", 16, UI.GREEN))
+		st.add_child(UI.lbl(G.OPS._thousands(int(p.reposts)), 15, UI.MUTED))
+		pv.add_child(st)
+		for r in p.replies:
+			var rr = UI.panel(Color(1, 1, 1, 0.04), 8, 10, 5)
+			rr.add_child(UI.wrap("@%s  %s" % [r[0], r[1]], 16, UI.MUTED))
+			pv.add_child(rr)
+		pc.add_child(pv)
+		v.add_child(pc)
+	if d.posts.is_empty():
+		_note(v, "The feed fills up once matches are played.")
 
 
 func _press(v: Control):

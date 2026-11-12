@@ -61,6 +61,18 @@ func run(m):
 		for k in ["medical", "contracts", "top50", "bargains"]:
 			main.root("lists", {"kind": k, "grp": "club"})
 			await snap("list_" + k)
+	if want.call("social"):
+		for i in 30:
+			G.advance()
+			var fx = G.user_fixture_today()
+			if fx != null:
+				var sim = G.new_sim(fx, false)
+				while sim.phase < 4:
+					sim.step()
+				G.apply_match(sim)
+		print("posts ", G.SOC.data().posts.size(), " ", G.SOC.post("Proud of the lads, great win. Haaland was superb"))
+		main.root("hub", {"kind": "social", "grp": "manager"})
+		await snap("social")
 	if want.call("hub"):
 		for k in ["press", "doc", "invest", "owner", "life", "contract", "dressing", "fans", "sponsors", "request", "report", "identity", "analysis", "timeline", "philosophy", "tcentre", "awards", "scores", "standards", "findclub", "rolefinder", "status", "manual", "achieve", "fame", "editor"]:
 			main.root("hub", {"kind": k, "grp": "club"})
