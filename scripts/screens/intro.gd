@@ -9,15 +9,25 @@ class Sil extends Control:
 		var h = size.y
 		var cx = w / 2.0
 		var dark = Color("06080d")
-		var rim = Color(1, 1, 1, 0.5)
-		var sh = PackedVector2Array([Vector2(cx - w * 0.5, h), Vector2(cx - w * 0.46, h * 0.78), Vector2(cx - w * 0.2, h * 0.66), Vector2(cx - w * 0.1, h * 0.56),
-			Vector2(cx + w * 0.1, h * 0.56), Vector2(cx + w * 0.2, h * 0.66), Vector2(cx + w * 0.46, h * 0.78), Vector2(cx + w * 0.5, h)])
+		var rim = Color(1, 1, 1, 0.3)
+		# shoulders and suit
+		var sh = PackedVector2Array([Vector2(cx - w * 0.47, h), Vector2(cx - w * 0.45, h * 0.8), Vector2(cx - w * 0.36, h * 0.7), Vector2(cx - w * 0.14, h * 0.63),
+			Vector2(cx - w * 0.075, h * 0.6), Vector2(cx + w * 0.075, h * 0.6), Vector2(cx + w * 0.14, h * 0.63), Vector2(cx + w * 0.36, h * 0.7),
+			Vector2(cx + w * 0.45, h * 0.8), Vector2(cx + w * 0.47, h)])
 		draw_colored_polygon(sh, dark)
-		draw_polyline(sh, Color(rim, 0.25), 2.0, true)
-		draw_set_transform(Vector2(cx, h * 0.34), 0.0, Vector2(1.0, 1.25))
-		draw_circle(Vector2.ZERO, w * 0.21, dark)
-		draw_arc(Vector2.ZERO, w * 0.21, -PI * 0.9, -PI * 0.1, 30, rim, 3.0, true)
+		draw_polyline(sh, rim, 2.0, true)
+		# neck
+		draw_rect(Rect2(cx - w * 0.07, h * 0.48, w * 0.14, h * 0.14), dark)
+		# head: taller than wide, with ears and a hair line
+		draw_set_transform(Vector2(cx, h * 0.33), 0.0, Vector2(0.8, 1.0))
+		draw_circle(Vector2.ZERO, h * 0.2, dark)
+		draw_arc(Vector2.ZERO, h * 0.2, -PI * 0.85, -PI * 0.15, 30, Color(1, 1, 1, 0.45), 2.5, true)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		for sx in [-1.0, 1.0]:
+			draw_circle(Vector2(cx + sx * h * 0.165, h * 0.35), h * 0.03, dark)
+		# collar and tie hint
+		draw_colored_polygon(PackedVector2Array([Vector2(cx - w * 0.07, h * 0.6), Vector2(cx, h * 0.72), Vector2(cx + w * 0.07, h * 0.6)]), Color("1b2233"))
+		draw_colored_polygon(PackedVector2Array([Vector2(cx - w * 0.018, h * 0.66), Vector2(cx + w * 0.018, h * 0.66), Vector2(cx + w * 0.03, h * 0.9), Vector2(cx, h * 0.96), Vector2(cx - w * 0.03, h * 0.9)]), Color("0e1320"))
 
 
 func build():
@@ -41,7 +51,7 @@ func _appoint():
 	m.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(m)
 	var tv = UI.panel(Color("05070b"), 10, 10, 10, Color(1, 1, 1, 0.18))
-	tv.custom_minimum_size = Vector2(900, 470)
+	tv.custom_minimum_size = Vector2(820, 410)
 	tv.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var inner = Control.new()
 	inner.clip_contents = true
@@ -78,7 +88,7 @@ func _appoint():
 	sil.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	sil.offset_left = 90
 	sil.offset_right = 430
-	sil.offset_top = -400
+	sil.offset_top = -372
 	sil.offset_bottom = -46
 	inner.add_child(sil)
 	var tag = UI.panel(Color("f5c518"), 0, 18, 6)
@@ -113,7 +123,7 @@ func _appoint():
 	holder.add_child(foot)
 	tv.modulate.a = 0.0
 	tv.scale = Vector2(0.94, 0.94)
-	tv.pivot_offset = Vector2(450, 235)
+	tv.pivot_offset = Vector2(410, 205)
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(tv, "modulate:a", 1.0, 0.5)
 	tw.tween_property(tv, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

@@ -158,6 +158,8 @@ static func weekly():
 	var tier = s.leagues[c.lg].tier
 	var wages = G.squad_wages(c)
 	var sponsor = int(c.wage_budget * (0.86 + 0.03 * c.fac.commercial))
+	if s.user.get("sponsor") != null:
+		sponsor += int(s.user.sponsor.weekly)
 	var tv = int(c.wage_budget * 0.05)
 	var price = [46, 30, 20, 15][clampi(tier - 1, 0, 3)]
 	var fill = clamp(0.55 + (c.rep - 55.0) * 0.012 + (0.1 if c.form.count("W") >= 3 else 0.0), 0.35, 0.98)

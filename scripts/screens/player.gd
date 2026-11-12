@@ -166,6 +166,17 @@ func build():
 		th.add_child(rb0)
 		v.add_child(th)
 	v.add_child(UI.btn("Compare with…", func(): _compare(p), "secondary", "users", 68))
+	v.add_child(UI.btn("Find similar players", func(): UI.main.open("lists", {"kind": "similar", "pid": p.id, "grp": "search"}), "secondary", "search", 56))
+	if G.settings.get("editor", false):
+		var eh = UI.hb(8)
+		for d in [-1, 1]:
+			var eb = UI.btn("Rating %+d" % d, func():
+				G.change_ovr(p, d)
+				p.pot = max(p.pot, p.ovr)
+				refresh(), "ghost", "pencil", 52)
+			eb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			eh.add_child(eb)
+		v.add_child(eh)
 	if own and not loaned_in:
 		v.add_child(UI.btn("Offer new contract", func(): UI.main.open("nego", {"pid": p.id, "mode": "renew"}), "primary", "handshake"))
 		var hb2 = UI.hb(10)

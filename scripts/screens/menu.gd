@@ -11,40 +11,53 @@ func build():
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.clip_contents = true
 	body.add_child(holder)
-	# stadium art on the right
-	var glow = UI.panel(Color(0.35, 0.55, 1.0, 0.1), 400, 0, 0)
-	glow.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
-	glow.offset_left = -860
-	glow.offset_right = -60
-	glow.offset_top = -400
-	glow.offset_bottom = 400
-	holder.add_child(glow)
-	art = TextureRect.new()
-	art.texture = load("res://assets/iso/stadium_level_5.png")
-	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	art.modulate = Color(0.72, 0.8, 1.0)
-	art.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
-	art.offset_left = -840
-	art.offset_right = -40
-	art.offset_top = -400
-	art.offset_bottom = 400
-	holder.add_child(art)
-	var tw = create_tween().set_loops()
-	tw.tween_property(art, "position:y", art.position.y - 10, 2.6).set_trans(Tween.TRANS_SINE)
-	tw.tween_property(art, "position:y", art.position.y, 2.6).set_trans(Tween.TRANS_SINE)
+	# background scene if one is supplied, otherwise the stadium art on the right
+	if ResourceLoader.exists("res://assets/scenes/title.jpg"):
+		var bg = TextureRect.new()
+		bg.texture = load("res://assets/scenes/title.jpg")
+		bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(bg)
+		var shade = TextureRect.new()
+		var g = Gradient.new()
+		g.set_color(0, Color(0.02, 0.03, 0.06, 0.94))
+		g.set_color(1, Color(0.02, 0.03, 0.06, 0.0))
+		var gt = GradientTexture2D.new()
+		gt.gradient = g
+		gt.fill_to = Vector2(0.75, 0)
+		shade.texture = gt
+		shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		shade.stretch_mode = TextureRect.STRETCH_SCALE
+		shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(shade)
+	else:
+		var box = CenterContainer.new()
+		box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		box.offset_left = 520
+		holder.add_child(box)
+		art = TextureRect.new()
+		art.texture = load("res://assets/iso/stadium_level_5.png")
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art.modulate = Color(0.78, 0.84, 1.0)
+		art.custom_minimum_size = Vector2(600, 600)
+		box.add_child(art)
 	# left column
 	var v = UI.vb(0)
 	v.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
 	v.offset_left = 56
 	v.offset_right = 56 + 520
-	v.offset_top = 34
-	v.offset_bottom = -26
+	v.offset_top = 20
+	v.offset_bottom = -16
 	holder.add_child(v)
 	var t = UI.vb(-30)
-	t.add_child(UI.lbl("FOOTBALL", 104, UI.TEXT, "xbold"))
-	t.add_child(UI.lbl("DYNASTY", 104, UI.GOLD, "xbold"))
+	t.add_child(UI.lbl("FOOTBALL", 92, UI.TEXT, "xbold"))
+	t.add_child(UI.lbl("DYNASTY", 92, UI.GOLD, "xbold"))
 	v.add_child(t)
 	v.add_child(UI.caps("Career manager  ·  Season 2026/27", 22, UI.MUTED))
 	v.add_child(UI.sp())
@@ -83,7 +96,7 @@ func build():
 		G.save_settings()
 		refresh()))
 	v.add_child(UI.sp(0, 16))
-	v.add_child(UI.lbl("v0.3 · personal build · not for distribution", 16, UI.DIM))
+	v.add_child(UI.lbl("v0.4 · personal build · not for distribution", 16, UI.DIM))
 	if not G.ui.get("sting", false):
 		G.ui["sting"] = true
 		UI.sfx("sting_start", -10.0)

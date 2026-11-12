@@ -2,6 +2,7 @@ extends Control
 # Base class for every screen. Subclasses override build().
 
 const FLOW = preload("res://scripts/widgets/flow.gd")
+const PAGER = preload("res://scripts/widgets/pager.gd")
 
 var args: Dictionary = {}
 var sname := ""
@@ -13,6 +14,8 @@ var cols := 0               # 0 = automatic column count for content()
 var max_w := 0.0
 var body: VBoxContainer
 var sc: ScrollContainer = null
+var pager: Control = null
+var keep_page := 0
 
 
 func _ready():
@@ -31,6 +34,8 @@ func build():
 func refresh():
 	var y = sc.scroll_vertical if sc != null and is_instance_valid(sc) else 0
 	sc = null
+	keep_page = pager.page if pager != null and is_instance_valid(pager) else 0
+	pager = null
 	for c in body.get_children():
 		body.remove_child(c)
 		c.queue_free()
@@ -49,15 +54,17 @@ func on_resume():
 
 
 func content(sep := 14, pad := 20) -> Container:
-	# scrolling area whose children flow into balanced columns
+	# content flows into columns; what does not fit goes onto further pages you swipe between
 	var v = FLOW.new()
 	v.sep = sep
 	v.cols = cols
 	v.max_w = max_w
+	v.pad = pad
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var m = UI.margin(v, pad, 6, pad, 20)
-	sc = UI.scroll(m)
-	body.add_child(sc)
+	pager = PAGER.new()
+	pager.setup(v)
+	pager.page = keep_page
+	body.add_child(pager)
 	return v
 
 

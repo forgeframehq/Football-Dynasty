@@ -2,7 +2,7 @@ extends "res://scripts/screens/screen.gd"
 # Ready-made player lists: medical centre, contracts, top players, smart searches.
 
 const TITLES = {"medical": "Medical Centre", "contracts": "Contracts", "top50": "Top 50 Players", "wonderkids": "Wonderkids",
-	"bargains": "Bargains", "expiring": "Expiring Contracts", "free": "Free Agents", "listed": "Transfer Listed"}
+	"bargains": "Bargains", "expiring": "Expiring Contracts", "free": "Free Agents", "listed": "Transfer Listed", "similar": "Similar Players", "role": "Role Finder", "pos": "Best Available"}
 
 
 func build():
@@ -59,6 +59,17 @@ func build():
 				if p.club < 0 or p.club == c.id or p.cend > s.season + 1: continue
 				sc_ = p.ovr
 				extra = "%s · %d yrs · contract ends June %d" % [cl, G.age(p), p.cend]
+			elif kind == "similar":
+				var q = s.players[args.pid]
+				if p.id == q.id or p.club == c.id or p.pos != q.pos or absi(p.ovr - q.ovr) > 4: continue
+				if p.club >= 0 and s.leagues[s.clubs[p.club].lg].roe: continue
+				sc_ = 100.0 - absi(p.ovr - q.ovr) * 6.0 - maxf(0.0, G.age(p) - G.age(q)) * 2.0 - float(G.value(p)) / maxf(1.0, G.value(q)) * 10.0
+				extra = "%s · %d yrs · %s" % [cl, G.age(p), G.money(G.value(p))]
+			elif kind == "role" or kind == "pos":
+				if p.club == c.id or G.fit(p, args.pos) < 0.9: continue
+				if p.club >= 0 and (s.leagues[s.clubs[p.club].lg].roe or G.value(p) > budget): continue
+				sc_ = G.RL.score(p, args.rid) if kind == "role" else float(p.ovr)
+				extra = "%s · %d yrs · %s" % [cl, G.age(p), G.money(G.value(p))]
 			elif kind == "bargains":
 				if p.club < 0 or p.club == c.id or s.leagues[s.clubs[p.club].lg].roe: continue
 				var val = G.value(p)
@@ -71,6 +82,12 @@ func build():
 			rows.resize(50 if kind in ["top50", "wonderkids"] else 60)
 		if kind == "bargains":
 			note = "The best players your %s budget can buy, weighted towards younger and cheaper." % G.money(budget)
+	if kind == "similar":
+		note = "Players like %s: same position, close in ability, ranked towards younger and cheaper." % G.pname(s.players[args.pid])
+	elif kind == "role":
+		note = "Best affordable players for the %s role at %s." % [G.RL.ROLES[args.rid].n, args.pos]
+	elif kind == "pos":
+		note = "Best affordable players who can play %s." % args.pos
 	body.add_child(UI.topbar(TITLES.get(kind, "Players"), true, UI.chip("%d PLAYERS" % rows.size(), Color(1, 1, 1, 0.06), UI.MUTED, 18)))
 	var v = content(8)
 	if note != "":

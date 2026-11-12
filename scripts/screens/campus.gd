@@ -98,6 +98,22 @@ class Ground extends Control:
 		ci.draw_circle(at + Vector2(-5 * s, -30 * s), 11 * s, Color("46a05a"))
 
 
+class Crane extends Control:
+	# tower crane and fence drawn over a plot that is being built on
+	func _draw():
+		var y = Color("f6c945")
+		var base = Vector2(40, 150)
+		draw_line(base, base + Vector2(0, -150), y, 6.0)
+		draw_line(base + Vector2(-34, -138), base + Vector2(120, -138), y, 5.0)
+		draw_line(base + Vector2(0, -150), base + Vector2(-34, -138), y, 2.0)
+		draw_line(base + Vector2(0, -150), base + Vector2(120, -138), y, 2.0)
+		draw_line(base + Vector2(90, -138), base + Vector2(90, -96), Color(1, 1, 1, 0.8), 2.0)
+		draw_rect(Rect2(base + Vector2(82, -96), Vector2(16, 12)), Color("8b96ab"))
+		draw_rect(Rect2(base + Vector2(-44, -146), Vector2(18, 14)), Color("5b6680"))
+		for i in 8:
+			draw_line(base + Vector2(-3, -i * 18), base + Vector2(3, -i * 18 - 9), Color(0, 0, 0, 0.35), 2.0)
+
+
 class Trees extends Control:
 	var seed_v := 1
 	var a = 150.0
@@ -195,6 +211,12 @@ func build():
 			tr.size = Vector2(340, 300)
 			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			world.add_child(tr)
+		if it.k != "" and c.build != null and c.build.key == it.k:
+			var cr = Crane.new()
+			cr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cr.size = Vector2(180, 160)
+			cr.position = ground.iso(it.u * P + span * 0.5, it.v * P + span * 0.5) - Vector2(20 + 130 * span, 150)
+			world.add_child(cr)
 		if it.k != "":
 			var top = ground.iso(it.u * P + span * 0.5, it.v * P + span * 0.5)
 			world.add_child(_chip(c, it.k, top - Vector2(0, 150 * span if ResourceLoader.exists(path) else 30)))

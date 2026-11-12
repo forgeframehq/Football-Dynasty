@@ -244,6 +244,15 @@ func msg(title: String, body: String, kind := "info", ref = null, important := f
 		stop_flag = true
 
 
+func scrap(title: String, text: String):
+	var u = s.user
+	if not u.has("scrap"):
+		u["scrap"] = []
+	u.scrap.push_front({"day": s.day, "title": title, "text": text})
+	if u.scrap.size() > 60:
+		u.scrap.resize(60)
+
+
 func news(text: String):
 	s.news.push_front({"day": s.day, "text": text})
 	if s.news.size() > 40:
@@ -944,6 +953,14 @@ func apply_match(sim):
 		u.conf = clamp(u.conf + (pts - ex) * 3.0, 0.0, 100.0)
 		if f.ko and sim.winner() == ui:
 			u.conf = min(100.0, u.conf + 6)
+		u["fans"] = clamp(u.get("fans", 55.0) + (pts - ex) * 2.2 + (1.5 if t.goals - o.goals >= 3 else 0.0), 0.0, 100.0)
+		var sp = u.get("sponsor")
+		if sp != null and pts == 3:
+			uc().budget += int(sp.win)
+		if t.goals - o.goals >= 4:
+			scrap("Big win", "%s %d-%d %s" % [t.club.name, t.goals, o.goals, o.club.name])
+		elif o.club.rep - t.club.rep >= 8 and pts == 3:
+			scrap("Giant killing", "%s beat %s %d-%d" % [t.club.name, o.club.name, t.goals, o.goals])
 		if u.conf < 6.0 and uc().t.p >= 10 and not u.sacked:
 			u.sacked = true
 			stop_flag = true

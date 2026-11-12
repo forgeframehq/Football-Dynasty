@@ -411,6 +411,7 @@ static func rollover():
 	if title:
 		note = "Champions"
 		u.trophies.append("%s %s" % [s.leagues[old_lg].name, G.season_name()])
+		G.scrap("Champions", "%s won the %s" % [ucl.name, s.leagues[old_lg].name])
 	elif promoted:
 		note = "Promoted"
 	elif relegated:

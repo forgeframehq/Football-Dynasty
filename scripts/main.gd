@@ -30,6 +30,7 @@ const SCREENS = {
 	"trophies": preload("res://scripts/screens/trophies.gd"),
 	"scouting": preload("res://scripts/screens/scouting.gd"),
 	"lists": preload("res://scripts/screens/lists.gd"),
+	"hub": preload("res://scripts/screens/hub.gd"),
 }
 const RAIL = [["inbox", "mail"], ["home", "house"], ["club", ""], ["manager", "user"], ["world", "globe"], ["search", "search"], ["options", "settings"]]
 const RAIL_W = 92
@@ -278,7 +279,7 @@ func _rail_key() -> String:
 		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists"],
 		"manager": ["board", "trophies", "jobs"], "world": ["table", "comps", "stats", "clubview"],
 		"search": ["transfers", "scouting", "player", "nego", "compare"]}
-	if nm == "lists":
+	if nm == "lists" or nm == "hub":
 		return str(stack[0].args.get("grp", "club"))
 	for k in groups:
 		if nm in groups[k]:
@@ -491,12 +492,22 @@ func menu_items(key: String) -> Array:
 		a.append(_row("repeat", "Loan Watch", "%d out on loan" % loaned, func(): root("squad", {"tab": 2})))
 		a.append(_row("calendar", "Fixtures", "Next: %s" % s.clubs[f.a if f.h == c.id else f.h].short if f != null else "Season over", func(): root("fixtures")))
 		a.append(_row("wallet", "Finances", "%s budget" % G.money(c.budget), func(): root("finances")))
+		a.append(_row("clipboard-list", "Team Report", "Strengths and gaps", func(): root("hub", {"kind": "report", "grp": "club"})))
+		a.append(_row("users", "Dressing Room", "Hierarchy and morale", func(): root("hub", {"kind": "dressing", "grp": "club"})))
+		a.append(_row("megaphone", "Fans", "%d%% confidence" % int(s.user.get("fans", 55.0)), func(): root("hub", {"kind": "fans", "grp": "club"})))
+		a.append(_row("hand-coins", "Sponsors", str(s.user.sponsor.name) if s.user.get("sponsor") != null and s.user.sponsor.season == s.season else "No shirt sponsor", func(): root("hub", {"kind": "sponsors", "grp": "club"})))
+		a.append(_row("chart-bar", "Match Analysis", "Goals, home and away", func(): root("hub", {"kind": "analysis", "grp": "club"})))
+		a.append(_row("shield", "Club Identity", "Colours and records", func(): root("hub", {"kind": "identity", "grp": "club"})))
 		a.append(_row("building", "Club City", "Stadium %s" % G.OPS._thousands(G.OPS.capacity(c)), func(): root("campus")))
 	elif key == "manager":
 		a.append(_row("user", "Manager Profile", s.user.name, func(): root("board")))
 		a.append(_row("target", "Board Confidence", "%d%% · %s" % [int(s.user.conf), s.user.obj.text], func(): root("board")))
 		a.append(_row("trophy", "Trophy Cabinet", "%d won" % s.user.trophies.size(), func(): root("trophies")))
 		a.append(_row("briefcase", "Jobs", "%d club%s interested" % [s.user.jobs.size(), "" if s.user.jobs.size() == 1 else "s"], func(): root("jobs")))
+		a.append(_row("scroll-text", "Career Timeline", "%d season%s" % [s.history.size(), "" if s.history.size() == 1 else "s"], func(): root("hub", {"kind": "timeline", "grp": "manager"})))
+		a.append(_row("book-open", "Philosophy", "Your club identity", func(): root("hub", {"kind": "philosophy", "grp": "manager"})))
+		a.append(_row("circle-question-mark", "Board Request", "Ask for backing", func(): root("hub", {"kind": "request", "grp": "manager"})))
+		a.append(_row("info", "Game Status", G.fmt_date(s.day, true), func(): root("hub", {"kind": "status", "grp": "manager"})))
 	elif key == "world":
 		a.append(_row("list-ordered", "Club Division", "%s in the %s" % [G.LG.ordinal(G.LG.position(c.id)), s.leagues[c.lg].name], func(): root("table", {"lg": c.lg})))
 		a.append(_row("trophy", "Cups & Continental", "%d competitions" % G.CP.club_comps(c.id).size(), func(): root("comps")))
@@ -507,6 +518,10 @@ func menu_items(key: String) -> Array:
 					var lid = i
 					a.append(_row("", nat, l.name, func(): root("table", {"lg": lid}), nat))
 					break
+		a.append(_row("arrow-left-right", "Transfer Centre", "%d deals this season" % s.tx_log.size(), func(): root("hub", {"kind": "tcentre", "grp": "world"})))
+		a.append(_row("award", "Awards", "Golden boot and more", func(): root("hub", {"kind": "awards", "grp": "world"})))
+		a.append(_row("goal", "Live Scores", "Latest league results", func(): root("hub", {"kind": "scores", "grp": "world"})))
+		a.append(_row("list", "League Standards", "Leagues ranked", func(): root("hub", {"kind": "standards", "grp": "world"})))
 		a.append(_row("chart-bar", "Player Stats", "Scorers, assists, ratings", func(): root("stats", {"lg": c.lg})))
 		a.append(_row("crown", "Top 50 Players", "Best in the world", func(): root("lists", {"kind": "top50", "grp": "world"})))
 		a.append(_row("sparkles", "Wonderkids", "Best aged 21 or under", func(): root("lists", {"kind": "wonderkids", "grp": "world"})))
@@ -517,6 +532,8 @@ func menu_items(key: String) -> Array:
 		a.append(_row("clock", "Expiring Contracts", "Out of contract in June", func(): root("lists", {"kind": "expiring", "grp": "search"})))
 		a.append(_row("users", "Free Agents", "Available now", func(): root("lists", {"kind": "free", "grp": "search"})))
 		a.append(_row("flag", "Transfer Listed", "Clubs want to sell", func(): root("lists", {"kind": "listed", "grp": "search"})))
+		a.append(_row("target", "Role Finder", "Players for your roles", func(): root("hub", {"kind": "rolefinder", "grp": "search"})))
+		a.append(_row("shield", "Find Club", "Search every club", func(): root("hub", {"kind": "findclub", "grp": "search"})))
 		a.append(_row("briefcase", "Jobs", "Clubs interested in you", func(): root("jobs")))
 	elif key == "options":
 		var snd = G.settings.get("sound", true)
@@ -530,6 +547,10 @@ func menu_items(key: String) -> Array:
 			if not G.settings["sound"]:
 				UI.ambience(false)
 			open_menu("options")))
+		a.append(_row("award", "Achievements", "Career milestones", func(): root("hub", {"kind": "achieve", "grp": "options"})))
+		a.append(_row("crown", "Hall of Fame", "Honours and scrapbook", func(): root("hub", {"kind": "fame", "grp": "options"})))
+		a.append(_row("pencil", "Editor", "On" if G.settings.get("editor", false) else "Off", func(): root("hub", {"kind": "editor", "grp": "options"})))
+		a.append(_row("book-open", "Manual", "How to play", func(): root("hub", {"kind": "manual", "grp": "options"})))
 		a.append(_row("log-out", "Exit to Menu", "Saves first", func():
 			G.save_game()
 			G.active = false
