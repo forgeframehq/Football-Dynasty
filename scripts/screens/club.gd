@@ -16,6 +16,7 @@ func build():
 		["activity", "Training", "%s focus · %s intensity" % [G.OPS.FOCUS[c.train.focus], G.OPS.INTENSITY[c.train.inten].to_lower()], func(): UI.main.open("training")],
 		["search", "Scouting", "%d player%s being watched" % [G.s.scout.queue.size(), "" if G.s.scout.queue.size() == 1 else "s"], func(): UI.main.open("scouting")],
 		["trophy", "Competitions", "Cups and European football", func(): UI.main.open("comps")],
+		["star", "Trophy room", "%d trophies won as manager" % G.s.user.trophies.size(), func(): UI.main.open("trophies")],
 		["calendar", "Fixtures & results", "Your season schedule", func(): UI.main.open("fixtures")],
 		["chart-bar", "Player stats", "Top scorers, assists and ratings", func(): UI.main.open("stats", {"lg": c.lg})],
 		["wallet", "Finances", "%s budget · %s/wk wages" % [G.money(c.budget), G.money(G.squad_wages(c))], func(): UI.main.open("finances")],
@@ -39,6 +40,10 @@ func build():
 		UI.tap(r, it[3])
 		v.add_child(r)
 	v.add_child(UI.sp(0, 6))
+	v.add_child(UI.btn("Sound: %s" % ("on" if G.settings.get("sound", true) else "off"), func():
+		G.settings["sound"] = not G.settings.get("sound", true)
+		G.save_settings()
+		refresh(), "ghost", "zap", 64))
 	v.add_child(UI.btn("Save & exit to menu", func():
 		G.save_game()
 		G.active = false

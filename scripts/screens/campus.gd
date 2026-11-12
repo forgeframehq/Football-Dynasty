@@ -185,6 +185,18 @@ func _world(c: Dictionary) -> Node3D:
 			_box(crane, Vector3(34, 2, 2), Vector3(12, 44, 0), Color("f6ad3c"))
 			crane.position = SPOT[k] + Vector3(38 if k != "stadium" else 80, 0, 30)
 			root.add_child(crane)
+	# neighbourhood around the campus
+	var props = [["city_block_1", -150, -250, 0], ["city_block_2", -75, -255, 0], ["city_block_3", 75, -255, 0], ["city_block_1", 150, -250, 0], ["city_block_2", 0, -262, 0],
+		["city_block_3", -178, -150, 90], ["city_block_2", 178, -150, -90], ["city_block_1", -182, -55, 90], ["city_block_3", 182, -55, -90],
+		["city_block_2", -178, 130, 90], ["city_block_1", 178, 130, -90], ["city_block_1", -170, 305, 90], ["city_block_3", 170, 305, -90],
+		["car_park", 96, 322, 0], ["car_park", -96, 322, 0], ["city_block_2", 0, 345, 180]]
+	for pr in props:
+		var node = _glb("res://assets/models/%s.glb" % pr[0], 1.0, c1, c2)
+		if node != null:
+			node.position = Vector3(pr[1], 0, pr[2])
+			node.rotation_degrees.y = pr[3]
+			root.add_child(node)
+	var has_tc = ResourceLoader.exists("res://assets/models/tree_cluster.glb")
 	# trees
 	var rng = RandomNumberGenerator.new()
 	rng.seed = 7 + c.id
@@ -194,14 +206,20 @@ func _world(c: Dictionary) -> Node3D:
 	cone.height = 13.0
 	cone.radial_segments = 6
 	var tm = [_mat(Color("24633a")), _mat(Color("2c7445")), _mat(Color("1e5231"))]
-	for i in 90:
-		var p = Vector3(rng.randf_range(-230, 230), 0, rng.randf_range(-260, 400))
+	for i in 60:
+		var p = Vector3(rng.randf_range(-140, 140), 0, rng.randf_range(-215, 285))
 		var ok = true
 		for k in SPOT:
 			var d = Vector2(p.x - SPOT[k].x, p.z - SPOT[k].z)
 			if abs(d.x) < (118 if k == "stadium" else 50) and abs(d.y) < (96 if k == "stadium" else 44):
 				ok = false
 		if not ok or abs(p.x + 8) < 14 or abs(p.z - 150) < 12 or abs(p.z - 8) < 12:
+			continue
+		if has_tc and i % 2 == 0:
+			var tc = _glb("res://assets/models/tree_cluster.glb", rng.randf_range(0.9, 1.4), c1, c2)
+			tc.position = p
+			tc.rotation_degrees.y = rng.randf_range(0, 360)
+			root.add_child(tc)
 			continue
 		var t = MeshInstance3D.new()
 		t.mesh = cone
@@ -214,7 +232,10 @@ func _world(c: Dictionary) -> Node3D:
 
 
 func _model(k: String, l: int, c1: Color, c2: Color) -> Node3D:
-	var path = "res://assets/models/%s_level_%d.glb" % [MODEL_FILE[k], l]
+	return _glb("res://assets/models/%s_level_%d.glb" % [MODEL_FILE[k], l], MODEL_SCALE[k], c1, c2)
+
+
+func _glb(path: String, sc: float, c1: Color, c2: Color) -> Node3D:
 	if not ResourceLoader.exists(path):
 		return null
 	var scene = load(path)
@@ -224,7 +245,6 @@ func _model(k: String, l: int, c1: Color, c2: Color) -> Node3D:
 	var holder = Node3D.new()
 	holder.add_child(inst)
 	inst.rotation_degrees.x = -90
-	var sc = MODEL_SCALE[k]
 	holder.scale = Vector3(sc, sc, sc)
 	var seat1 = c1 if c1.get_luminance() < 0.85 else c2
 	var seat2 = c2 if _far(c2, seat1) and c2.get_luminance() < 0.9 else seat1.darkened(0.3)

@@ -15,18 +15,26 @@ Builds are signed with the debug key in `tools/debug.keystore`, so new builds in
 
 ## What's in the game
 
-- **13 leagues, 266 clubs, ~7,200 real players** (2026/27 squads): Premier League → League Two, LaLiga + LaLiga 2,
+- **13 playable leagues, 266 clubs, ~7,200 real players** (2026/27 squads): Premier League → League Two, LaLiga + LaLiga 2,
   Serie A + B, Bundesliga → 3. Liga, Ligue 1 + 2, with promotion, relegation and play-offs.
-- **Career hub** – calendar-driven "Continue" flow, board objective and confidence, inbox, news, job market, sacking.
-- **Match day** – pre-match briefing, live minute-by-minute match with commentary, ball tracker, live stats,
-  speed control, substitutions and tactical changes, full-time report with player ratings. Or quick-sim.
-- **Tactics** – 8 formations, tap-to-swap line-up on the pitch, mentality / pressing / tempo, fitness and suspensions.
-- **Transfers** – search and shortlist, fee and contract negotiations, incoming bids for your players,
-  AI-to-AI transfers, free agents, two windows per season.
-- **Squad building** – player growth and decline, potential, morale, form, injuries, contract renewals,
-  retirements and yearly youth intake.
-- **Finances** – transfer budget, wage budget, prize money each season.
-- Autosave after every match / continue.
+  A further 64 clubs from the rest of Europe (Benfica, Ajax, Celtic, Galatasaray…) appear in European
+  competitions and the transfer market.
+- **Competitions** – six domestic cups, Champions League, Europa League, Conference League, pre-season friendlies.
+- **Manager** – nationality, coaching badge, playing career and four coaching attributes; study for the next badge.
+- **Match day** – opposition report, live 2D match with all 22 players, commentary, momentum graph, live scores and
+  "as it stands" table, shot map, touchline shouts, half-time team talk, substitutions, presets, key-highlights speed.
+- **Tactics** – drag players anywhere on the pitch, 28 player roles with suitability, mentality / pressing / tempo /
+  width / defensive line / passing / counter-attack, captain and set-piece takers, three saved presets.
+- **Squad** – five list views, depth chart, squad status, numbers, player comparison, youth team, loans.
+- **Transfers** – search, shortlist, fee and contract negotiation, release clauses, loans, incoming bids,
+  AI transfers, free agents, deadline day.
+- **Scouting** – other clubs' players show a potential range until scouted; standing scouting assignments.
+- **Training** – team focus and intensity, individual programmes, position retraining.
+- **Club** – 3D campus with stadium and five facilities (levels 1–5) that change as you upgrade them;
+  weekly finances from sponsorship, gates, TV, wages and upkeep.
+- **Career** – board objective and confidence, sacking and job offers, player growth and decline over 18 attributes,
+  morale and unhappy players, injuries, youth intake, season awards, trophy room.
+- Three save slots, autosave, sound effects.
 
 ## Project layout
 
@@ -38,10 +46,15 @@ scripts/game.gd         autoload G: career state, time, line-ups, save/load
 scripts/match_engine.gd minute-by-minute match simulation
 scripts/leagues.gd      fixtures, tables, play-offs, season rollover
 scripts/transfers.gd    market logic and AI transfers
+scripts/comps.gd        domestic cups and European competitions
+scripts/club_ops.gd     facilities, finances, training, scouting, loans, manager profile
+scripts/roles.gd        detailed attributes and player roles
 scripts/ui.gd           autoload UI: design system and widgets
 scripts/main.gd         app shell: screen stack, bottom nav, sheets
 scripts/screens/        one script per screen
 scripts/widgets/        custom-drawn badge, pitch, player token, bar
+assets/models           stadium, facility and surroundings models (GLB, levels 1-5)
+assets/sfx              generated sound effects
 dev/                    headless season soak test, screenshot + touch test tools
 ```
 

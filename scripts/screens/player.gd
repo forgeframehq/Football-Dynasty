@@ -189,7 +189,7 @@ func build():
 		_scout_btn(v, p)
 		if G.window_open():
 			v.add_child(UI.btn("Make transfer offer", func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"}), "primary", "handshake"))
-			var ap = UI.caps("Asking price around %s" % G.money(G.TR.asking_price(p)), 19, UI.MUTED)
+			var ap = UI.caps("Asking price around %s%s" % [G.money(G.TR.asking_price(p)), (" · release clause %s" % G.money(p.rc)) if p.get("rc", 0) > 0 else ""], 19, UI.MUTED)
 			ap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			v.add_child(ap)
 			v.add_child(UI.btn("Ask for a season loan", func():

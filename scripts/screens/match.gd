@@ -203,6 +203,8 @@ func _start_others():
 func _kickoff():
 	sim = G.new_sim(f, true)
 	_start_others()
+	UI.sfx("whistle")
+	UI.ambience(true)
 	stage = "live"
 	refresh()
 
@@ -577,7 +579,10 @@ func _tick() -> bool:
 		_add_event(e)
 		if e.t != "info" and e.t != "sub":
 			notable = true
+		if e.t == "ht" or e.t == "ft":
+			UI.sfx("whistle")
 		if e.t == "goal":
+			UI.sfx("cheer" if e.s == us else "groan", -3.0)
 			hold = 1.8 if speed != 2 else 0.7
 			banner_l.text = "GOAL!"
 			var sub = "%s %d'" % [G.pname(G.s.players[e.p]), min(e.m, 90)]
@@ -767,7 +772,12 @@ func _sub_row(p: Dictionary, role: String, cond: float, on: bool, cb: Callable) 
 
 # ---------------------------------------------------------------- full time
 
+func _exit_tree():
+	UI.ambience(false)
+
+
 func _show_ft():
+	UI.ambience(false)
 	for c in lower.get_children():
 		lower.remove_child(c)
 		c.queue_free()

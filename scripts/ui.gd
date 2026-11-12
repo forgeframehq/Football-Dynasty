@@ -24,6 +24,7 @@ var fonts: Dictionary = {}
 var icon_src: Dictionary = {}
 var icon_cache: Dictionary = {}
 var main = null
+var players: Dictionary = {}
 
 
 func _ready():
@@ -39,6 +40,42 @@ func _ready():
 	if f != null:
 		icon_src = JSON.parse_string(f.get_as_text())
 		f.close()
+
+
+func sfx(nm: String, db := -6.0):
+	if not G.settings.get("sound", true):
+		return
+	if not players.has(nm):
+		var path = "res://assets/sfx/%s.wav" % nm
+		if not ResourceLoader.exists(path):
+			return
+		var pl = AudioStreamPlayer.new()
+		pl.stream = load(path)
+		add_child(pl)
+		players[nm] = pl
+	players[nm].volume_db = db
+	players[nm].play()
+
+
+func ambience(on: bool):
+	if not players.has("crowd"):
+		var path = "res://assets/sfx/crowd.wav"
+		if not ResourceLoader.exists(path):
+			return
+		var pl = AudioStreamPlayer.new()
+		var st = load(path)
+		st.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		st.loop_begin = 0
+		st.loop_end = int(st.get_length() * st.mix_rate)
+		pl.stream = st
+		pl.volume_db = -16.0
+		add_child(pl)
+		players["crowd"] = pl
+	if on and G.settings.get("sound", true):
+		if not players["crowd"].playing:
+			players["crowd"].play()
+	else:
+		players["crowd"].stop()
 
 
 func set_accent_from(c: Dictionary):
@@ -189,6 +226,7 @@ func tap(c: Control, cb: Callable, stop := false):
 				c.set_meta("tp", null)
 				c.modulate = Color.WHITE
 				if st != null and st.distance_to(e.global_position) < 22:
+					sfx("click", -16.0)
 					cb.call())
 	c.mouse_exited.connect(func(): c.modulate = Color.WHITE)
 

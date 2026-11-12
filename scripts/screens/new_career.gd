@@ -235,5 +235,6 @@ func _start(ci: int):
 	UI.close_sheet()
 	var nm = mname.strip_edges()
 	prof.name = nm if nm != "" else "Manager"
+	G.slot = args.get("slot", 0)
 	G.new_game(prof, ci)
 	UI.main.root("home")

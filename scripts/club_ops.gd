@@ -173,11 +173,22 @@ static func weekly():
 	if c.bank_log.size() > 12:
 		c.bank_log.resize(12)
 	var u = s.user
-	if u.attr.mot >= 14:
-		for pid in c.players:
-			var p = s.players[pid]
-			if p.mor < 70:
-				p.mor += 1
+	for pid in c.players:
+		var p = s.players[pid]
+		if u.attr.mot >= 14 and p.mor < 70:
+			p.mor += 1
+		if p.get("loan", -1) >= 0 or p.get("youth", false):
+			continue
+		var un = p.get("unhappy", 0)
+		if un == 0 and p.mor < 36 and G.status_of(p) <= 1:
+			p["unhappy"] = s.day
+			G.msg("%s is unhappy" % G.pname(p), "%s feels he is not playing enough and wants reassurance. Give him games, change his squad status, or expect a transfer request." % G.pfull(p), "contract", null, true)
+		elif un > 0 and p.mor >= 55:
+			p.erase("unhappy")
+			G.msg("%s is settled again" % G.pname(p), "%s is happy with his situation at the club." % G.pfull(p), "info")
+		elif un > 0 and s.day - un > 35 and not p.listed:
+			p.listed = true
+			G.msg("Transfer request: %s" % G.pname(p), "%s has handed in a transfer request and has been placed on the transfer list." % G.pfull(p), "contract", null, true)
 
 
 static func on_home_match(c: Dictionary):

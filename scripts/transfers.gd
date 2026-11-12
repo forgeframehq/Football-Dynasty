@@ -65,6 +65,9 @@ static func bid(p: Dictionary, fee: int) -> Dictionary:
 		return {"res": "error", "text": "You only have %s in the transfer budget." % G.money(uc.budget)}
 	if n.block > G.s.day:
 		return {"res": "reject", "text": "%s have ended negotiations for now. Try again after %s." % [G.s.clubs[p.club].name, G.fmt_date(n.block)]}
+	if p.get("rc", 0) > 0 and fee >= p.rc:
+		n.fee = fee
+		return {"res": "accept", "text": "Your %s bid triggers %s's release clause. %s cannot refuse." % [G.money(fee), G.pname(p), G.s.clubs[p.club].name]}
 	if fee >= ask * 0.95:
 		n.fee = fee
 		return {"res": "accept", "text": "%s accept your offer of %s." % [G.s.clubs[p.club].name, G.money(fee)]}
@@ -131,6 +134,8 @@ static func move(p: Dictionary, to_id: int, fee: int, wage: int, years: int):
 	tc.spent += fee
 	p.club = to_id
 	p.erase("status")
+	p.erase("rc")
+	p.erase("unhappy")
 	G.give_number(tc, p)
 	p.wage = wage
 	p.cend = s.season + years

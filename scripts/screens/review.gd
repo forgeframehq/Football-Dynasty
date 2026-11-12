@@ -47,6 +47,20 @@ func build():
 		h.add_child(UI.icon("trophy", 28, UI.GOLD))
 		r.add_child(h)
 		v.add_child(r)
+	if rv.get("awards", []).size() > 0:
+		v.add_child(UI.section("Awards"))
+		for a in rv.awards:
+			var ar = UI.panel(Color(UI.GOLD, 0.07), 18, 16, 12, Color(UI.GOLD, 0.25))
+			var ah = UI.hb(12)
+			ah.add_child(UI.icon("star-f", 26, UI.GOLD))
+			var av = UI.vb(0)
+			av.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			av.add_child(UI.caps(a[0], 17, UI.GOLD))
+			av.add_child(UI.lbl_fill("%s · %s" % [a[1], a[2]], 25, UI.TEXT, "semi"))
+			av.add_child(UI.lbl_fill(a[3], 19, UI.MUTED))
+			ah.add_child(av)
+			ar.add_child(ah)
+			v.add_child(ar)
 	if rv.get("cups", []).size() > 0:
 		v.add_child(UI.section("Cup winners"))
 		var cc = UI.card()

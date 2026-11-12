@@ -133,7 +133,7 @@ func run(m):
 	main.tab("transfers")
 	await snap("deals")
 	G.ui.tr_tab = 0
-	for t in ["table", "fixtures", "stats", "finances", "board", "inbox", "jobs", "training", "scouting", "comps", "campus"]:
+	for t in ["table", "fixtures", "stats", "finances", "board", "inbox", "jobs", "training", "scouting", "comps", "campus", "trophies"]:
 		main.open(t, {"lg": G.uc().lg})
 		await snap(t)
 		main.back()

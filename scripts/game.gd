@@ -9,8 +9,42 @@ const CP = preload("res://scripts/comps.gd")
 const OPS = preload("res://scripts/club_ops.gd")
 
 const SAVE_V = 2
-const SAVE_PATH = "user://career.sav"
-const META_PATH = "user://career.meta"
+var slot := 0
+var settings: Dictionary = {"sound": true}
+
+
+func save_path(i = null) -> String:
+	if i == null:
+		i = slot
+	return "user://career.sav" if i == 0 else "user://career%d.sav" % i
+
+
+func meta_path(i = null) -> String:
+	if i == null:
+		i = slot
+	return "user://career.meta" if i == 0 else "user://career%d.meta" % i
+
+
+func delete_save(i: int):
+	for p in [save_path(i), meta_path(i)]:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+
+
+func load_settings():
+	if FileAccess.file_exists("user://settings.dat"):
+		var f = FileAccess.open("user://settings.dat", FileAccess.READ)
+		var d = f.get_var()
+		f.close()
+		if typeof(d) == TYPE_DICTIONARY:
+			settings.merge(d, true)
+
+
+func save_settings():
+	var f = FileAccess.open("user://settings.dat", FileAccess.WRITE)
+	if f != null:
+		f.store_var(settings)
+		f.close()
 const LINE = {"GK": 0, "CB": 1, "LB": 1, "RB": 1, "CDM": 2, "CM": 2, "CAM": 2, "LM": 2, "RM": 2, "LW": 3, "RW": 3, "ST": 3}
 const LINE_NAMES = ["Goalkeepers", "Defenders", "Midfielders", "Attackers"]
 const STAT_NAMES = ["PAC", "SHO", "PAS", "DRI", "DEF", "PHY"]
@@ -56,6 +90,7 @@ func _ready():
 		fit_table[p[0] + p[1]] = p[2]
 		fit_table[p[1] + p[0]] = p[2]
 	rng.randomize()
+	load_settings()
 
 
 # ---------------------------------------------------------------- helpers
@@ -337,6 +372,12 @@ func ensure_state():
 	for cl in s.clubs:
 		if cl.players.size() > 0 and not s.players[cl.players[0]].has("num"):
 			number_squad(cl)
+	if not s.has("rc_done"):
+		s["rc_done"] = true
+		for pid in s.players:
+			var rp = s.players[pid]
+			if rp.club >= 0 and (s.leagues[s.clubs[rp.club].lg].country == "Spain" or pid % 5 == 0):
+				rp["rc"] = nice(value(rp) * (2.4 if rp.ovr >= 80 else 1.8))
 	var c = uc()
 	OPS.ensure(c)
 	if not c.has("slots") or c.slots.size() != 11:
@@ -802,6 +843,13 @@ func apply_match(sim):
 			for g in sim.sd[i].scorers:
 				sc[i].append([pname(s.players[g.pid]), g.m, g.pen])
 		f.sc = sc
+	if f.get("fr", false):
+		# friendlies only cost fitness
+		for pid in sim.pm:
+			if sim.pm[pid].tin >= 0:
+				s.players[pid].cond = int(sim.pm[pid].cond)
+				s.recov[pid] = true
+		return
 	for i in 2:
 		var t = sim.sd[i]
 		var o = sim.sd[1 - i]
@@ -943,6 +991,10 @@ func start_of_day():
 		contract_warning()
 	if window_open():
 		TR.daily()
+		if cur.day == 31 and (cur.month == 8 or cur.month == 1):
+			for i in 30:
+				TR.ai_deal()
+			msg("Deadline day", "It is the last day of the transfer window. Clubs are scrambling to get deals done — any business you want to do has to happen today.", "info", null, true)
 	TR.expire_offers()
 	LG.update_playoffs()
 	CP.daily()
@@ -1059,26 +1111,28 @@ func take_job(cid: int):
 
 # ---------------------------------------------------------------- save / load
 
-func has_save() -> bool:
-	return FileAccess.file_exists(SAVE_PATH)
+func has_save(i = null) -> bool:
+	return FileAccess.file_exists(save_path(i))
 
 
 func save_game():
-	var f = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f = FileAccess.open(save_path(), FileAccess.WRITE)
 	if f == null:
 		return
 	f.store_var(s)
 	f.close()
-	var m = FileAccess.open(META_PATH, FileAccess.WRITE)
+	var m = FileAccess.open(meta_path(), FileAccess.WRITE)
 	if m != null:
 		m.store_var({"club": uc().name, "manager": s.user.name, "date": fmt_date(s.day, true), "season": season_name(), "cid": s.user.club, "c1": uc().c1, "c2": uc().c2, "short": uc().short})
 		m.close()
 
 
-func load_game() -> bool:
+func load_game(i = null) -> bool:
+	if i != null:
+		slot = i
 	if not has_save():
 		return false
-	var f = FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var f = FileAccess.open(save_path(), FileAccess.READ)
 	var d = f.get_var()
 	f.close()
 	if typeof(d) != TYPE_DICTIONARY or not d.has("players"):
@@ -1093,10 +1147,10 @@ func load_game() -> bool:
 	return true
 
 
-func save_meta():
-	if not FileAccess.file_exists(META_PATH):
+func save_meta(i = null):
+	if not FileAccess.file_exists(meta_path(i)):
 		return null
-	var f = FileAccess.open(META_PATH, FileAccess.READ)
+	var f = FileAccess.open(meta_path(i), FileAccess.READ)
 	var d = f.get_var()
 	f.close()
 	return d if typeof(d) == TYPE_DICTIONARY else null

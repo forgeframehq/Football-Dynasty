@@ -187,6 +187,25 @@ static func generate_fixtures():
 				s.fixtures.append({"id": s.fixtures.size(), "lg": lg.id, "rd": r + 1, "day": days[r], "h": m[0], "a": m[1], "hg": -1, "ag": -1, "played": false, "ko": false, "label": ""})
 	G.build_index()
 	G.CP.setup_season()
+	# pre-season friendlies for the manager's club
+	if s.user.has("club") and s.day < G.ymd(s.season, 7, 15):
+		var me = s.clubs[s.user.club]
+		var used = {me.id: true}
+		var k = 0
+		for md in [[7, 18], [7, 25], [8, 1]]:
+			var day = G.CP.snap(md, 6)
+			for t in 200:
+				var o = s.clubs[G.rng.randi() % s.clubs.size()]
+				if used.has(o.id) or s.leagues[o.lg].country == s.leagues[me.lg].country or abs(o.rep - me.rep) > 9:
+					continue
+				used[o.id] = true
+				var id = s.fixtures.size()
+				s.fixtures.append({"id": id, "lg": -1, "comp": "fr", "fr": true, "rd": 0, "day": day, "h": me.id if k % 2 == 0 else o.id, "a": o.id if k % 2 == 0 else me.id, "hg": -1, "ag": -1, "played": false, "ko": false, "label": "Pre-season friendly"})
+				if not G.fx_by_day.has(day):
+					G.fx_by_day[day] = []
+				G.fx_by_day[day].append(id)
+				k += 1
+				break
 
 
 static func add_ko(lg: int, h: int, a: int, day: int, label: String) -> int:
@@ -313,11 +332,51 @@ static func rollover():
 		champs[lg.id] = s.clubs[t[0]].name
 		var ts = top_scorer(lg.id)
 		review.leagues.append({"lg": lg.id, "champ": t[0], "scorer": G.pname(ts) if ts != null else "", "goals": ts.ss.g if ts != null else 0, "scorer_club": s.clubs[ts.club].short if ts != null else ""})
+	# season awards
+	var awards = []
+	var best = null
+	var best_y = null
+	for lg in s.leagues:
+		if lg.roe or lg.tier != 1:
+			continue
+		var lb = null
+		for cid in lg.clubs:
+			for pid in s.clubs[cid].players:
+				var p = s.players[pid]
+				if p.ss.ap < 20:
+					continue
+				var r = G.avg_rating(p)
+				if lb == null or r > G.avg_rating(lb):
+					lb = p
+				if best == null or r + p.ovr * 0.01 > G.avg_rating(best) + best.ovr * 0.01:
+					best = p
+				if G.age(p) <= 21 and (best_y == null or r > G.avg_rating(best_y)):
+					best_y = p
+		if lb != null:
+			awards.append(["%s Player of the Season" % lg.name, G.pname(lb), s.clubs[lb.club].short, "%.2f avg · %d G · %d A" % [G.avg_rating(lb), lb.ss.g, lb.ss.a]])
+	if best != null:
+		awards.push_front(["World Player of the Year", G.pname(best), s.clubs[best.club].short, "%.2f avg · %d G · %d A" % [G.avg_rating(best), best.ss.g, best.ss.a]])
+		G.news("%s is named World Player of the Year." % G.pfull(best))
+	if best_y != null:
+		awards.append(["Young Player of the Year", G.pname(best_y), s.clubs[best_y.club].short, "%.2f avg · age %d" % [G.avg_rating(best_y), G.age(best_y)]])
+	review["awards"] = awards
 	var cups = []
 	for comp in s.get("comps", []):
 		if comp.winner >= 0:
 			cups.append([comp.name, comp.winner])
 	review["cups"] = cups
+	if not s.has("honours"):
+		s["honours"] = {}
+	var hon = []
+	for lg in s.leagues:
+		if not lg.roe:
+			hon.append([tables[lg.id][0], lg.name])
+	for x in cups:
+		hon.append([x[1], x[0]])
+	for x in hon:
+		if not s.honours.has(x[0]):
+			s.honours[x[0]] = []
+		s.honours[x[0]].append([x[1], s.season])
 	G.CP.qualify(tables)
 	s.champs.push_front({"season": s.season, "c": champs})
 	# user review
