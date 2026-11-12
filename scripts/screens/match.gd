@@ -49,6 +49,7 @@ func on_resume():
 
 
 func build():
+	chrome = false
 	f = args.fx
 	us = 0 if f.h == G.s.user.club else 1
 	if stage == "pre":
@@ -204,6 +205,7 @@ func _kickoff():
 	sim = G.new_sim(f, true)
 	_start_others()
 	UI.sfx("whistle")
+	UI.sfx("vo_kickoff", -4.0)
 	UI.ambience(true)
 	stage = "live"
 	refresh()
@@ -227,40 +229,50 @@ func _col(c: Dictionary) -> Color:
 func _build_live():
 	var h = sim.sd[0]
 	var a = sim.sd[1]
-	var sb = UI.panel(UI.CARD, 26, 18, 12, UI.LINE)
-	var sv = UI.vb(4)
-	var cap = UI.caps(G.fx_caption(f), 18, UI.DIM)
-	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sv.add_child(cap)
-	var row = UI.hb(10)
-	row.add_child(UI.badge(h.club, 72))
-	row.add_child(UI.lbl_fill(h.club.short, 42, UI.TEXT, "xbold"))
-	score_l = UI.lbl("0 – 0", 72, UI.TEXT, "xbold")
+	# scoreboard strip
+	var sb = UI.panel(UI.CARD, 18, 18, 6, UI.LINE)
+	var row = UI.hb(12)
+	row.add_child(UI.badge(h.club, 56))
+	var hn = UI.lbl(h.club.short, 38, UI.TEXT, "xbold")
+	row.add_child(hn)
+	sc_l = []
+	var l0 = UI.wrap("", 16, UI.MUTED)
+	l0.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	l0.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sc_l.append(l0)
+	row.add_child(l0)
+	var mid = UI.vb(-8)
+	mid.custom_minimum_size = Vector2(230, 0)
+	score_l = UI.lbl("0 – 0", 54, UI.TEXT, "xbold")
 	score_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	row.add_child(score_l)
-	var an = UI.lbl_fill(a.club.short, 42, UI.TEXT, "xbold")
-	an.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	row.add_child(an)
-	row.add_child(UI.badge(a.club, 72))
-	sv.add_child(row)
-	var mc = UI.chip("0'", Color(UI.accent, 0.16), UI.accent, 24, 90)
+	mid.add_child(score_l)
+	var mc = UI.chip("0'", Color(UI.accent, 0.16), UI.accent, 20, 84)
 	mc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	min_l = mc.get_child(0)
-	sv.add_child(mc)
-	var sh = UI.hb(16)
-	sc_l = []
-	for i in 2:
-		var l = UI.wrap("", 18, UI.MUTED)
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if i == 0 else HORIZONTAL_ALIGNMENT_RIGHT
-		sc_l.append(l)
-		sh.add_child(l)
-	sv.add_child(sh)
-	sb.add_child(sv)
-	body.add_child(UI.margin(sb, 20, 4, 20, 8))
+	mid.add_child(mc)
+	row.add_child(mid)
+	var l1 = UI.wrap("", 16, UI.MUTED)
+	l1.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	l1.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sc_l.append(l1)
+	row.add_child(l1)
+	row.add_child(UI.lbl(a.club.short, 38, UI.TEXT, "xbold"))
+	row.add_child(UI.badge(a.club, 56))
+	sb.add_child(row)
+	body.add_child(UI.margin(sb, 20, 8, 20, 8))
+	var hbx = UI.hb(14)
+	hbx.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var hm = UI.margin(hbx, 20, 0, 20, 12)
+	hm.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(hm)
+	var left = UI.vb(8)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbx.add_child(left)
 	pitch = PITCH.new()
-	pitch.custom_minimum_size = Vector2(0, 400)
+	pitch.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pitch.custom_minimum_size = Vector2(0, 300)
 	pitch.setup(sim)
-	body.add_child(UI.margin(pitch, 20, 0, 20, 8))
+	left.add_child(pitch)
 	banner = UI.panel(Color("0b111c"), 20, 26, 12, UI.GOLD)
 	var bv = UI.vb(-2)
 	banner_l = UI.lbl("GOAL!", 52, UI.GOLD, "xbold")
@@ -288,27 +300,33 @@ func _build_live():
 	pr.add_child(poss_bar)
 	pr.add_child(stat_l["pa"])
 	pr.add_child(stat_l["sa"])
-	body.add_child(UI.margin(pr, 24, 0, 24, 8))
+	left.add_child(pr)
+	ctrl = UI.hb(8)
+	left.add_child(ctrl)
+	# side panel: tabs + feed
+	var side = UI.panel(UI.CARD, 18, 0, 10, UI.LINE)
+	side.custom_minimum_size = Vector2(clamp((UI.main.size.x) * 0.31, 400, 500), 0)
+	var sv = UI.vb(0)
+	side.add_child(sv)
+	hbx.add_child(side)
 	tab_holder = Control.new()
 	tab_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body.add_child(tab_holder)
+	sv.add_child(tab_holder)
 	_build_tabs()
 	lower = Control.new()
 	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	lower.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lower.clip_contents = true
-	body.add_child(lower)
-	feed = UI.vb(8)
-	feed_sc = UI.scroll(UI.margin(feed, 20, 0, 20, 12))
+	sv.add_child(lower)
+	feed = UI.vb(6)
+	feed_sc = UI.scroll(UI.margin(feed, 12, 0, 12, 8))
 	feed_sc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	lower.add_child(feed_sc)
 	tabv = UI.vb(8)
-	tab_sc = UI.scroll(UI.margin(tabv, 20, 0, 20, 12))
+	tab_sc = UI.scroll(UI.margin(tabv, 12, 0, 12, 8))
 	tab_sc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	tab_sc.visible = false
 	lower.add_child(tab_sc)
-	ctrl = UI.hb(10)
-	body.add_child(UI.margin(ctrl, 20, 8, 20, 14))
 	_build_ctrl()
 	_update()
 	for e in sim.events:
@@ -323,10 +341,10 @@ func _build_tabs():
 		tab = i
 		_build_tabs()
 		_refresh_tab(), 20)
-	var m = UI.margin(sg, 20, 0, 20, 8)
+	var m = UI.margin(sg, 10, 0, 10, 8)
 	tab_holder.add_child(m)
 	m.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	tab_holder.custom_minimum_size = Vector2(0, 62)
+	tab_holder.custom_minimum_size = Vector2(0, 54)
 
 
 func _score_at(sm, side: int, minute: int) -> int:
@@ -487,16 +505,16 @@ func _build_ctrl():
 		ctrl.remove_child(c)
 		c.queue_free()
 	if stage == "ft":
-		ctrl.get_parent().visible = false
+		ctrl.visible = false
 		return
 	if stage == "ht":
-		var b = UI.btn("Team talk & restart", _team_talk, "primary", "play", 80)
+		var b = UI.btn("Team talk & restart", _team_talk, "primary", "play", 56)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		ctrl.add_child(b)
-		ctrl.add_child(UI.btn("Team", _team_sheet, "secondary", "repeat", 80))
+		ctrl.add_child(UI.btn("Team", _team_sheet, "secondary", "repeat", 56))
 		return
-	var pb = UI.panel(UI.accent, 20, 22, 0)
-	pb.custom_minimum_size = Vector2(0, 80)
+	var pb = UI.panel(UI.accent, 16, 26, 0)
+	pb.custom_minimum_size = Vector2(0, 56)
 	pb.add_child(UI.icon("play" if paused else "pause", 34, UI.on_color(UI.accent)))
 	UI.tap(pb, func():
 		paused = not paused
@@ -506,11 +524,11 @@ func _build_ctrl():
 		speed = i
 		_build_ctrl(), 22)
 	sg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sg.custom_minimum_size = Vector2(0, 80)
+	sg.custom_minimum_size = Vector2(0, 56)
 	ctrl.add_child(sg)
-	ctrl.add_child(UI.btn("Team", _team_sheet, "secondary", "repeat", 80))
-	var sk = UI.panel(UI.CARD2, 20, 20, 0, Color(1, 1, 1, 0.1))
-	sk.custom_minimum_size = Vector2(0, 80)
+	ctrl.add_child(UI.btn("Team", _team_sheet, "secondary", "repeat", 56))
+	var sk = UI.panel(UI.CARD2, 16, 22, 0, Color(1, 1, 1, 0.1))
+	sk.custom_minimum_size = Vector2(0, 56)
 	sk.add_child(UI.icon("fast-forward", 32, UI.TEXT))
 	UI.tap(sk, _skip, true)
 	ctrl.add_child(sk)
@@ -579,10 +597,24 @@ func _tick() -> bool:
 		_add_event(e)
 		if e.t != "info" and e.t != "sub":
 			notable = true
-		if e.t == "ht" or e.t == "ft":
+		if e.t == "ht":
 			UI.sfx("whistle")
+			UI.sfx("vo_half", -4.0)
+		elif e.t == "ft":
+			UI.sfx("whistle_end")
+			UI.sfx("vo_full", -4.0)
+		elif e.t == "save":
+			UI.sfx("kick", -8.0)
+			UI.sfx("applause" if e.s != us else "groan", -12.0)
+		elif e.t == "miss":
+			UI.sfx("kick", -8.0)
+		elif e.t == "red":
+			UI.sfx("vo_red", -4.0)
+			UI.sfx("boo", -8.0)
 		if e.t == "goal":
+			UI.sfx("kick", -6.0)
 			UI.sfx("cheer" if e.s == us else "groan", -3.0)
+			UI.sfx("vo_goal%d" % (1 + randi() % 4), -3.0)
 			hold = 1.8 if speed != 2 else 0.7
 			banner_l.text = "GOAL!"
 			var sub = "%s %d'" % [G.pname(G.s.players[e.p]), min(e.m, 90)]
