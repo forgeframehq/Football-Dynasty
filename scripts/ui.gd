@@ -510,6 +510,38 @@ func player_row(p: Dictionary, cb: Callable, extra := "") -> PanelContainer:
 	return row
 
 
+func trow(cells: Array, widths: Array, opt := {}) -> PanelContainer:
+	# compact table row. cells: strings or Controls; widths: px, 0 = stretch, negative = right-aligned px
+	var head = opt.get("head", false)
+	var hi = opt.get("hi", false)
+	var r = panel(Color(accent, 0.16) if hi else Color(1, 1, 1, 0.0 if head else (0.045 if opt.get("alt", false) else 0.02)), 5, 8, opt.get("pad", 4))
+	var h = hb(opt.get("sep", 6))
+	var size = opt.get("size", 19)
+	for i in cells.size():
+		var c = cells[i]
+		var w = widths[i] if i < widths.size() else 0
+		var node: Control
+		if c is Control:
+			node = c
+		else:
+			var col = opt.get("cols", {}).get(i, MUTED if head else TEXT)
+			var l = lbl(str(c), size - 4 if head else size, col, "semi" if head or (hi and i == opt.get("bold", -1)) else "body")
+			l.clip_text = true
+			l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			if w < 0:
+				l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			node = l
+		if w == 0:
+			node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		else:
+			node.custom_minimum_size = Vector2(abs(w), node.custom_minimum_size.y)
+		h.add_child(node)
+	r.add_child(h)
+	if opt.has("tap"):
+		tap(r, opt.tap)
+	return r
+
+
 func topbar(title: String, back := true, right: Control = null) -> Control:
 	if main != null and main.uses_chrome():
 		main.set_title(title, "", right)

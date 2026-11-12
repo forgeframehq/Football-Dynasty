@@ -13,6 +13,7 @@ const SCREENS = {
 	"club": preload("res://scripts/screens/club.gd"),
 	"player": preload("res://scripts/screens/player.gd"),
 	"nego": preload("res://scripts/screens/deal.gd"),
+	"life": preload("res://scripts/screens/life.gd"),
 	"match": preload("res://scripts/screens/match.gd"),
 	"table": preload("res://scripts/screens/table.gd"),
 	"fixtures": preload("res://scripts/screens/fixtures.gd"),
@@ -290,7 +291,7 @@ func _rail_key() -> String:
 	var nm = stack[0].sname
 	var groups = {"inbox": ["inbox"], "home": ["home"],
 		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists"],
-		"manager": ["board", "trophies", "jobs"], "world": ["table", "comps", "stats", "clubview"],
+		"manager": ["board", "trophies", "jobs", "life"], "world": ["table", "comps", "stats", "clubview"],
 		"search": ["search", "transfers", "scouting", "player", "nego", "compare"]}
 	if nm == "lists" or nm == "hub":
 		return str(stack[0].args.get("grp", "club"))
@@ -522,7 +523,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("trophy", "Trophy Cabinet", "%d won" % s.user.trophies.size(), func(): root("trophies")))
 		a.append(_row("briefcase", "Jobs", "%d club%s interested" % [s.user.jobs.size(), "" if s.user.jobs.size() == 1 else "s"], func(): root("jobs")))
 		a.append(_row("megaphone", "Social", "%s followers" % G.OPS._thousands(G.SOC.data().followers), func(): root("hub", {"kind": "social", "grp": "manager"})))
-		a.append(_row("house", "Lifestyle", "%s in the bank" % G.money(G.OPS.life().cash), func(): root("hub", {"kind": "life", "grp": "manager"})))
+		a.append(_row("house", "Lifestyle", "%s in the bank" % G.money(G.OPS.life().cash), func(): root("life")))
 		a.append(_row("trending-up", "Investments", "Savings, property, shares", func(): root("hub", {"kind": "invest", "grp": "manager"})))
 		a.append(_row("landmark", "Club Ownership", "Buy shares in clubs", func(): root("hub", {"kind": "owner", "grp": "manager"})))
 		a.append(_row("file-text", "My Contract", "%s a week" % G.money(G.OPS.salary()), func(): root("hub", {"kind": "contract", "grp": "manager"})))

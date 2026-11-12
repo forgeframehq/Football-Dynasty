@@ -145,6 +145,14 @@ func run(m):
 			await snap("deal_sell")
 		main.root("nego", {"pid": c.xi[3], "mode": "renew"})
 		await snap("deal_renew")
+	if want.call("life"):
+		G.OPS.life().cash = 2400000
+		main.root("life")
+		for i in 5:
+			main.stack[-1].tab = i
+			main.stack[-1].pick = -1
+			main.stack[-1].refresh()
+			await snap("life_%d" % i)
 	if want.call("tactics2"):
 		main.root("tactics")
 		var t = main.stack[-1]

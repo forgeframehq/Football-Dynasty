@@ -106,8 +106,11 @@ Options
 - [x] Player quick card when tapping a player in Tactics
 - [x] Fixed action bar on player pages; correct club under the player's name
 - [x] Lifestyle header showing current home, car and money
-- [ ] Transfers as a process: enquiry, club negotiation screen (fee, instalments, add-ons, sell-on), club accepts by message, then player and agent talks (wage, length, squad role, signing fee, agent fee, clauses), completion with news; rival bids; same in reverse for sales
+- [x] Transfers as a process: enquiry, club replies by message, fee talks (instalments, appearance add-on, sell-on), then player and agent talks (wage, length, squad role, signing-on fee, agent fee, release clause), newspaper on completion, rival bidders, lapsing agreements, broken role promises, counter-offers when selling
 - [x] Player profile as six swipeable pages: profile with position map and all attributes, personal, positions and roles, contract, stats, manage
 - [x] Player Search as a dense sortable table with three views, filters and paging
-- [ ] Go through every screen: more depth, less blank space, practical layouts
-- [ ] Lifestyle: separate showroom screens, weekly money in and out
+- [x] Dense rework: league table, player stats (four boards), cups (list + detail), scouting (reports on file), transfer market desk, job market
+- [ ] Dense rework still to do: training, finances, fixtures, club view, board, hub pages
+- [x] Lifestyle screen: overview, estate agent, car showroom with named cars and garage, businesses, weekly money in and out, net worth, holidays
+- [x] Player personal details: personality, favoured club, languages, caps, career totals, season-by-season table
+- [ ] Lifestyle later: family, legacy items (statue, stand), property abroad

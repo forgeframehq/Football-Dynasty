@@ -163,8 +163,97 @@ static func club_value(c: Dictionary) -> int:
 	return G.nice(c.wage_budget * 52.0 * 1.4 + CAPACITY[c.fac.stadium - 1] * 900.0 if c.has("fac") else c.wage_budget * 52.0 * 1.6)
 
 
+const HOME_UP = [0, 300, 1200, 4000, 12000]
+const CAR_UP = [0, 150, 500, 1800, 5000]
+const HOME_PRICE = [0, 180000, 900000, 3500000, 12000000]
+const CAR_PRICE = [0, 45000, 160000, 600000, 2500000]
+
+
+static func invest_init(lf: Dictionary):
+	if not lf.has("cars"):
+		lf["cars"] = []
+		for i in int(lf.car) + 1:
+			lf.cars.append(i)
+	if not lf.has("savings"):
+		lf["savings"] = 0
+		lf["props"] = []
+		lf["shares"] = {}
+		lf["px"] = []
+		lf["stakes"] = {}
+		lf["agent"] = false
+		lf["media"] = false
+
+
+static func life_ledger(lf: Dictionary) -> Array:
+	# what comes in and goes out of the manager's own account each week
+	invest_init(lf)
+	var rows = [["Salary", salary()]]
+	if lf.income > 0: rows.append(["Businesses", int(lf.income)])
+	var rent = 0
+	for pr in lf.props:
+		rent += int(pr.rent)
+	if rent > 0: rows.append(["Rent from property", rent])
+	var div = 0
+	for cid in lf.stakes:
+		div += int(G.s.clubs[int(cid)].wage_budget * 0.06 * float(lf.stakes[cid]) / 100.0)
+	if div > 0: rows.append(["Club dividends", div])
+	if lf.media: rows.append(["Media work", 8000])
+	if lf.agent: rows.append(["Personal agent", -2000])
+	if lf.study != "": rows.append(["Language lessons", -400])
+	if HOME_UP[lf.home] > 0: rows.append(["Home upkeep", -HOME_UP[lf.home]])
+	var cu = 0
+	for ci in lf.cars:
+		cu += CAR_UP[ci]
+	if cu > 0: rows.append(["Cars", -cu])
+	rows.append(["Living costs", -living(lf)])
+	return rows
+
+
+static func living(lf: Dictionary) -> int:
+	return 350 + 250 * int(lf.home)
+
+
+static func worth_rows(lf: Dictionary) -> Array:
+	invest_init(lf)
+	var rows = [["Cash", int(lf.cash)], ["Savings", int(lf.savings)], ["Home", HOME_PRICE[lf.home]]]
+	var cv = 0
+	for ci in lf.cars:
+		cv += int(CAR_PRICE[ci] * 0.7)
+	rows.append(["Cars", cv])
+	var pv = 0
+	for pr in lf.props:
+		pv += int(pr.value)
+	rows.append(["Rental property", pv])
+	var bz = 0
+	for i in lf.biz:
+		bz += [250000, 1200000, 5000000][i]
+	rows.append(["Businesses", bz])
+	var sh = 0
+	for k in lf.shares:
+		if int(k) < lf.px.size():
+			sh += int(float(lf.shares[k]) * lf.px[int(k)])
+	rows.append(["Shares", sh])
+	var st = 0
+	for cid in lf.stakes:
+		st += int(club_value(G.s.clubs[int(cid)]) * float(lf.stakes[cid]) / 100.0)
+	rows.append(["Club stakes", st])
+	return rows
+
+
+static func net_worth(lf: Dictionary) -> int:
+	var t = 0
+	for r in worth_rows(lf):
+		t += r[1]
+	return t
+
+
 static func invest_week(lf: Dictionary):
 	var s = G.s
+	invest_init(lf)
+	var cu = living(lf) + HOME_UP[lf.home]
+	for ci in lf.cars:
+		cu += CAR_UP[ci]
+	lf.cash = max(0, lf.cash - cu)
 	if not lf.has("savings"):
 		lf["savings"] = 0
 		lf["props"] = []
