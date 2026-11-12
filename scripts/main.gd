@@ -504,6 +504,8 @@ func menu_items(key: String) -> Array:
 		a.append(_row("target", "Board Confidence", "%d%% · %s" % [int(s.user.conf), s.user.obj.text], func(): root("board")))
 		a.append(_row("trophy", "Trophy Cabinet", "%d won" % s.user.trophies.size(), func(): root("trophies")))
 		a.append(_row("briefcase", "Jobs", "%d club%s interested" % [s.user.jobs.size(), "" if s.user.jobs.size() == 1 else "s"], func(): root("jobs")))
+		a.append(_row("house", "Lifestyle", "%s in the bank" % G.money(G.OPS.life().cash), func(): root("hub", {"kind": "life", "grp": "manager"})))
+		a.append(_row("file-text", "My Contract", "%s a week" % G.money(G.OPS.salary()), func(): root("hub", {"kind": "contract", "grp": "manager"})))
 		a.append(_row("scroll-text", "Career Timeline", "%d season%s" % [s.history.size(), "" if s.history.size() == 1 else "s"], func(): root("hub", {"kind": "timeline", "grp": "manager"})))
 		a.append(_row("book-open", "Philosophy", "Your club identity", func(): root("hub", {"kind": "philosophy", "grp": "manager"})))
 		a.append(_row("circle-question-mark", "Board Request", "Ask for backing", func(): root("hub", {"kind": "request", "grp": "manager"})))

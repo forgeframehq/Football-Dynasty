@@ -152,6 +152,21 @@ static func daily():
 		weekly()
 
 
+static func life() -> Dictionary:
+	var u = G.s.user
+	if not u.has("life"):
+		u["life"] = {"cash": 20000, "home": 0, "car": 0, "lang": {}, "study": "", "income": 0, "settled": 10.0, "biz": [], "country": ""}
+	return u.life
+
+
+static func salary() -> int:
+	var u = G.s.user
+	if u.has("salary"):
+		return int(u.salary)
+	var c = G.uc()
+	return G.nice(c.wage_budget * 0.012 * (0.5 + u.rep / 100.0))
+
+
 static func weekly():
 	var s = G.s
 	var c = G.uc()
@@ -160,6 +175,19 @@ static func weekly():
 	var sponsor = int(c.wage_budget * (0.86 + 0.03 * c.fac.commercial))
 	if s.user.get("sponsor") != null:
 		sponsor += int(s.user.sponsor.weekly)
+	# the manager's own money and life
+	var lf = life()
+	lf.cash += salary() + int(lf.income)
+	if lf.study != "":
+		var cost = 400
+		if lf.cash >= cost:
+			lf.cash -= cost
+			lf.lang[lf.study] = min(100.0, float(lf.lang.get(lf.study, 0.0)) + 4.0 + s.user.attr.tac * 0.1)
+			if lf.lang[lf.study] >= 100.0:
+				G.msg("You are now fluent in %s" % lf.study, "Months of lessons have paid off. Speaking the language helps you get your message across: Motivation +1.", "info")
+				s.user.attr.mot = min(22, s.user.attr.mot + 1)
+				lf.study = ""
+	lf.settled = min(100.0, float(lf.settled) + 1.5 + lf.home * 0.8)
 	var tv = int(c.wage_budget * 0.05)
 	var price = [46, 30, 20, 15][clampi(tier - 1, 0, 3)]
 	var fill = clamp(0.55 + (c.rep - 55.0) * 0.012 + (0.1 if c.form.count("W") >= 3 else 0.0), 0.35, 0.98)

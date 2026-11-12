@@ -5,7 +5,12 @@ extends "res://scripts/screens/screen.gd"
 const TITLES = {"dressing": "Dressing Room", "fans": "Fans", "sponsors": "Sponsors", "request": "Board Request", "report": "Team Report",
 	"tcentre": "Transfer Centre", "awards": "Awards", "scores": "Live Scores", "standards": "League Standards", "timeline": "Career Timeline",
 	"philosophy": "Philosophy", "status": "Game Status", "manual": "Manual", "achieve": "Achievements", "fame": "Hall of Fame",
-	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Identity", "analysis": "Match Analysis"}
+	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Identity", "analysis": "Match Analysis", "life": "Lifestyle", "contract": "My Contract"}
+const HOMES = [["Club flat", 0, "A small flat the club lends you."], ["City apartment", 180000, "Two bedrooms near the ground."], ["Riverside penthouse", 900000, "Top floor, skyline views."],
+	["Country villa", 3500000, "Gardens, a pool and privacy."], ["Mansion estate", 12000000, "The home of a football great."]]
+const CARS = [["Club car", 0], ["Executive saloon", 45000], ["Sports coupe", 160000], ["Supercar", 600000], ["Classic collection", 2500000]]
+const BIZ = [["Local restaurant", 250000, 1800], ["Football academy school", 1200000, 9500], ["Boutique hotel", 5000000, 42000]]
+const LANG = {"England": "English", "Spain": "Spanish", "Italy": "Italian", "Germany": "German", "France": "French"}
 const SPONSORS = [["AeroNova", "Airline"], ["SkyLink", "Airline"], ["Horizon Trust", "Bank"], ["Pinnacle Bank", "Bank"], ["NovaCore", "Tech"], ["PulseDyn", "Tech"],
 	["HelixSys", "Tech"], ["Apex Motors", "Car maker"], ["TurboForge", "Car maker"], ["WaveConnect", "Telecom"], ["SignalPulse", "Telecom"], ["LuminaVolt", "Energy"],
 	["TerraSpark", "Energy"], ["FizzVital", "Drinks"], ["AquaBoost", "Drinks"], ["AegisGuard", "Insurance"]]
@@ -397,6 +402,143 @@ func _philosophy(v: Control):
 			u["dna_season"] = G.s.season
 			refresh())
 		v.add_child(p)
+
+
+func _buy(lf: Dictionary, cost: int, what: String, apply: Callable):
+	if lf.cash < cost:
+		UI.sfx("error", -8.0)
+		UI.toast("You need %s; you have %s" % [G.money(cost), G.money(lf.cash)], UI.RED)
+		return
+	lf.cash -= cost
+	apply.call()
+	UI.sfx("cash", -8.0)
+	UI.toast("Bought: %s" % what, UI.GREEN)
+	refresh()
+
+
+func _life(v: Control):
+	var s = G.s
+	var u = s.user
+	var lf = G.OPS.life()
+	var country = s.leagues[G.uc().lg].country
+	if lf.country != country:
+		lf.country = country
+		lf.settled = 10.0
+	var net = int(lf.cash)
+	for i in lf.home + 1:
+		net += HOMES[i][1]
+	for i in lf.car + 1:
+		net += CARS[i][1]
+	_note(v, "Your own money and life away from the pitch. You are paid %s a week. Homes and cars raise your standing in the game; a business pays you every week; learning the language and giving to local causes win over the dressing room and the fans." % G.money(G.OPS.salary()))
+	var o = _card(v, "Your money")
+	o.add_child(UI.lbl(G.money(lf.cash), 44, UI.GREEN, "xbold"))
+	o.add_child(UI.kv("Weekly salary", G.money(G.OPS.salary())))
+	o.add_child(UI.kv("Business income", "%s a week" % G.money(lf.income)))
+	o.add_child(UI.kv("Net worth", G.money(net)))
+	var cc = _card(v, "Life in %s" % country)
+	var ch = UI.hb(10)
+	ch.add_child(UI.flag(country, 44))
+	ch.add_child(UI.lbl_fill("Settled in", 21, UI.MUTED))
+	ch.add_child(UI.bar(lf.settled / 100.0, UI.accent, 8))
+	ch.add_child(UI.lbl("%d%%" % int(lf.settled), 20, UI.TEXT, "disp"))
+	cc.add_child(ch)
+	var lang = LANG.get(country, "English")
+	var prog = float(lf.lang.get(lang, 100.0 if (lang == "English" and u.nat in ["England", "Scotland", "Wales", "Northern Ireland", "Republic of Ireland", "United States", "Australia", "Canada", "Jamaica"]) or LANG.get(u.nat, "") == lang else 0.0))
+	lf.lang[lang] = prog
+	cc.add_child(UI.kv(lang, "Fluent" if prog >= 100 else ("%d%% · studying" % int(prog) if lf.study == lang else "%d%%" % int(prog)), UI.GREEN if prog >= 100 else UI.TEXT))
+	if prog < 100:
+		cc.add_child(UI.btn("Stop lessons" if lf.study == lang else "Take %s lessons (€400 a week)" % lang, func():
+			lf.study = "" if lf.study == lang else lang
+			refresh(), "secondary", "book-open", 50))
+		cc.add_child(UI.wrap("Fluency takes about five months and gives Motivation +1.", 17, UI.DIM))
+	cc.add_child(UI.btn("Give €25K to a local cause", func(): _buy(lf, 25000, "a donation the fans noticed", func():
+		u["fans"] = min(100.0, float(u.get("fans", 55.0)) + 3.0)), "secondary", "heart", 50))
+	var hv = _card(v, "Home")
+	for i in HOMES.size():
+		var owned = i <= lf.home
+		var r = UI.hb(10)
+		r.add_child(UI.icon("house", 22, UI.GOLD if i == lf.home else (UI.DIM if owned else UI.MUTED)))
+		var tv = UI.vb(-4)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl(HOMES[i][0], 21, UI.TEXT if not owned or i == lf.home else UI.DIM, "semi"))
+		tv.add_child(UI.lbl_fill(HOMES[i][2], 15, UI.MUTED))
+		r.add_child(tv)
+		if i == lf.home:
+			r.add_child(UI.chip("HOME", Color(UI.GOLD, 0.16), UI.GOLD, 15))
+		elif i == lf.home + 1:
+			var idx = i
+			var b = UI.chip("BUY " + G.money(HOMES[i][1]), UI.accent, UI.on_color(UI.accent), 16)
+			UI.tap(b, func(): _buy(lf, HOMES[idx][1], HOMES[idx][0], func():
+				lf.home = idx
+				u.rep = min(100.0, u.rep + 1.0)), true)
+			r.add_child(b)
+		elif not owned:
+			r.add_child(UI.lbl(G.money(HOMES[i][1]), 18, UI.DIM, "disp"))
+		hv.add_child(r)
+	var cv = _card(v, "Garage")
+	for i in CARS.size():
+		var r = UI.hb(10)
+		r.add_child(UI.lbl_fill(CARS[i][0], 21, UI.TEXT if i >= lf.car else UI.DIM, "semi"))
+		if i == lf.car:
+			r.add_child(UI.chip("DRIVING", Color(UI.GOLD, 0.16), UI.GOLD, 15))
+		elif i == lf.car + 1:
+			var idx = i
+			var b = UI.chip("BUY " + G.money(CARS[i][1]), UI.accent, UI.on_color(UI.accent), 16)
+			UI.tap(b, func(): _buy(lf, CARS[idx][1], CARS[idx][0], func(): lf.car = idx), true)
+			r.add_child(b)
+		elif i > lf.car:
+			r.add_child(UI.lbl(G.money(CARS[i][1]), 18, UI.DIM, "disp"))
+		cv.add_child(r)
+	var bv = _card(v, "Business")
+	for i in BIZ.size():
+		var own = i in lf.biz
+		var r = UI.hb(10)
+		var tv = UI.vb(-4)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl(BIZ[i][0], 21, UI.TEXT, "semi"))
+		tv.add_child(UI.lbl_fill("Pays %s a week" % G.money(BIZ[i][2]), 15, UI.MUTED))
+		r.add_child(tv)
+		if own:
+			r.add_child(UI.chip("OWNED", Color(UI.GREEN, 0.16), UI.GREEN, 15))
+		else:
+			var idx = i
+			var b = UI.chip("BUY " + G.money(BIZ[i][1]), UI.accent, UI.on_color(UI.accent), 16)
+			UI.tap(b, func(): _buy(lf, BIZ[idx][1], BIZ[idx][0], func():
+				lf.biz.append(idx)
+				lf.income += BIZ[idx][2]), true)
+			r.add_child(b)
+		bv.add_child(r)
+
+
+func _contract(v: Control):
+	var s = G.s
+	var u = s.user
+	var sal = G.OPS.salary()
+	var cv = _card(v, "Your deal at %s" % G.uc().name)
+	cv.add_child(UI.lbl("%s a week" % G.money(sal), 40, UI.TEXT, "xbold"))
+	cv.add_child(UI.kv("A year", G.money(sal * 52)))
+	cv.add_child(UI.kv("Board confidence", "%d%%" % int(u.conf)))
+	cv.add_child(UI.kv("Reputation", "%d / 100" % int(u.rep)))
+	var wait = int(u.get("raise_day", -400)) + 180 - s.day
+	var rv = _card(v, "Ask for a new contract")
+	if wait > 0:
+		rv.add_child(UI.wrap("You can open talks again in %d days." % wait, 20, UI.AMBER))
+	else:
+		rv.add_child(UI.wrap("The board pays more to managers they trust. Above 60% confidence they usually agree; below 45% asking only annoys them.", 19, UI.MUTED))
+		for pct in [10, 25]:
+			var p = pct
+			rv.add_child(UI.btn("Ask for %d%% more" % p, func():
+				u["raise_day"] = s.day
+				var chance = clamp(0.5 + (u.conf - (55.0 + p * 0.6)) * 0.03, 0.03, 0.95)
+				if G.rng.randf() < chance:
+					u["salary"] = int(sal * (1.0 + p / 100.0))
+					UI.sfx("cash", -8.0)
+					UI.toast("New contract agreed: %s a week" % G.money(u.salary), UI.GREEN)
+				else:
+					u.conf = max(0.0, u.conf - 2.0)
+					UI.sfx("error", -8.0)
+					UI.toast("The board refused", UI.RED)
+				refresh(), "secondary", "file-text", 52))
 
 
 # ---------------------------------------------------------------- world

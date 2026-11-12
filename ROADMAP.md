@@ -37,7 +37,8 @@ Club
 
 Manager
 - [x] Philosophy (club DNA with bonuses)
-- [ ] Rival Managers, Career Timeline, My Contract (salary spent on courses)
+- [x] Career Timeline, My Contract, Lifestyle (home, garage, business, language, local causes)
+- [ ] Rival Managers
 - [ ] Board Request (transfer funds, wages, stadium, new contract)
 - [ ] Holiday mode, Game Status
 

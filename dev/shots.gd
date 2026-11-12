@@ -62,7 +62,7 @@ func run(m):
 			main.root("lists", {"kind": k, "grp": "club"})
 			await snap("list_" + k)
 	if want.call("hub"):
-		for k in ["dressing", "fans", "sponsors", "request", "report", "identity", "analysis", "timeline", "philosophy", "tcentre", "awards", "scores", "standards", "findclub", "rolefinder", "status", "manual", "achieve", "fame", "editor"]:
+		for k in ["life", "contract", "dressing", "fans", "sponsors", "request", "report", "identity", "analysis", "timeline", "philosophy", "tcentre", "awards", "scores", "standards", "findclub", "rolefinder", "status", "manual", "achieve", "fame", "editor"]:
 			main.root("hub", {"kind": k, "grp": "club"})
 			await snap("hub_" + k)
 		main.root("lists", {"kind": "similar", "pid": c.xi[9], "grp": "search"})
