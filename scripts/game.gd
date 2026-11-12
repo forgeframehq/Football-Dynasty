@@ -1,0 +1,875 @@
+extends Node
+# Global career state and core game logic.
+
+const ME = preload("res://scripts/match_engine.gd")
+const LG = preload("res://scripts/leagues.gd")
+const TR = preload("res://scripts/transfers.gd")
+
+const SAVE_PATH = "user://career.sav"
+const META_PATH = "user://career.meta"
+const LINE = {"GK": 0, "CB": 1, "LB": 1, "RB": 1, "CDM": 2, "CM": 2, "CAM": 2, "LM": 2, "RM": 2, "LW": 3, "RW": 3, "ST": 3}
+const LINE_NAMES = ["Goalkeepers", "Defenders", "Midfielders", "Attackers"]
+const STAT_NAMES = ["PAC", "SHO", "PAS", "DRI", "DEF", "PHY"]
+const GK_STAT_NAMES = ["DIV", "HAN", "KIC", "REF", "SPD", "POS"]
+const MENTALITY = ["Park the Bus", "Defensive", "Balanced", "Attacking", "All-Out Attack"]
+const PRESSING = ["Low Block", "Standard", "High Press"]
+const TEMPO = ["Patient", "Normal", "Fast"]
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const WDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+const FORMATIONS = {
+	"4-3-3": [["GK", .5, .05], ["LB", .12, .27], ["CB", .36, .21], ["CB", .64, .21], ["RB", .88, .27], ["CM", .27, .52], ["CDM", .5, .42], ["CM", .73, .52], ["LW", .16, .78], ["ST", .5, .86], ["RW", .84, .78]],
+	"4-2-3-1": [["GK", .5, .05], ["LB", .12, .27], ["CB", .36, .21], ["CB", .64, .21], ["RB", .88, .27], ["CDM", .35, .43], ["CDM", .65, .43], ["LM", .14, .67], ["CAM", .5, .66], ["RM", .86, .67], ["ST", .5, .87]],
+	"4-4-2": [["GK", .5, .05], ["LB", .12, .27], ["CB", .36, .21], ["CB", .64, .21], ["RB", .88, .27], ["LM", .12, .56], ["CM", .37, .5], ["CM", .63, .5], ["RM", .88, .56], ["ST", .36, .84], ["ST", .64, .84]],
+	"4-1-2-1-2": [["GK", .5, .05], ["LB", .12, .27], ["CB", .36, .21], ["CB", .64, .21], ["RB", .88, .27], ["CDM", .5, .38], ["CM", .28, .54], ["CM", .72, .54], ["CAM", .5, .68], ["ST", .36, .86], ["ST", .64, .86]],
+	"4-5-1": [["GK", .5, .05], ["LB", .12, .27], ["CB", .36, .21], ["CB", .64, .21], ["RB", .88, .27], ["LM", .1, .6], ["CM", .3, .52], ["CDM", .5, .42], ["CM", .7, .52], ["RM", .9, .6], ["ST", .5, .86]],
+	"3-5-2": [["GK", .5, .05], ["CB", .25, .22], ["CB", .5, .2], ["CB", .75, .22], ["LM", .08, .54], ["CM", .3, .52], ["CDM", .5, .41], ["CM", .7, .52], ["RM", .92, .54], ["ST", .36, .84], ["ST", .64, .84]],
+	"3-4-3": [["GK", .5, .05], ["CB", .25, .22], ["CB", .5, .2], ["CB", .75, .22], ["LM", .1, .52], ["CM", .37, .47], ["CM", .63, .47], ["RM", .9, .52], ["LW", .18, .8], ["ST", .5, .87], ["RW", .82, .8]],
+	"5-3-2": [["GK", .5, .05], ["LB", .08, .34], ["CB", .28, .22], ["CB", .5, .2], ["CB", .72, .22], ["RB", .92, .34], ["CM", .27, .54], ["CDM", .5, .46], ["CM", .73, .54], ["ST", .36, .84], ["ST", .64, .84]],
+}
+const AI_FORMATIONS = ["4-3-3", "4-2-3-1", "4-4-2", "4-2-3-1", "4-3-3", "3-5-2", "5-3-2", "3-4-3", "4-1-2-1-2", "4-5-1", "4-4-2"]
+const FIT_PAIRS = [["CB", "CDM", .9], ["CB", "LB", .86], ["CB", "RB", .86], ["LB", "RB", .9], ["LB", "LM", .9], ["RB", "RM", .9], ["LB", "LW", .82], ["RB", "RW", .82],
+	["CDM", "CM", .94], ["CM", "CAM", .93], ["CDM", "CAM", .84], ["CM", "LM", .86], ["CM", "RM", .86], ["CAM", "LM", .88], ["CAM", "RM", .88], ["CAM", "LW", .88], ["CAM", "RW", .88], ["CAM", "ST", .87],
+	["LM", "LW", .96], ["RM", "RW", .96], ["LM", "RM", .92], ["LW", "RW", .93], ["LM", "RW", .9], ["RM", "LW", .9], ["LW", "ST", .88], ["RW", "ST", .88], ["LM", "ST", .8], ["RM", "ST", .8]]
+# stat offsets from overall for generated players: PAC SHO PAS DRI DEF PHY
+const GEN_STATS = {"ST": [2, 3, -8, 0, -35, -2], "LW": [6, -3, -4, 4, -35, -12], "RW": [6, -3, -4, 4, -35, -12], "LM": [5, -6, -2, 3, -22, -8], "RM": [5, -6, -2, 3, -22, -8],
+	"CAM": [-2, -2, 3, 4, -28, -12], "CM": [-4, -6, 3, 2, -6, -2], "CDM": [-6, -14, -1, -3, 2, 4], "LB": [5, -22, -5, -2, -1, -2], "RB": [5, -22, -5, -2, -1, -2], "CB": [-6, -32, -12, -12, 2, 4]}
+
+var s: Dictionary = {}
+var fx_by_day: Dictionary = {}
+var cur: Dictionary = {}
+var rng = RandomNumberGenerator.new()
+var stop_flag := false
+var active := false
+var fit_table: Dictionary = {}
+var lu_cache: Dictionary = {}
+var ui: Dictionary = {"sq_filter": 0, "sq_sort": 0, "tr_tab": 0, "tr_pos": 0, "tr_name": "", "tr_afford": false, "tr_u23": false, "tr_listed": false, "tr_free": false}
+
+
+func _ready():
+	for p in FIT_PAIRS:
+		fit_table[p[0] + p[1]] = p[2]
+		fit_table[p[1] + p[0]] = p[2]
+	rng.randomize()
+
+
+# ---------------------------------------------------------------- helpers
+
+func ymd(y: int, m: int, d: int) -> int:
+	return int(Time.get_unix_time_from_datetime_dict({"year": y, "month": m, "day": d, "hour": 12, "minute": 0, "second": 0}) / 86400)
+
+
+func date(dy: int) -> Dictionary:
+	return Time.get_date_dict_from_unix_time(dy * 86400 + 43200)
+
+
+func fmt_date(dy: int, with_year := false) -> String:
+	var d = date(dy)
+	var t = "%s %d %s" % [WDAYS[d.weekday], d.day, MONTHS[d.month - 1]]
+	if with_year:
+		t += " %d" % d.year
+	return t
+
+
+func set_date():
+	cur = date(s.day)
+
+
+func season_name(y = null) -> String:
+	if y == null:
+		y = s.season
+	return "%d/%02d" % [y, (y + 1) % 100]
+
+
+func uc() -> Dictionary:
+	return s.clubs[s.user.club]
+
+
+func P(pid: int) -> Dictionary:
+	return s.players[pid]
+
+
+func pname(p: Dictionary) -> String:
+	if p.cn != "":
+		return p.cn
+	if p.fn == "":
+		return p.ln
+	return "%s. %s" % [p.fn.substr(0, 1), p.ln]
+
+
+func pfull(p: Dictionary) -> String:
+	if p.cn != "":
+		return p.cn
+	return ("%s %s" % [p.fn, p.ln]).strip_edges()
+
+
+func age(p: Dictionary) -> int:
+	var a = cur.year - p.by
+	if cur.month < p.bm or (cur.month == p.bm and cur.day < p.bd):
+		a -= 1
+	return a
+
+
+func fit(p: Dictionary, role: String) -> float:
+	if p.pos == role:
+		return 1.0
+	if role in p.alt:
+		return 0.98
+	if p.pos == "GK" or role == "GK":
+		return 0.35
+	return fit_table.get(p.pos + role, 0.72)
+
+
+func value(p: Dictionary) -> int:
+	var a = age(p)
+	var v = 500000.0 * pow(1.21, p.ovr - 60)
+	var af = 0.12
+	if a <= 21: af = 1.15
+	elif a <= 24: af = 1.2
+	elif a <= 27: af = 1.1
+	elif a <= 34: af = [0.95, 0.85, 0.7, 0.55, 0.42, 0.3, 0.2][a - 28]
+	v *= af
+	v *= 1.0 + max(0, p.pot - p.ovr) * (0.07 if a <= 23 else 0.03)
+	if p.pos == "GK":
+		v *= 0.7
+	if p.cend - s.season <= 1:
+		v *= 0.8
+	return nice(v)
+
+
+func wage_for(ovr: int, a: int) -> int:
+	var w = 1500.0 * pow(1.17, ovr - 60)
+	if a < 21:
+		w *= 0.7
+	return nice(max(w, 250.0))
+
+
+func nice(v: float) -> int:
+	if v <= 0:
+		return 0
+	var mag = pow(10.0, floor(log(v) / log(10.0)) - 1)
+	return int(round(v / mag) * mag)
+
+
+func money(v) -> String:
+	var n = float(v)
+	var sg = "-" if n < 0 else ""
+	n = abs(n)
+	if n >= 1e9:
+		return "%s€%.2fB" % [sg, n / 1e9]
+	if n >= 1e6:
+		var t = "%.1f" % (n / 1e6)
+		if t.ends_with(".0") or n >= 1e8:
+			t = "%d" % int(round(n / 1e6))
+		return "%s€%sM" % [sg, t]
+	if n >= 1e3:
+		return "%s€%dK" % [sg, int(round(n / 1e3))]
+	return "%s€%d" % [sg, int(n)]
+
+
+func available(p: Dictionary) -> bool:
+	return p.inj <= 0 and p.susp <= 0
+
+
+func squad_wages(c: Dictionary) -> int:
+	var t = 0
+	for pid in c.players:
+		t += s.players[pid].wage
+	return t
+
+
+func new_table() -> Dictionary:
+	return {"p": 0, "w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0, "pts": 0}
+
+
+func new_stats() -> Dictionary:
+	return {"ap": 0, "g": 0, "a": 0, "rs": 0.0, "yc": 0, "rc": 0, "cs": 0, "mom": 0}
+
+
+func avg_rating(p: Dictionary) -> float:
+	return p.ss.rs / p.ss.ap if p.ss.ap > 0 else 0.0
+
+
+func window_open() -> bool:
+	var m = cur.month
+	return m == 7 or m == 8 or m == 1 or (m == 6 and cur.day >= 12)
+
+
+func msg(title: String, body: String, kind := "info", ref = null, important := false):
+	s.inbox.push_front({"id": s.msg_id, "day": s.day, "title": title, "body": body, "kind": kind, "ref": ref, "read": false})
+	s.msg_id += 1
+	if s.inbox.size() > 60:
+		s.inbox.resize(60)
+	if important:
+		stop_flag = true
+
+
+func news(text: String):
+	s.news.push_front({"day": s.day, "text": text})
+	if s.news.size() > 40:
+		s.news.resize(40)
+
+
+func unread() -> int:
+	var n = 0
+	for m in s.inbox:
+		if not m.read:
+			n += 1
+	return n
+
+
+# ---------------------------------------------------------------- new game
+
+func new_game(mname: String, club_id: int):
+	var raw = DB.load_db()
+	rng.randomize()
+	lu_cache = {}
+	var season = int(raw.season)
+	s = {"v": 1, "season": season, "day": ymd(season, 7, 1), "players": {}, "clubs": [], "leagues": [], "fixtures": [], "inbox": [], "news": [],
+		"offers": [], "shortlist": [], "free": [], "playoffs": [], "negos": {}, "next_id": 900000, "msg_id": 1, "offer_id": 1, "history": [], "champs": [], "tx_log": [], "review": null, "recov": {}, "user": {}}
+	set_date()
+	for i in raw.leagues.size():
+		var l = raw.leagues[i]
+		s.leagues.append({"id": i, "name": l.name, "short": l.short, "country": l.country, "tier": int(l.tier), "clubs": []})
+	for i in raw.clubs.size():
+		var c = raw.clubs[i]
+		s.clubs.append({"id": i, "name": c.name, "short": c.short, "lg": int(c.lg), "c1": c.c1, "c2": c.c2, "stadium": c.stadium, "players": [], "xi": [], "bench": [],
+			"formation": AI_FORMATIONS[rng.randi() % AI_FORMATIONS.size()], "ment": 2, "press": 1, "tempo": 1, "rep": 60.0, "budget": 0, "wage_budget": 0, "t": new_table(), "form": [], "spent": 0, "earned": 0})
+		s.leagues[int(c.lg)].clubs.append(i)
+	var prng = RandomNumberGenerator.new()
+	for r in raw.players:
+		var pid = int(r[0])
+		prng.seed = pid * 7919 + 13
+		var p = {"id": pid, "fn": r[1], "ln": r[2], "cn": r[3], "club": int(r[4]), "pos": r[5], "alt": (r[6].split(" ", false) if r[6] != "" else []), "nat": r[7],
+			"by": int(r[8]), "bm": int(r[9]), "bd": int(r[10]), "ovr": int(r[11]), "pot": 0, "st": [int(r[12]), int(r[13]), int(r[14]), int(r[15]), int(r[16]), int(r[17])],
+			"foot": r[18], "sm": int(r[19]), "wf": int(r[20]), "wage": 0, "cend": 0, "cond": 100, "mor": 70, "inj": 0, "susp": 0, "ycs": 0, "listed": false, "form": 6.5, "ss": new_stats(), "cg": 0, "cap": 0}
+		p.alt = Array(p.alt)
+		var a = age(p)
+		p.pot = gen_potential(p.ovr, a, prng)
+		p.wage = wage_for(p.ovr, a)
+		p.cend = season + 1 + (prng.randi() % 2 if a >= 32 else prng.randi() % 4)
+		s.players[pid] = p
+		s.clubs[p.club].players.append(pid)
+	for c in s.clubs:
+		ensure_squad(c)
+		c.rep = calc_rep(c)
+		c.formation = best_formation(c)
+		c.budget = nice(900000.0 * pow(1.2, c.rep - 60.0))
+		c.wage_budget = nice(squad_wages(c) * 1.15)
+	s.user = {"name": mname, "club": club_id, "rep": 0.0, "conf": 60.0, "obj": {}, "p": 0, "w": 0, "d": 0, "l": 0, "trophies": [], "sacked": false, "jobs": []}
+	var mc = uc()
+	s.user.rep = clamp(mc.rep - 25.0, 20.0, 70.0)
+	s.user.obj = LG.objective(mc)
+	auto_pick(mc)
+	LG.generate_fixtures()
+	active = true
+	msg("Welcome to %s" % mc.name, "The board welcomes you as the new manager of %s.\n\nSeason objective: %s.\n\nYou have a transfer budget of %s and the transfer window is open until 31 August. Set up your tactics, shape the squad and press Continue when you are ready." % [mc.name, s.user.obj.text, money(mc.budget)], "board")
+	save_game()
+
+
+func gen_potential(ovr: int, a: int, r: RandomNumberGenerator) -> int:
+	var head = 0
+	if a <= 17: head = r.randi_range(12, 22)
+	elif a <= 19: head = r.randi_range(8, 18)
+	elif a <= 21: head = r.randi_range(5, 13)
+	elif a <= 23: head = r.randi_range(2, 8)
+	elif a <= 25: head = r.randi_range(0, 4)
+	elif a <= 27: head = r.randi_range(0, 1)
+	var pot = float(ovr + head)
+	if pot > 88:
+		pot = 88 + (pot - 88) * 0.6
+	return clampi(int(round(pot)), ovr, 97)
+
+
+func calc_rep(c: Dictionary) -> float:
+	var ov = []
+	for pid in c.players:
+		ov.append(s.players[pid].ovr)
+	ov.sort()
+	ov.reverse()
+	var n = min(16, ov.size())
+	var t = 0.0
+	for i in n:
+		t += ov[i]
+	return t / max(1, n)
+
+
+func gen_player(club_id: int, pos: String, a: int, ovr: int, pot: int, nat: String) -> Dictionary:
+	var nm = DB.random_name(nat, rng)
+	var st = []
+	if pos == "GK":
+		st = [ovr + 1, ovr - 1, ovr - 4, ovr + 2, 45, ovr]
+	else:
+		for o in GEN_STATS[pos]:
+			st.append(ovr + o)
+	for i in 6:
+		st[i] = clampi(st[i] + rng.randi_range(-3, 3), 20, 97)
+	var pid = s.next_id
+	s.next_id += 1
+	var p = {"id": pid, "fn": nm[0], "ln": nm[1], "cn": "", "club": club_id, "pos": pos, "alt": [], "nat": nat,
+		"by": cur.year - a - (1 if cur.month < 7 else 0), "bm": rng.randi_range(7, 12), "bd": rng.randi_range(1, 28), "ovr": ovr, "pot": max(pot, ovr), "st": st,
+		"foot": "L" if rng.randf() < 0.24 else "R", "sm": rng.randi_range(2, 3), "wf": rng.randi_range(2, 4), "wage": 0, "cend": s.season + rng.randi_range(2, 4),
+		"cond": 100, "mor": 70, "inj": 0, "susp": 0, "ycs": 0, "listed": false, "form": 6.5, "ss": new_stats(), "cg": 0, "cap": 0}
+	p.wage = wage_for(ovr, age(p))
+	s.players[pid] = p
+	if club_id >= 0:
+		s.clubs[club_id].players.append(pid)
+	else:
+		s.free.append(pid)
+	return p
+
+
+func ensure_squad(c: Dictionary):
+	var cnt = [0, 0, 0, 0]
+	var tot = 0.0
+	for pid in c.players:
+		var p = s.players[pid]
+		cnt[LINE[p.pos]] += 1
+		tot += p.ovr
+	var base = int(tot / max(1, c.players.size())) - 4 if c.players.size() > 0 else 55
+	var need = [2, 7, 7, 5]
+	var opts = [["GK"], ["CB", "CB", "LB", "RB"], ["CM", "CDM", "CAM", "LM", "RM", "CM"], ["ST", "ST", "LW", "RW"]]
+	var country = s.leagues[c.lg].country
+	for l in 4:
+		while cnt[l] < need[l]:
+			var o = base + rng.randi_range(-4, 2)
+			gen_player(c.id, opts[l][rng.randi() % opts[l].size()], rng.randi_range(18, 23), o, o + rng.randi_range(3, 12), country)
+			cnt[l] += 1
+
+
+# ---------------------------------------------------------------- lineups
+
+func pick_xi(c: Dictionary, formation: String) -> Dictionary:
+	var slots = FORMATIONS[formation]
+	var avail = []
+	for pid in c.players:
+		var p = s.players[pid]
+		if p.inj <= 0 and p.susp <= 0:
+			avail.append(p)
+	var xi = []
+	xi.resize(11)
+	xi.fill(-1)
+	var used = {}
+	# pass 1: natural positions
+	for i in 11:
+		var role = slots[i][0]
+		var best = null
+		var bs = -1.0
+		for p in avail:
+			if used.has(p.id) or (p.pos != role and not (role in p.alt)):
+				continue
+			var sc = p.ovr * (1.0 if p.pos == role else 0.98) * (0.8 + 0.2 * p.cond / 100.0)
+			if sc > bs:
+				bs = sc
+				best = p
+		if best != null:
+			xi[i] = best.id
+			used[best.id] = bs
+	# pass 2: fill gaps / upgrade with out-of-position players
+	for i in 11:
+		var role = slots[i][0]
+		var cs = used.get(xi[i], -1.0) if xi[i] >= 0 else -1.0
+		var best = null
+		var bs = cs + 1.5
+		for p in avail:
+			if used.has(p.id):
+				continue
+			var sc = p.ovr * fit(p, role) * (0.8 + 0.2 * p.cond / 100.0)
+			if sc > bs:
+				bs = sc
+				best = p
+		if best != null:
+			if xi[i] >= 0:
+				used.erase(xi[i])
+			xi[i] = best.id
+			used[best.id] = bs
+	var rest = []
+	for p in avail:
+		if not used.has(p.id):
+			rest.append(p)
+	rest.sort_custom(func(a, b): return a.ovr > b.ovr)
+	var bench = []
+	for l in [0, 1, 2, 3]:
+		for p in rest:
+			if LINE[p.pos] == l and not (p.id in bench):
+				bench.append(p.id)
+				break
+	for p in rest:
+		if bench.size() >= 7:
+			break
+		if not (p.id in bench) and p.pos != "GK":
+			bench.append(p.id)
+	return {"xi": xi, "bench": bench}
+
+
+func best_formation(c: Dictionary) -> String:
+	var best = "4-3-3"
+	var bs = -1.0
+	for f in FORMATIONS.keys():
+		var xi = pick_xi(c, f).xi
+		var slots = FORMATIONS[f]
+		var t = 0.0
+		for i in 11:
+			if xi[i] >= 0:
+				t += s.players[xi[i]].ovr * fit(s.players[xi[i]], slots[i][0])
+		t += rng.randf() * 4.0
+		if t > bs:
+			bs = t
+			best = f
+	return best
+
+
+func auto_pick(c: Dictionary):
+	var r = pick_xi(c, c.formation)
+	c.xi = r.xi
+	c.bench = r.bench
+
+
+func fix_lineup() -> Array:
+	# make sure the user's XI and bench only contain available squad players
+	var c = uc()
+	var changes = []
+	if c.xi.size() != 11:
+		auto_pick(c)
+		return changes
+	var slots = FORMATIONS[c.formation]
+	var bench2 = []
+	for pid in c.bench:
+		if pid in c.players and available(s.players[pid]) and not (pid in c.xi) and not (pid in bench2):
+			bench2.append(pid)
+	c.bench = bench2
+	for i in 11:
+		var pid = c.xi[i]
+		if pid >= 0 and pid in c.players and available(s.players[pid]) and c.xi.find(pid) == i:
+			continue
+		var best = null
+		var bs = -1.0
+		for q in c.players:
+			var p = s.players[q]
+			if q in c.xi or not available(p):
+				continue
+			var sc = p.ovr * fit(p, slots[i][0])
+			if sc > bs:
+				bs = sc
+				best = p
+		if pid >= 0 and s.players.has(pid) and pid in c.players and best != null:
+			changes.append("%s replaces %s" % [pname(best), pname(s.players[pid])])
+		c.xi[i] = best.id if best != null else -1
+		if best != null:
+			c.bench.erase(best.id)
+	# top up the bench
+	if c.bench.size() < 7:
+		var rest = []
+		for q in c.players:
+			if not (q in c.xi) and not (q in c.bench) and available(s.players[q]):
+				rest.append(s.players[q])
+		rest.sort_custom(func(a, b): return a.ovr > b.ovr)
+		var has_gk = false
+		for q in c.bench:
+			if s.players[q].pos == "GK":
+				has_gk = true
+		for p in rest:
+			if c.bench.size() >= 7:
+				break
+			if p.pos == "GK":
+				if has_gk:
+					continue
+				has_gk = true
+			c.bench.append(p.id)
+	return changes
+
+
+func lineup(cid: int, opp: int) -> Dictionary:
+	var c = s.clubs[cid]
+	if cid == s.user.club:
+		fix_lineup()
+		return {"club": cid, "xi": c.xi, "bench": c.bench, "formation": c.formation, "ment": c.ment, "press": c.press, "tempo": c.tempo, "user": true}
+	var r = lu_cache.get(cid, null)
+	if r != null:
+		for pid in r.xi:
+			if pid < 0 or not s.players.has(pid):
+				r = null
+				break
+			var p = s.players[pid]
+			if p.club != cid or p.inj > 0 or p.susp > 0 or p.cond < 86:
+				r = null
+				break
+	if r != null:
+		for pid in r.bench:
+			if not s.players.has(pid) or s.players[pid].club != cid or not available(s.players[pid]):
+				r = null
+				break
+	if r == null or r.day < s.day - 28:
+		r = pick_xi(c, c.formation)
+		r["day"] = s.day
+		lu_cache[cid] = r
+	var d = c.rep - s.clubs[opp].rep
+	var ment = 3 if d >= 4 else (1 if d <= -6 else 2)
+	return {"club": cid, "xi": r.xi, "bench": r.bench, "formation": c.formation, "ment": ment, "press": c.press, "tempo": c.tempo, "user": false}
+
+
+func team_ratings(cid: int) -> Dictionary:
+	# quick attack / midfield / defence summary for display
+	var c = s.clubs[cid]
+	var xi = c.xi if cid == s.user.club and c.xi.size() == 11 else pick_xi(c, c.formation).xi
+	var slots = FORMATIONS[c.formation]
+	var sum = [0.0, 0.0, 0.0, 0.0]
+	var n = [0, 0, 0, 0]
+	for i in 11:
+		if xi[i] < 0:
+			continue
+		var p = s.players[xi[i]]
+		var l = LINE[slots[i][0]]
+		sum[l] += p.ovr * fit(p, slots[i][0])
+		n[l] += 1
+	var ovr = (sum[0] + sum[1] + sum[2] + sum[3]) / max(1, n[0] + n[1] + n[2] + n[3])
+	return {"att": int(round(sum[3] / max(1, n[3]))), "mid": int(round(sum[2] / max(1, n[2]))), "def": int(round((sum[1] + sum[0]) / max(1, n[1] + n[0]))), "ovr": int(round(ovr))}
+
+
+# ---------------------------------------------------------------- matches
+
+func build_index():
+	fx_by_day = {}
+	for i in s.fixtures.size():
+		var d = s.fixtures[i].day
+		if not fx_by_day.has(d):
+			fx_by_day[d] = []
+		fx_by_day[d].append(i)
+
+
+func user_fixture_today():
+	for i in fx_by_day.get(s.day, []):
+		var f = s.fixtures[i]
+		if not f.played and (f.h == s.user.club or f.a == s.user.club):
+			return f
+	return null
+
+
+func next_user_fixture():
+	var best = null
+	for f in s.fixtures:
+		if not f.played and (f.h == s.user.club or f.a == s.user.club):
+			if best == null or f.day < best.day:
+				best = f
+	return best
+
+
+func club_fixtures(cid: int) -> Array:
+	var out = []
+	for f in s.fixtures:
+		if f.h == cid or f.a == cid:
+			out.append(f)
+	out.sort_custom(func(a, b): return a.day < b.day)
+	return out
+
+
+func new_sim(f: Dictionary, detailed: bool):
+	var sim = ME.new()
+	sim.setup(f, lineup(f.h, f.a), lineup(f.a, f.h), detailed)
+	return sim
+
+
+func sim_fixture(f: Dictionary):
+	var sim = new_sim(f, false)
+	sim.sd[0].auto = true
+	sim.sd[1].auto = true
+	sim.run_to_end()
+	apply_match(sim)
+	return sim
+
+
+func play_day_fixtures():
+	for i in fx_by_day.get(s.day, []):
+		var f = s.fixtures[i]
+		if f.played or f.h == s.user.club or f.a == s.user.club:
+			continue
+		sim_fixture(f)
+
+
+func apply_match(sim):
+	var f = sim.fx
+	var ucid = s.user.club
+	f.played = true
+	f.hg = sim.sd[0].goals
+	f.ag = sim.sd[1].goals
+	if sim.pens != null:
+		f.pens = sim.pens
+	var involved = f.h == ucid or f.a == ucid
+	if involved:
+		var sc = [[], []]
+		for i in 2:
+			for g in sim.sd[i].scorers:
+				sc[i].append([pname(s.players[g.pid]), g.m, g.pen])
+		f.sc = sc
+	for i in 2:
+		var t = sim.sd[i]
+		var o = sim.sd[1 - i]
+		var c = t.club
+		for pid in c.players:
+			var p = s.players[pid]
+			if p.susp > 0:
+				p.susp -= 1
+		var res = "D"
+		if t.goals > o.goals: res = "W"
+		elif t.goals < o.goals: res = "L"
+		if not f.ko:
+			var tb = c.t
+			tb.p += 1
+			tb.gf += t.goals
+			tb.ga += o.goals
+			if res == "W":
+				tb.w += 1
+				tb.pts += 3
+			elif res == "D":
+				tb.d += 1
+				tb.pts += 1
+			else:
+				tb.l += 1
+		c.form.append(res)
+		if c.form.size() > 5:
+			c.form.pop_front()
+		var md = 3 if res == "W" else (-3 if res == "L" else 0)
+		for pid in c.players:
+			var p = s.players[pid]
+			if not sim.pm.has(pid) or sim.pm[pid].tin < 0:
+				if c.id == ucid and p.ovr >= c.rep - 2 and available(p):
+					p.mor = max(25, p.mor - 1)
+				continue
+			var q = sim.pm[pid]
+			p.cond = int(q.cond)
+			s.recov[pid] = true
+			var ss = p.ss
+			ss.ap += 1
+			ss.g += q.g
+			ss.a += q.a
+			ss.rs += q.r
+			ss.yc += q.yc
+			ss.rc += q.rc
+			p.cg += q.g
+			p.cap += 1
+			p.form = lerp(p.form, q.r, 0.4)
+			p.mor = clampi(p.mor + md + int((q.r - 6.5) * 2.0), 20, 100)
+			if q.rc > 0:
+				p.susp = 1 if q.yc >= 2 else rng.randi_range(1, 3)
+				if c.id == ucid:
+					msg("%s suspended" % pname(p), "%s was sent off and will miss the next %d match%s." % [pfull(p), p.susp, "" if p.susp == 1 else "es"])
+			elif q.yc > 0:
+				p.ycs += q.yc
+				if p.ycs >= 5:
+					p.ycs = 0
+					p.susp = 1
+					if c.id == ucid:
+						msg("%s suspended" % pname(p), "%s has picked up five yellow cards and is banned for the next match." % pfull(p))
+			if q.inj > 0:
+				p.inj = q.inj
+				if c.id == ucid:
+					msg("Injury: %s" % pname(p), "%s picked up an injury and will be out for around %s." % [pfull(p), inj_text(q.inj)])
+		if o.goals == 0 and t.xi[0] >= 0:
+			s.players[t.xi[0]].ss.cs += 1
+	if sim.motm >= 0:
+		s.players[sim.motm].ss.mom += 1
+	if involved:
+		var ui = 0 if f.h == ucid else 1
+		var t = sim.sd[ui]
+		var o = sim.sd[1 - ui]
+		var u = s.user
+		u.p += 1
+		var pts = 1
+		if t.goals > o.goals:
+			u.w += 1
+			pts = 3
+		elif t.goals < o.goals:
+			u.l += 1
+			pts = 0
+		else:
+			u.d += 1
+		var ex = clamp(1.35 + (t.club.rep - o.club.rep) * 0.05 + (0.25 if ui == 0 else -0.15), 0.3, 2.6)
+		u.conf = clamp(u.conf + (pts - ex) * 3.0, 0.0, 100.0)
+		if f.ko and sim.winner() == ui:
+			u.conf = min(100.0, u.conf + 6)
+		if u.conf < 6.0 and uc().t.p >= 10 and not u.sacked:
+			u.sacked = true
+			stop_flag = true
+
+
+func inj_text(days: int) -> String:
+	if days < 10:
+		return "%d days" % days
+	if days < 50:
+		return "%d weeks" % int(round(days / 7.0))
+	return "%d months" % int(round(days / 30.0))
+
+
+# ---------------------------------------------------------------- time
+
+func advance() -> void:
+	# moves time forward until something needs the manager's attention
+	stop_flag = false
+	for i in 7:
+		play_day_fixtures()
+		s.day += 1
+		start_of_day()
+		if user_fixture_today() != null or stop_flag or s.review != null or s.user.sacked:
+			break
+	save_game()
+
+
+func start_of_day():
+	set_date()
+	var rec = s.recov
+	for pid in rec.keys():
+		if not s.players.has(pid):
+			rec.erase(pid)
+			continue
+		var p = s.players[pid]
+		if p.cond < 100:
+			p.cond = min(100, p.cond + 6)
+		if p.inj > 0:
+			p.inj -= 1
+		if p.cond >= 100 and p.inj <= 0:
+			rec.erase(pid)
+	if cur.day == 1 and (cur.month >= 9 or cur.month <= 5):
+		develop_all()
+	if cur.day == 1 and cur.month == 1:
+		contract_warning()
+	if window_open():
+		TR.daily()
+	TR.expire_offers()
+	LG.update_playoffs()
+	if cur.day == 1 and (cur.month == 9 or cur.month == 2):
+		msg("Transfer window closed", "The transfer window has closed. You can still sign free agents and agree new contracts with your own players.")
+	if cur.day == 1 and cur.month == 1:
+		msg("Transfer window open", "The January transfer window is open until the end of the month.", "info", null, true)
+	if cur.day == 15:
+		refresh_jobs()
+	if s.day == ymd(s.season + 1, 6, 12):
+		LG.rollover()
+		stop_flag = true
+
+
+func develop_all():
+	var up = []
+	var down = []
+	var ucid = s.user.club
+	for pid in s.players:
+		var p = s.players[pid]
+		var a = age(p)
+		var ch = 0
+		if p.ovr < p.pot and a <= 29:
+			var pr = 0.05
+			if a <= 19: pr = 0.5
+			elif a <= 21: pr = 0.42
+			elif a <= 23: pr = 0.3
+			elif a <= 26: pr = 0.15
+			pr *= 0.75 + min(0.5, p.ss.ap * 0.03)
+			if rng.randf() < pr:
+				ch = 1
+		elif a >= 31:
+			if rng.randf() < (a - 30) * 0.06:
+				ch = -1
+		if ch != 0:
+			change_ovr(p, ch)
+			if p.club == ucid:
+				if ch > 0:
+					up.append("%s (%d)" % [pname(p), p.ovr])
+				else:
+					down.append("%s (%d)" % [pname(p), p.ovr])
+	if up.size() + down.size() > 0:
+		var body = ""
+		if up.size() > 0:
+			body += "Improved: " + ", ".join(up) + "."
+		if down.size() > 0:
+			body += ("\n\n" if body != "" else "") + "Declined: " + ", ".join(down) + "."
+		msg("Monthly development report", body, "info")
+
+
+func change_ovr(p: Dictionary, ch: int):
+	p.ovr = clampi(p.ovr + ch, 30, 99)
+	for i in 6:
+		if ch > 0:
+			if rng.randf() < 0.65:
+				p.st[i] = min(99, p.st[i] + 1)
+		else:
+			if rng.randf() < (0.8 if (i == 0 or i == 5) else 0.45):
+				p.st[i] = max(20, p.st[i] - 1)
+	if p.pot < p.ovr:
+		p.pot = p.ovr
+
+
+func contract_warning():
+	var names = []
+	for pid in uc().players:
+		var p = s.players[pid]
+		if p.cend <= s.season + 1:
+			names.append(pname(p))
+	if names.size() > 0:
+		msg("Contracts expiring", "These players are out of contract at the end of the season and will leave for free unless you agree new deals:\n\n" + ", ".join(names) + ".", "contract", null, true)
+
+
+func refresh_jobs():
+	var u = s.user
+	var cands = []
+	for c in s.clubs:
+		if c.id != u.club and c.rep <= u.rep + 26.5 and c.rep >= u.rep + 13:
+			cands.append(c.id)
+	cands.shuffle()
+	u.jobs = cands.slice(0, 4)
+
+
+func take_job(cid: int):
+	var u = s.user
+	u.club = cid
+	u.conf = 60.0
+	u.sacked = false
+	u.jobs = []
+	s.offers = []
+	s.negos = {}
+	var c = uc()
+	u.obj = LG.objective(c)
+	auto_pick(c)
+	msg("Welcome to %s" % c.name, "You have been appointed manager of %s.\n\nObjective: %s." % [c.name, u.obj.text], "board")
+	save_game()
+
+
+# ---------------------------------------------------------------- save / load
+
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+
+func save_game():
+	var f = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_var(s)
+	f.close()
+	var m = FileAccess.open(META_PATH, FileAccess.WRITE)
+	if m != null:
+		m.store_var({"club": uc().name, "manager": s.user.name, "date": fmt_date(s.day, true), "season": season_name(), "cid": s.user.club, "c1": uc().c1, "c2": uc().c2, "short": uc().short})
+		m.close()
+
+
+func load_game() -> bool:
+	if not has_save():
+		return false
+	var f = FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var d = f.get_var()
+	f.close()
+	if typeof(d) != TYPE_DICTIONARY or not d.has("players"):
+		return false
+	DB.load_db()
+	s = d
+	set_date()
+	build_index()
+	lu_cache = {}
+	active = true
+	return true
+
+
+func save_meta():
+	if not FileAccess.file_exists(META_PATH):
+		return null
+	var f = FileAccess.open(META_PATH, FileAccess.READ)
+	var d = f.get_var()
+	f.close()
+	return d if typeof(d) == TYPE_DICTIONARY else null

@@ -1,0 +1,511 @@
+extends Node
+# Design system: colours, fonts and widget factories shared by every screen.
+
+const BADGE = preload("res://scripts/widgets/badge.gd")
+const BAR = preload("res://scripts/widgets/bar.gd")
+
+const BG = Color("090d16")
+const BG2 = Color("0f1522")
+const CARD = Color("141b2b")
+const CARD2 = Color("1b2438")
+const LINE = Color(1, 1, 1, 0.07)
+const TEXT = Color("f3f6fb")
+const MUTED = Color("8b96ab")
+const DIM = Color("5b6680")
+const GOLD = Color("e9c46a")
+const GREEN = Color("2ee59d")
+const RED = Color("ff5c72")
+const AMBER = Color("f6ad3c")
+const BLUE = Color("4da3ff")
+const LINE_COL = [Color("f6ad3c"), Color("4da3ff"), Color("2ee59d"), Color("ff6b81")]
+
+var accent: Color = GOLD
+var fonts: Dictionary = {}
+var icon_src: Dictionary = {}
+var icon_cache: Dictionary = {}
+var main = null
+
+
+func _ready():
+	fonts = {
+		"body": load("res://assets/fonts/Barlow-Medium.ttf"),
+		"semi": load("res://assets/fonts/Barlow-SemiBold.ttf"),
+		"bold": load("res://assets/fonts/Barlow-Bold.ttf"),
+		"cond": load("res://assets/fonts/BarlowCondensed-SemiBold.ttf"),
+		"disp": load("res://assets/fonts/BarlowCondensed-Bold.ttf"),
+		"xbold": load("res://assets/fonts/BarlowCondensed-ExtraBold.ttf"),
+	}
+	var f = FileAccess.open("res://data/icons.json", FileAccess.READ)
+	if f != null:
+		icon_src = JSON.parse_string(f.get_as_text())
+		f.close()
+
+
+func set_accent_from(c: Dictionary):
+	var a = Color(c.c1)
+	var b = Color(c.c2)
+	var pick = a if a.s * a.v >= b.s * b.v else b
+	if pick.s < 0.25:
+		accent = GOLD
+		return
+	if pick.v < 0.75:
+		pick = Color.from_hsv(pick.h, min(pick.s, 0.8), 0.85)
+	if pick.get_luminance() < 0.28:
+		pick = pick.lightened(0.35)
+	accent = pick
+
+
+func on_color(c: Color) -> Color:
+	return Color("0a0e17") if c.get_luminance() > 0.45 else Color.WHITE
+
+
+# ---------------------------------------------------------------- basic nodes
+
+func lbl(text, size := 24, color := TEXT, font := "body") -> Label:
+	var l = Label.new()
+	l.text = str(text)
+	l.add_theme_font_override("font", fonts[font])
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
+func lbl_fill(text, size := 24, color := TEXT, font := "body") -> Label:
+	# label that takes the remaining row width and truncates with an ellipsis
+	var l = lbl(text, size, color, font)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.clip_text = true
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	return l
+
+
+func wrap(text, size := 24, color := TEXT, font := "body") -> Label:
+	var l = lbl(text, size, color, font)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return l
+
+
+func caps(text, size := 20, color := MUTED) -> Label:
+	var l = lbl(str(text).to_upper(), size, color, "cond")
+	l.add_theme_constant_override("outline_size", 0)
+	return l
+
+
+func vb(sep := 12) -> VBoxContainer:
+	var b = VBoxContainer.new()
+	b.add_theme_constant_override("separation", sep)
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return b
+
+
+func hb(sep := 12) -> HBoxContainer:
+	var b = HBoxContainer.new()
+	b.add_theme_constant_override("separation", sep)
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.alignment = BoxContainer.ALIGNMENT_BEGIN
+	return b
+
+
+func sp(w := 0, h := 0) -> Control:
+	var c = Control.new()
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if w == 0 and h == 0:
+		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		c.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	else:
+		c.custom_minimum_size = Vector2(w, h)
+	return c
+
+
+func sbox(color: Color, radius := 22, border := Color(0, 0, 0, 0), bw := 1) -> StyleBoxFlat:
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = color
+	sb.set_corner_radius_all(radius)
+	sb.corner_detail = 10
+	sb.anti_aliasing = true
+	if border.a > 0:
+		sb.border_color = border
+		sb.set_border_width_all(bw)
+	return sb
+
+
+func panel(color: Color, radius := 22, pad_h := 22, pad_v := 20, border := Color(0, 0, 0, 0)) -> PanelContainer:
+	var p = PanelContainer.new()
+	var sb = sbox(color, radius, border)
+	sb.content_margin_left = pad_h
+	sb.content_margin_right = pad_h
+	sb.content_margin_top = pad_v
+	sb.content_margin_bottom = pad_v
+	p.add_theme_stylebox_override("panel", sb)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return p
+
+
+func card(pad_h := 22, pad_v := 20) -> PanelContainer:
+	return panel(CARD, 24, pad_h, pad_v, LINE)
+
+
+func margin(node: Control, l := 24, t := 0, r := 24, b := 0) -> MarginContainer:
+	var m = MarginContainer.new()
+	m.add_theme_constant_override("margin_left", l)
+	m.add_theme_constant_override("margin_right", r)
+	m.add_theme_constant_override("margin_top", t)
+	m.add_theme_constant_override("margin_bottom", b)
+	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	m.add_child(node)
+	return m
+
+
+func center(node: Control) -> CenterContainer:
+	var c = CenterContainer.new()
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(node)
+	return c
+
+
+func scroll(inner: Control) -> ScrollContainer:
+	var s = ScrollContainer.new()
+	s.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	s.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	s.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	s.add_child(inner)
+	return s
+
+
+func tap(c: Control, cb: Callable, stop := false):
+	c.mouse_filter = Control.MOUSE_FILTER_STOP if stop else Control.MOUSE_FILTER_PASS
+	c.set_meta("tp", null)
+	c.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+			if e.pressed:
+				c.set_meta("tp", e.global_position)
+				c.modulate = Color(1, 1, 1, 0.65)
+			else:
+				var st = c.get_meta("tp")
+				c.set_meta("tp", null)
+				c.modulate = Color.WHITE
+				if st != null and st.distance_to(e.global_position) < 22:
+					cb.call())
+	c.mouse_exited.connect(func(): c.modulate = Color.WHITE)
+
+
+func icon(nm: String, size := 28, color := TEXT) -> TextureRect:
+	var t = TextureRect.new()
+	if not icon_cache.has(nm) and icon_src.has(nm):
+		var img = Image.new()
+		if img.load_svg_from_string(icon_src[nm], 3.0) == OK:
+			icon_cache[nm] = ImageTexture.create_from_image(img)
+	t.texture = icon_cache.get(nm, null)
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	t.custom_minimum_size = Vector2(size, size)
+	t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	t.modulate = color
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return t
+
+
+# ---------------------------------------------------------------- composite widgets
+
+func btn(text: String, cb: Callable, kind := "primary", icon_name := "", height := 84) -> PanelContainer:
+	var bg = accent
+	var fg = on_color(accent)
+	var border = Color(0, 0, 0, 0)
+	if kind == "secondary":
+		bg = CARD2
+		fg = TEXT
+		border = Color(1, 1, 1, 0.1)
+	elif kind == "ghost":
+		bg = Color(1, 1, 1, 0.04)
+		fg = MUTED
+	elif kind == "danger":
+		bg = Color(RED, 0.16)
+		fg = RED
+		border = Color(RED, 0.4)
+	elif kind == "gold":
+		bg = GOLD
+		fg = Color("0a0e17")
+	var p = panel(bg, 20, 22, 0, border)
+	p.custom_minimum_size = Vector2(0, height)
+	var h = hb(10)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	if icon_name != "":
+		h.add_child(icon(icon_name, 30, fg))
+	var l = lbl(text.to_upper(), 30 if height >= 80 else 24, fg, "disp")
+	h.add_child(l)
+	p.add_child(h)
+	tap(p, cb, true)
+	return p
+
+
+func chip(text: String, bg: Color, fg: Color, size := 20, minw := 0) -> PanelContainer:
+	var p = panel(bg, 10, 10, 3)
+	var l = lbl(text, size, fg, "disp")
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	p.add_child(l)
+	if minw > 0:
+		p.custom_minimum_size = Vector2(minw, 0)
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return p
+
+
+func ovr_color(v: int) -> Color:
+	if v >= 85: return GOLD
+	if v >= 78: return GREEN
+	if v >= 70: return Color("b6e354")
+	if v >= 62: return AMBER
+	return Color("f08a5d")
+
+
+func ovr(v: int, size := 26) -> PanelContainer:
+	var c = ovr_color(v)
+	var p = chip(str(v), Color(c, 0.16), c, size, int(size * 2.1))
+	p.get_theme_stylebox("panel").border_color = Color(c, 0.45)
+	p.get_theme_stylebox("panel").set_border_width_all(1)
+	return p
+
+
+func pos(pos_name: String, size := 20) -> PanelContainer:
+	var c = LINE_COL[G.LINE.get(pos_name, 2)]
+	return chip(pos_name, Color(c, 0.14), c, size, int(size * 2.9))
+
+
+func badge(c: Dictionary, size := 64) -> Control:
+	var b = BADGE.new()
+	b.setup(c, size)
+	return b
+
+
+func bar(frac: float, color: Color, h := 8, bg := Color(1, 1, 1, 0.08)) -> Control:
+	var b = BAR.new()
+	b.frac = clamp(frac, 0.0, 1.0)
+	b.color = color
+	b.bg = bg
+	b.custom_minimum_size = Vector2(40, h)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return b
+
+
+func cond_color(v: float) -> Color:
+	if v >= 80: return GREEN
+	if v >= 60: return AMBER
+	return RED
+
+
+func seg(options: Array, sel: int, cb: Callable, size := 22) -> PanelContainer:
+	var p = panel(Color(1, 1, 1, 0.05), 16, 5, 5)
+	var h = hb(4)
+	for i in options.size():
+		var on = i == sel
+		var it = panel(accent if on else Color(0, 0, 0, 0), 12, 8, 9)
+		it.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var l = lbl(str(options[i]).to_upper(), size, on_color(accent) if on else MUTED, "disp")
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		it.add_child(l)
+		var idx = i
+		tap(it, func(): cb.call(idx), true)
+		h.add_child(it)
+	p.add_child(h)
+	return p
+
+
+func section(text: String, right := "") -> HBoxContainer:
+	var h = hb(8)
+	h.add_child(caps(text, 22, MUTED))
+	h.add_child(sp())
+	if right != "":
+		h.add_child(caps(right, 20, DIM))
+	return h
+
+
+func stat_tile(label: String, value: String, color := TEXT) -> PanelContainer:
+	var p = panel(Color(1, 1, 1, 0.04), 16, 14, 12)
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v = vb(0)
+	var a = lbl(value, 34, color, "disp")
+	a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var b = caps(label, 17, MUTED)
+	b.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(a)
+	v.add_child(b)
+	p.add_child(v)
+	return p
+
+
+func kv(k: String, v: String, vc := TEXT) -> HBoxContainer:
+	var h = hb(8)
+	h.add_child(lbl(k, 23, MUTED))
+	h.add_child(sp())
+	h.add_child(lbl(v, 23, vc, "semi"))
+	return h
+
+
+func divider() -> ColorRect:
+	var r = ColorRect.new()
+	r.color = LINE
+	r.custom_minimum_size = Vector2(0, 1)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
+
+
+func form_dots(form: Array, size := 14) -> HBoxContainer:
+	var h = hb(5)
+	for r in form:
+		var c = GREEN if r == "W" else (RED if r == "L" else DIM)
+		var d = panel(c, size / 2, 0, 0)
+		d.custom_minimum_size = Vector2(size, size)
+		d.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(d)
+	return h
+
+
+func player_row(p: Dictionary, cb: Callable, extra := "") -> PanelContainer:
+	# standard list row: position, name, meta line, overall
+	var row = panel(CARD, 18, 16, 12, LINE)
+	var h = hb(14)
+	h.add_child(pos(p.pos))
+	var v = vb(0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var n = hb(8)
+	n.add_child(lbl_fill(G.pname(p), 26, TEXT, "semi"))
+	v.add_child(n)
+	var meta = extra if extra != "" else "%d yrs · %s" % [G.age(p), G.money(G.value(p))]
+	v.add_child(lbl_fill(meta, 20, MUTED))
+	h.add_child(v)
+	if p.inj > 0:
+		h.add_child(icon("bandage", 24, RED))
+	if p.susp > 0:
+		h.add_child(icon("square", 22, RED))
+	if p.listed:
+		h.add_child(icon("flag", 22, AMBER))
+	h.add_child(ovr(p.ovr))
+	row.add_child(h)
+	tap(row, cb)
+	return row
+
+
+func topbar(title: String, back := true, right: Control = null) -> Control:
+	var h = hb(12)
+	h.custom_minimum_size = Vector2(0, 76)
+	if back:
+		var b = panel(Color(1, 1, 1, 0.06), 18, 14, 14)
+		b.add_child(icon("chevron-left", 30, TEXT))
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tap(b, func(): main.back(), true)
+		h.add_child(b)
+	var l = lbl_fill(title.to_upper(), 40, TEXT, "xbold")
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(l)
+	if right != null:
+		right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(right)
+	return margin(h, 24, 10, 24, 10)
+
+
+func toast(text: String, color := TEXT):
+	if main != null:
+		main.toast(text, color)
+
+
+func sheet(title: String, build: Callable):
+	if main != null:
+		main.open_sheet(title, build)
+
+
+func close_sheet():
+	if main != null:
+		main.close_sheet()
+
+
+func confirm(title: String, text: String, yes: String, cb: Callable, danger := false):
+	var on_yes = func():
+		close_sheet()
+		cb.call()
+	var build = func(v):
+		v.add_child(wrap(text, 24, MUTED))
+		v.add_child(sp(0, 8))
+		v.add_child(btn(yes, on_yes, "danger" if danger else "primary"))
+		v.add_child(btn("Cancel", close_sheet, "ghost", "", 68))
+	sheet(title, build)
+
+
+func stars(rep: float, size := 22) -> HBoxContainer:
+	var n = int(round(clamp((rep - 50.0) / 7.0, 0.5, 5.0)))
+	var h = hb(2)
+	for i in 5:
+		h.add_child(icon("star-f", size, GOLD if i < n else Color(1, 1, 1, 0.12)))
+	return h
+
+
+func input(text: String, placeholder: String, cb: Callable) -> LineEdit:
+	var le = LineEdit.new()
+	le.text = text
+	le.placeholder_text = placeholder
+	le.max_length = 24
+	le.custom_minimum_size = Vector2(0, 80)
+	le.add_theme_font_override("font", fonts["semi"])
+	le.add_theme_font_size_override("font_size", 28)
+	le.add_theme_color_override("font_color", TEXT)
+	le.add_theme_color_override("font_placeholder_color", DIM)
+	le.add_theme_color_override("caret_color", accent)
+	var sb = sbox(Color(1, 1, 1, 0.05), 18, Color(1, 1, 1, 0.1))
+	sb.content_margin_left = 22
+	sb.content_margin_right = 22
+	le.add_theme_stylebox_override("normal", sb)
+	var sf = sbox(Color(1, 1, 1, 0.07), 18, Color(accent, 0.7), 2)
+	sf.content_margin_left = 22
+	sf.content_margin_right = 22
+	le.add_theme_stylebox_override("focus", sf)
+	le.text_changed.connect(cb)
+	return le
+
+
+func slider(minv: float, maxv: float, value: float, step: float, cb: Callable) -> HSlider:
+	var sl = HSlider.new()
+	sl.min_value = minv
+	sl.max_value = maxv
+	sl.step = step
+	sl.value = value
+	sl.custom_minimum_size = Vector2(0, 64)
+	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var track = sbox(Color(1, 1, 1, 0.1), 6)
+	track.content_margin_top = 6
+	track.content_margin_bottom = 6
+	sl.add_theme_stylebox_override("slider", track)
+	var fill = sbox(accent, 6)
+	sl.add_theme_stylebox_override("grabber_area", fill)
+	sl.add_theme_stylebox_override("grabber_area_highlight", fill)
+	if not icon_cache.has("_grab"):
+		var img = Image.create(56, 56, false, Image.FORMAT_RGBA8)
+		for y in 56:
+			for x in 56:
+				var d = Vector2(x - 27.5, y - 27.5).length()
+				var a = clamp(26.0 - d, 0.0, 1.0)
+				img.set_pixel(x, y, Color(1, 1, 1, a))
+		icon_cache["_grab"] = ImageTexture.create_from_image(img)
+	sl.add_theme_icon_override("grabber", icon_cache["_grab"])
+	sl.add_theme_icon_override("grabber_highlight", icon_cache["_grab"])
+	sl.value_changed.connect(cb)
+	return sl
+
+
+func clubbar(right: Control = null) -> Control:
+	var c = G.uc()
+	var h = hb(16)
+	h.add_child(badge(c, 76))
+	var v = vb(0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(lbl_fill(c.name.to_upper(), 38, TEXT, "xbold"))
+	v.add_child(lbl_fill("%s · %s" % [G.s.user.name, G.s.leagues[c.lg].name], 22, MUTED))
+	h.add_child(v)
+	if right != null:
+		right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(right)
+	return margin(h, 24, 8, 24, 12)
