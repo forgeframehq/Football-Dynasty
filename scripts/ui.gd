@@ -737,15 +737,20 @@ func close_sheet():
 		main.close_sheet()
 
 
-func confirm(title: String, text: String, yes: String, cb: Callable, danger := false):
+func confirm(title: String, text: String, yes: String, cb: Callable, danger := false, no := Callable()):
+	# no: called when the player backs out, e.g. to reopen the list they were choosing from
 	var on_yes = func():
 		close_sheet()
 		cb.call()
+	var on_no = func():
+		close_sheet()
+		if no.is_valid():
+			no.call()
 	var build = func(v):
 		v.add_child(self.wrap(text, 24, MUTED))   # bare wrap() inside a lambda resolves to the built-in maths function
 		v.add_child(sp(0, 8))
 		v.add_child(btn(yes, on_yes, "danger" if danger else "primary"))
-		v.add_child(btn("Cancel", close_sheet, "ghost", "", 68))
+		v.add_child(btn("Go back" if no.is_valid() else "Cancel", on_no, "ghost", "", 68))
 	sheet(title, build)
 
 

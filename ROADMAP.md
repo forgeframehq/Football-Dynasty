@@ -154,3 +154,10 @@ Options
 - Skins: `UI.SKINS` (Dynasty, Midnight, Pitch, Crimson, Graphite). `UI.BG, BG2, CARD, CARD2, BRAND, MUTED, DIM, RAIL` are now vars set by `UI.apply_skin()`; `UI.main.reskin()` recolours the frame and redraws the screen. Some screens still have hard-coded dark colours.
 - Soundtrack: seven songs in assets/music (128 kbps MP3, 29 MB), listed in `UI.SONGS` with titles and lengths. `UI.songs()`, `music_play(i)`, `music_step(dir)`, `now_playing()`, signal `song_changed`. The title screen has a Soundtrack panel bottom right with previous / pause / next.
 - Currency: the save stays in euros; `G.money()` converts for display at fixed rates (`G.CUR_RATE`: £0.85, $1.15 per euro).
+
+## v0.7.1: rail, menus, Kit & Sponsors, confirms
+- Rail: icons use the strip beside a small camera hole and step over it (`main.hole`, from `DisplayServer.get_display_cutouts()`; dev args `notch=PX hole=Y0-Y1`). A long notch or an unknown cut-out keeps the old layout (`rail_wide()`). Three groups with dividers (Inbox, Home / Club, You / World, Market), Settings pinned at the bottom, a small label under each icon.
+- Slide-out menus are grouped under headings in two columns with no scrolling: `MENU_GROUPS` in main.gd names the rows per group; `menu_items()` still builds the rows.
+- `kit` screen (scripts/screens/kit.gd, widget scripts/widgets/shirt.gd): live shirt, six patterns (`c.kitp`), colours, and this season's sponsor offers with a preview on the shirt and a confirm before signing. Replaces the Sponsors hub page in the menus; Club Identity is now Club Records.
+- `G.OPS.sponsor_now()` is the only valid way to read the sponsor (it checks the season). `G.OPS.sponsor_call()` sends the important "Sponsor offers are in" message at new game, new job and season rollover; Home's To Do shows it until one is signed. There are no sponsor targets in the code.
+- `UI.confirm(..., danger, no)` takes a back-out callback; used for the permanent best-playstyle and link-up choices (tac_sheets.gd).

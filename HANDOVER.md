@@ -1,7 +1,7 @@
-# Football Dynasty 26 — Handover (12 Nov 2026, v0.7.0 on `dev`)
+# Football Dynasty 26 — Handover (13 Nov 2026, v0.7.1 on `main`)
 
 ## Where things stand
-- `main` and the published APK are still v0.6.2. All work since is on branch `dev` as v0.7.0 and has NOT been built into an APK: Sudhi said "don't build the APK". Merge `dev` into `main` only when he asks for one.
+- `main`, `dev` and the published APK are all v0.7.1 (built 13 Nov at Sudhi's request). Work on `dev`; push to `main` only when he asks for an APK.
 - v0.7.0 adds the tactics system, the transfer system, the Football Dynasty 26 branding (icon, wordmark, purple and gold scheme) and the intro film. See ROADMAP.md for the ticked list.
 - Personal football manager for Android (not for publishing): FIFA/PES career feel with Football Manager Mobile depth.
 - Godot 4.7.2, GDScript, GL Compatibility, all UI built in code. Landscape, base viewport 1100×620, immersive and edge-to-edge.
@@ -22,7 +22,7 @@ Standing rules:
 - Godot is not preinstalled: download `Godot_v4.7.2-stable_linux.x86_64.zip` from the godotengine/godot GitHub releases.
 - Build check: `gh run list -R forgeframehq/Football-Dynasty --limit 1`; APK: `gh api repos/forgeframehq/Football-Dynasty/releases/tags/latest -q '.assets[]'`.
 - Commits: author `Claude <noreply@anthropic.com>`; end messages with the Co-Authored-By and Claude-Session lines the session supplies.
-- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.7.0, code 9).
+- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.7.1, code 10).
 
 ## Code map
 - Autoloads: `DB` (data), `UI` (`scripts/ui.gd`), `G` (`scripts/game.gd`). Save is `G.s`, binary, integer keys survive.
@@ -83,3 +83,10 @@ Standing rules:
 - Skins: `UI.SKINS` (Dynasty, Midnight, Pitch, Crimson, Graphite). `UI.BG, BG2, CARD, CARD2, BRAND, MUTED, DIM, RAIL` are now vars set by `UI.apply_skin()`; `UI.main.reskin()` recolours the frame and redraws the screen. Some screens still have hard-coded dark colours.
 - Soundtrack: seven songs in assets/music (128 kbps MP3, 29 MB), listed in `UI.SONGS` with titles and lengths. `UI.songs()`, `music_play(i)`, `music_step(dir)`, `now_playing()`, signal `song_changed`. The title screen has a Soundtrack panel bottom right with previous / pause / next.
 - Currency: the save stays in euros; `G.money()` converts for display at fixed rates (`G.CUR_RATE`: £0.85, $1.15 per euro).
+
+## v0.7.1: rail, menus, Kit & Sponsors, confirms
+- Rail: icons use the strip beside a small camera hole and step over it (`main.hole`, from `DisplayServer.get_display_cutouts()`; dev args `notch=PX hole=Y0-Y1`). A long notch or an unknown cut-out keeps the old layout (`rail_wide()`). Three groups with dividers (Inbox, Home / Club, You / World, Market), Settings pinned at the bottom, a small label under each icon.
+- Slide-out menus are grouped under headings in two columns with no scrolling: `MENU_GROUPS` in main.gd names the rows per group; `menu_items()` still builds the rows.
+- `kit` screen (scripts/screens/kit.gd, widget scripts/widgets/shirt.gd): live shirt, six patterns (`c.kitp`), colours, and this season's sponsor offers with a preview on the shirt and a confirm before signing. Replaces the Sponsors hub page in the menus; Club Identity is now Club Records.
+- `G.OPS.sponsor_now()` is the only valid way to read the sponsor (it checks the season). `G.OPS.sponsor_call()` sends the important "Sponsor offers are in" message at new game, new job and season rollover; Home's To Do shows it until one is signed. There are no sponsor targets in the code.
+- `UI.confirm(..., danger, no)` takes a back-out callback; used for the permanent best-playstyle and link-up choices (tac_sheets.gd).

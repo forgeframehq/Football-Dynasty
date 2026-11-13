@@ -174,6 +174,8 @@ func todo_items(c: Dictionary) -> Array:
 		a.push_front(["clock", "Deadline day is live: %d hours left" % (23 - int(ddy.hour)), UI.RED, func(): UI.main.open("deadline")])
 	if s.scout.has("brief_res") and int(s.scout.brief_res.day) >= s.day - 2:
 		a.append(["user-round-search", "Your chief scout's shortlist is in", UI.GREEN, func(): UI.main.root("scouting")])
+	if G.OPS.sponsor_now() == null:
+		a.append(["shirt", "Choose this season's shirt sponsor", UI.AMBER, func(): UI.main.root("kit")])
 	var n = G.unread()
 	if n > 0:
 		a.append(["mail", "%d unread message%s" % [n, "" if n == 1 else "s"], UI.accent, func(): UI.main.root("inbox")])

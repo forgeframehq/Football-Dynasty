@@ -32,12 +32,15 @@ const SCREENS = {
 	"scouting": preload("res://scripts/screens/scouting.gd"),
 	"deadline": preload("res://scripts/screens/deadline.gd"),
 	"settings": preload("res://scripts/screens/settings.gd"),
+	"kit": preload("res://scripts/screens/kit.gd"),
 	"lists": preload("res://scripts/screens/lists.gd"),
 	"hub": preload("res://scripts/screens/hub.gd"),
 	"search": preload("res://scripts/screens/search.gd"),
 }
+const RAIL_ICON = {"inbox": "mail", "home": "house", "club": "", "manager": "user", "world": "globe", "search": "search", "options": "settings"}
 const RAIL = [["inbox", "mail"], ["home", "house"], ["club", ""], ["manager", "user"], ["world", "globe"], ["search", "search"], ["options", "settings"]]
-const RAIL_W = 92
+const RAIL_W = 84
+var hole := Vector2(-1, -1)   # top and bottom of the camera cut-out on the left edge, in rail units (-1 = none known)
 var notch_l := 0            # width of the camera cut-out strip on the left, in viewport units
 const TOP_H = 70
 const NATIONS = ["England", "Spain", "Italy", "Germany", "France"]
@@ -312,9 +315,20 @@ func _safe_area():
 		r = max(0.0, (win.x - sa.end.x) * k)
 		t = max(0.0, sa.position.y * k)
 		b = max(0.0, (win.y - sa.end.y) * k)
+	hole = Vector2(-1, -1)
+	if l > 16 and win.y > 0:
+		var k2 = size.y / float(win.y)
+		for rc in DisplayServer.get_display_cutouts():
+			if rc.position.x < win.x * 0.2 and rc.size.y > 0:
+				hole = Vector2(rc.position.y * k2 - t - 8, rc.end.y * k2 - t + 8)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("notch="):
 			l = float(arg.substr(6))      # dev: pretend there is a camera cut-out on the left
+			if hole.x < 0:
+				hole = Vector2(272, 348)
+		if arg.begins_with("hole="):
+			var hp = arg.substr(5).split("-")
+			hole = Vector2(float(hp[0]), float(hp[1]))
 	# with the rail showing, its background runs under the camera cut-out and only the icons stay clear of it
 	notch_l = int(l)
 	_apply_left()
@@ -323,12 +337,20 @@ func _safe_area():
 	safe.add_theme_constant_override("margin_bottom", int(b))
 
 
+func rail_wide() -> bool:
+	# a long notch (or a cut-out we cannot locate) leaves no room for icons beside it: they sit to its right.
+	# A small camera hole does: the icons use the whole strip and simply skip the hole.
+	return notch_l > 16 and (hole.x < 0 or hole.y - hole.x > 190)
+
+
 func rail_col() -> int:
-	return 66 if notch_l > 16 else RAIL_W
+	return 66 if rail_wide() else rail_w()
 
 
 func rail_w() -> int:
-	return notch_l + rail_col()
+	if rail_wide():
+		return notch_l + 66
+	return max(RAIL_W, notch_l + 6) if notch_l > 16 else RAIL_W
 
 
 func _apply_left():
@@ -491,7 +513,7 @@ func _rail_key() -> String:
 		return ""
 	var nm = stack[0].sname
 	var groups = {"inbox": ["inbox"], "home": ["home"],
-		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists"],
+		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists", "kit"],
 		"manager": ["board", "trophies", "jobs", "life"], "world": ["table", "comps", "stats", "clubview"],
 		"search": ["search", "transfers", "scouting", "player", "nego", "compare"]}
 	if nm == "lists" or nm == "hub" or nm == "settings":
@@ -502,42 +524,92 @@ func _rail_key() -> String:
 	return ""
 
 
+const RAIL_LABEL = {"inbox": "Inbox", "home": "Home", "club": "Club", "manager": "You", "world": "World", "search": "Market", "options": "Settings"}
+const RAIL_GROUPS = [["inbox", "home"], ["club", "manager"], ["world", "search"]]   # Settings sits alone at the bottom
+
+
 func _build_rail():
+	# laid out by hand so the icons can use the strip beside the camera and step over the hole itself
 	_clear(rail)
-	var v = UI.vb(0)
+	var lay = Control.new()
+	lay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rail.add_child(lay)
 	var cur = _rail_key()
-	var bk = UI.panel(Color(0, 0, 0, 0), 0, 0, 0)
-	bk.custom_minimum_size = Vector2(rail_w(), 66)
+	var w = rail_w()
+	var pad_l = notch_l if rail_wide() else 0
+	var H = size.y - safe.get_theme_constant("margin_top") - safe.get_theme_constant("margin_bottom")
+	var h0 = hole.x if not rail_wide() and hole.x >= 0 else -1.0
+	var h1 = hole.y if h0 >= 0 else -1.0
+	var back_h = 46.0
+	var div_h = 11.0
+	var cell = clamp(floor((H - back_h - div_h * RAIL_GROUPS.size() - (h1 - h0 if h0 >= 0 else 0.0)) / 7.0), 44.0, 64.0)
+	var labels = cell >= 56.0
+	var step = func(y: float, h: float) -> float:
+		# the first position at or below y where something h tall clears the camera
+		return h1 if h0 >= 0 and y < h1 and y + h > h0 else y
+	var y = step.call(0.0, back_h)
+	var bk = Control.new()
+	bk.position = Vector2(pad_l, y)
+	bk.size = Vector2(w - pad_l, back_h)
 	var can_back = stack.size() > 1 or (stack.size() == 1 and stack[0].sname != "home")
-	bk.add_child(UI.margin(UI.center(UI.icon("chevron-left", 40, UI.TEXT if can_back else UI.DIM)), notch_l, 0, 0, 0))
+	var bi = UI.center(UI.icon("chevron-left", 32, UI.TEXT if can_back else UI.DIM))
+	bi.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bk.add_child(bi)
 	UI.tap(bk, back, true)
-	v.add_child(bk)
+	lay.add_child(bk)
+	y += back_h
 	var n = G.unread()
-	for it in RAIL:
-		var key = it[0]
+	var place = func(key: String, at: float):
 		var sel = key == cur
-		var cell = UI.panel(Color(UI.accent, 0.92) if sel else Color(0, 0, 0, 0), 0, 0, 0)
-		cell.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		cell.custom_minimum_size = Vector2(rail_w(), 60)
-		var fg = UI.on_color(UI.accent) if sel else UI.TEXT
-		var inner: Control
-		if key == "club":
-			inner = UI.badge(G.uc(), 46)
-		else:
-			inner = UI.icon(it[1], 36, fg)
-		var cc = UI.margin(UI.center(inner), notch_l, 0, 0, 0)
-		cell.add_child(cc)
+		var c = Control.new()
+		c.position = Vector2(pad_l, at)
+		c.size = Vector2(w - pad_l, cell)
+		var pill = UI.panel(Color(UI.accent, 0.95) if sel else Color(0, 0, 0, 0), 14, 0, 0)
+		pill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		pill.offset_left = 7
+		pill.offset_right = -7
+		pill.offset_top = 2
+		pill.offset_bottom = -2
+		pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var fg = UI.on_color(UI.accent) if sel else (UI.MUTED if key == "options" else UI.TEXT)
+		var iv = UI.vb(-1)
+		iv.alignment = BoxContainer.ALIGNMENT_CENTER
+		var isz = 30 if labels else 32
+		var ic: Control = UI.badge(G.uc(), isz + 6) if key == "club" else UI.icon(RAIL_ICON[key], isz, fg)
+		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		iv.add_child(ic)
+		if labels:
+			var lb = UI.caps(RAIL_LABEL[key], 12, fg if sel else UI.MUTED)
+			lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			iv.add_child(lb)
+		pill.add_child(iv)
+		c.add_child(pill)
 		if key == "inbox" and n > 0:
-			var bd = UI.chip(str(n), UI.RED, Color.WHITE, 17)
-			bd.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-			var holder2 = Control.new()
-			holder2.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			holder2.add_child(bd)
-			bd.position = Vector2(rail_w() - (40 if notch_l <= 16 else 30), 6)
-			cell.add_child(holder2)
-		UI.tap(cell, func(): _rail_tap(key), true)
-		v.add_child(cell)
-	rail.add_child(v)
+			var bd = UI.chip(str(n), UI.RED, Color.WHITE, 14)
+			bd.position = Vector2((w - pad_l) * 0.5 + 6, 1)
+			c.add_child(bd)
+		UI.tap(c, func(): _rail_tap(key), true)
+		lay.add_child(c)
+	for gi in RAIL_GROUPS.size():
+		if gi > 0:
+			var dy = step.call(y, div_h)
+			if dy == y:
+				var ln = ColorRect.new()
+				ln.color = Color(1, 1, 1, 0.1)
+				ln.position = Vector2(pad_l + 18, y + 5)
+				ln.size = Vector2(w - pad_l - 36, 1)
+				ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				lay.add_child(ln)
+				y += div_h
+		for key in RAIL_GROUPS[gi]:
+			y = step.call(y, cell)
+			place.call(key, y)
+			y += cell
+	# Settings: pinned to the bottom, clear of the camera
+	var yo = max(y, H - cell - 2)
+	if h0 >= 0 and yo < h1 and yo + cell > h0:
+		yo = h0 - cell if h0 - cell >= y else h1
+	place.call("options", yo)
 
 
 func _rail_tap(key: String):
@@ -714,9 +786,10 @@ func menu_items(key: String) -> Array:
 		a.append(_row("clipboard-list", "Team Report", "Strengths and gaps", func(): root("hub", {"kind": "report", "grp": "club"})))
 		a.append(_row("users", "Dressing Room", "Hierarchy and morale", func(): root("hub", {"kind": "dressing", "grp": "club"})))
 		a.append(_row("megaphone", "Fans", "%d%% confidence" % int(s.user.get("fans", 55.0)), func(): root("hub", {"kind": "fans", "grp": "club"})))
-		a.append(_row("hand-coins", "Sponsors", str(s.user.sponsor.name) if s.user.get("sponsor") != null and s.user.sponsor.season == s.season else "No shirt sponsor", func(): root("hub", {"kind": "sponsors", "grp": "club"})))
+		var spn = G.OPS.sponsor_now()
+		a.append(_row("shirt", "Kit & Sponsors", str(spn.name) if spn != null else "Choose a shirt sponsor", func(): root("kit")))
 		a.append(_row("chart-bar", "Match Analysis", "Goals, home and away", func(): root("hub", {"kind": "analysis", "grp": "club"})))
-		a.append(_row("shield", "Club Identity", "Colours and records", func(): root("hub", {"kind": "identity", "grp": "club"})))
+		a.append(_row("shield", "Club Records", "Your record and top scorers", func(): root("hub", {"kind": "identity", "grp": "club"})))
 		a.append(_row("building", "Club City", "Stadium %s" % G.OPS._thousands(G.OPS.capacity(c)), func(): root("campus")))
 	elif key == "manager":
 		a.append(_row("user", "Manager Profile", s.user.name, func(): root("board")))
@@ -779,6 +852,54 @@ func menu_items(key: String) -> Array:
 	return a
 
 
+# Menu layout: headings with the rows under them, "|" starts the second column. Rows not named land in the last group.
+const MENU_GROUPS = {
+	"club": [["Squad", ["First Team", "Youth & Reserves", "Tactics", "Loan Watch"]], ["Players", ["Development Hub", "Medical Centre", "Contracts", "Dressing Room"]], "|",
+		["Club", ["Kit & Sponsors", "Finances", "Club City", "Fans", "Club Records"]], ["Season", ["Fixtures", "Team Report", "Match Analysis"]]],
+	"manager": [["Job", ["Manager Profile", "Board Confidence", "My Contract", "Board Request", "Jobs", "Philosophy"]], "|",
+		["Money and life", ["Lifestyle", "Investments", "Club Ownership", "Social"]], ["Career", ["Trophy Cabinet", "Career Timeline", "Game Status"]]],
+	"world": [["Competitions", ["Club Division", "Cups & Continental"]], ["Leagues", []], "|",
+		["News", ["Live Scores", "Transfer Centre", "League Standards"]], ["Best players", ["Player Stats", "Team of the Week", "Awards", "Top 50 Players", "Wonderkids"]]],
+	"search": [["Find", ["Player Search", "Role Finder", "Find Club", "Scouting"]], ["Deals", ["Transfer Market", "Jobs"]], "|",
+		["Quick lists", ["Bargains", "Free Agents", "Transfer Listed", "Expiring Contracts"]]],
+	"options": [["Game", ["Save Game", "Settings", "Manual", "Editor", "Exit to Menu"]], "|", ["Your story", ["Achievements", "Season Documentary", "Hall of Fame"]]],
+}
+
+
+func menu_columns(key: String) -> Array:
+	# -> [[ [heading, rows], ... ], ...] one entry per column
+	var rows = menu_items(key)
+	var spec = MENU_GROUPS.get(key, [])
+	var named = {}
+	for g in spec:
+		if g is Array:
+			for nm in g[1]:
+				named[nm] = true
+	var cols = [[]]
+	var spare = []
+	for r in rows:
+		if not named.has(r[1]):
+			spare.append(r)
+	var catch_all = -1
+	for g in spec:
+		if g is String:
+			cols.append([])
+			continue
+		var got = []
+		for nm in g[1]:
+			for r in rows:
+				if r[1] == nm:
+					got.append(r)
+		if g[1].is_empty():
+			got = spare
+			catch_all = 1
+		if not got.is_empty():
+			cols[-1].append([g[0], got])
+	if catch_all < 0 and not spare.is_empty():
+		cols[-1].append(["More", spare])
+	return cols.filter(func(c): return not c.is_empty())
+
+
 func open_menu(key: String):
 	close_menu()
 	UI.sfx("open", -14.0)
@@ -796,43 +917,54 @@ func open_menu(key: String):
 		if e is InputEventMouseButton and e.pressed:
 			close_menu())
 	root_c.add_child(dim)
-	var p = UI.panel(Color("111827"), 0, 0, 0)
+	var cols = menu_columns(key)
+	var p = UI.panel(UI.BG2, 0, 0, 0)
 	p.get_theme_stylebox("panel").border_color = Color(UI.accent, 0.8)
 	p.get_theme_stylebox("panel").border_width_left = 3
 	p.mouse_filter = Control.MOUSE_FILTER_STOP
 	p.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
 	p.offset_left = left
-	p.offset_right = left + 400
+	p.offset_right = left + min(380.0 * cols.size() + 12, size.x - left - 60)
 	p.offset_top = safe.get_theme_constant("margin_top")
 	var v = UI.vb(0)
 	var head = UI.hb(12)
-	head.add_child(UI.badge(G.uc(), 44))
-	var hv = UI.vb(-4)
-	hv.add_child(UI.lbl(G.uc().name, 24, UI.TEXT, "bold"))
-	hv.add_child(UI.caps({"club": "Club", "manager": "Manager", "world": "World", "search": "Search", "options": "Options"}[key], 18, UI.accent))
-	head.add_child(hv)
-	v.add_child(UI.margin(head, 18, 12, 18, 10))
+	head.add_child(UI.badge(G.uc(), 36))
+	head.add_child(UI.lbl(G.uc().name, 22, UI.TEXT, "bold"))
+	head.add_child(UI.caps({"club": "Club", "manager": "Manager", "world": "World", "search": "Market", "options": "Options"}[key], 17, UI.accent))
+	v.add_child(UI.margin(head, 18, 8, 18, 6))
 	v.add_child(UI.divider())
-	var lv = UI.vb(0)
-	for it in menu_items(key):
-		var r = UI.panel(Color(0, 0, 0, 0), 0, 18, 9)
-		var h = UI.hb(14)
-		if it[4] != "":
-			h.add_child(UI.flag(it[4], 34))
-		else:
-			h.add_child(UI.icon(it[0], 28, UI.TEXT))
-		var tv = UI.vb(-3)
-		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tv.add_child(UI.lbl_fill(it[1], 25, UI.TEXT, "semi"))
-		if it[2] != "":
-			tv.add_child(UI.lbl_fill(it[2], 17, UI.MUTED))
-		h.add_child(tv)
-		h.add_child(UI.icon("chevron-right", 20, UI.DIM))
-		r.add_child(h)
-		UI.tap(r, it[3])
-		lv.add_child(r)
-		lv.add_child(UI.divider())
-	v.add_child(UI.scroll(lv))
+	var ch = UI.hb(0)
+	ch.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for ci in cols.size():
+		var lv = UI.vb(0)
+		for g in cols[ci]:
+			lv.add_child(UI.margin(UI.caps(g[0], 14, UI.accent), 18, 8, 18, 2))
+			for it in g[1]:
+				var r = UI.panel(Color(0, 0, 0, 0), 0, 18, 8)
+				var h = UI.hb(12)
+				if it[4] != "":
+					h.add_child(UI.flag(it[4], 28))
+				else:
+					h.add_child(UI.icon(it[0], 24, UI.TEXT))
+				var tv = UI.vb(-4)
+				tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				tv.add_child(UI.lbl_fill(it[1], 22, UI.TEXT, "semi"))
+				if it[2] != "":
+					tv.add_child(UI.lbl_fill(it[2], 15, UI.MUTED))
+				h.add_child(tv)
+				h.add_child(UI.icon("chevron-right", 16, UI.DIM))
+				r.add_child(h)
+				UI.tap(r, it[3])
+				lv.add_child(r)
+		var sc2 = UI.scroll(lv)
+		sc2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ch.add_child(sc2)
+		if ci < cols.size() - 1:
+			var vl = ColorRect.new()
+			vl.color = UI.LINE
+			vl.custom_minimum_size = Vector2(1, 0)
+			ch.add_child(vl)
+	v.add_child(ch)
 	p.add_child(v)
 	root_c.add_child(p)
 	overlay.add_child(root_c)

@@ -349,6 +349,7 @@ func new_game(profile, club_id: int):
 	ensure_state()
 	active = true
 	msg("Welcome to %s" % mc.name, "The board welcomes you as the new manager of %s.\n\nSeason objective: %s.\n\nYou have a transfer budget of %s and the transfer window is open until 31 August. Set up your tactics, shape the squad and press Continue when you are ready." % [mc.name, s.user.obj.text, money(mc.budget)], "board")
+	OPS.sponsor_call(true)
 	save_game()
 
 
@@ -1011,7 +1012,7 @@ func apply_match(sim):
 		if f.ko and sim.winner() == ui:
 			u.conf = min(100.0, u.conf + 6)
 		u["fans"] = clamp(u.get("fans", 55.0) + (pts - ex) * 2.2 + (1.5 if t.goals - o.goals >= 3 else 0.0), 0.0, 100.0)
-		var sp = u.get("sponsor")
+		var sp = OPS.sponsor_now()
 		if sp != null and pts == 3:
 			uc().budget += int(sp.win)
 		if pts == 3:
@@ -1193,6 +1194,8 @@ func take_job(cid: int):
 	init_user_tactics(c)
 	OPS.ensure(c)
 	msg("Welcome to %s" % c.name, "You have been appointed manager of %s.\n\nObjective: %s." % [c.name, u.obj.text], "board")
+	u["sponsor"] = null
+	OPS.sponsor_call(true)
 	save_game()
 
 

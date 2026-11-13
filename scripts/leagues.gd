@@ -537,6 +537,7 @@ static func rollover():
 	s.deals = {}
 	s.offers = []
 	G.MK.after_rollover()
+	G.OPS.sponsor_call()
 	generate_fixtures()
 	u.obj = objective(ucl)
 	G.fix_lineup()

@@ -86,6 +86,8 @@ func build():
 		var dl = G.DL.find(dpid)
 		if dl != null and dl.stage != "dead" and subj.club != G.uc().id:
 			acts.add_child(_act({"club": "Make new bid", "talks": "Talk to player"}.get(dl.stage, "Open talks"), "handshake", func(): UI.main.open("nego", {"pid": dpid, "mode": "buy"})))
+	if m.kind == "sponsor":
+		acts.add_child(_act("Kit & Sponsors", "shirt", func(): UI.main.root("kit")))
 	if m.kind == "contract":
 		acts.add_child(_act("Contracts", "file-text", func(): UI.main.root("lists", {"kind": "contracts", "grp": "club"})))
 	if m.kind == "board":

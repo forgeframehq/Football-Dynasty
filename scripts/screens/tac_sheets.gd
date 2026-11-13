@@ -25,10 +25,10 @@ static func pick_best_style(done: Callable):
 			card.add_child(h)
 			var idx = i
 			UI.tap(card, func():
-				u.prof = G.TC.start_prof(idx, int(u.get("badge", 2)))
-				G.TC.set_style(c, idx)
-				UI.close_sheet()
-				done.call())
+				UI.confirm("%s as your best playstyle?" % sd.n, "This is permanent. You start highly rated in %s and average in the other four; the others still improve with use and with coaching badges, but your best style cannot be picked again." % sd.n, "Lock it in", func():
+					u.prof = G.TC.start_prof(idx, int(u.get("badge", 2)))
+					G.TC.set_style(c, idx)
+					done.call(), false, func(): pick_best_style.call_deferred(done)))
 			v.add_child(card)
 	UI.sheet("Your best playstyle", build_sheet)
 
@@ -62,12 +62,12 @@ static func pick_link(replace: int, done: Callable, intro := ""):
 			card.add_child(cv)
 			var lid = id
 			UI.tap(card, func():
-				if replace >= 0 and replace < u.links.size():
-					u.links[replace] = lid
-				else:
-					u.links.append(lid)
-				UI.close_sheet()
-				done.call())
+				UI.confirm("Take %s?" % L.n, "This is permanent. Link-up plays cannot be swapped for another later; you only gain more with each coaching badge." if replace < 0 else "This replaces the link-up play in that slot.", "Lock it in", func():
+					if replace >= 0 and replace < u.links.size():
+						u.links[replace] = lid
+					else:
+						u.links.append(lid)
+					done.call(), false, func(): pick_link.call_deferred(replace, done, intro)))
 			v.add_child(card)
 	UI.sheet("Choose a link-up play", build_sheet)
 

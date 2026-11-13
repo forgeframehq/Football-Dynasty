@@ -75,6 +75,9 @@ func run(m):
 		preload("res://scripts/screens/tac_sheets.gd").pick_link(-1, func(): pass)
 		await snap("setup_link", 0.8)
 		main.close_sheet()
+		UI.confirm("Take Overlap?", "This is permanent. Link-up plays cannot be swapped for another later; you only gain more with each coaching badge.", "Lock it in", func(): pass, false, func(): pass)
+		await snap("setup_confirm", 0.6)
+		main.close_sheet()
 	G.s.user["tac_set"] = true
 	var simple = ["home", "inbox", "squad", "tactics", "training", "fixtures", "finances", "campus", "board", "trophies", "jobs", "table", "comps", "stats", "transfers", "scouting", "club"]
 	if want.call("trophies"):
@@ -90,6 +93,25 @@ func run(m):
 		await snap("fixtures_round")
 		main.root("clubview", {"cid": 2})
 		await snap("clubview")
+	if want.call("kit"):
+		main.root("kit")
+		await snap("kit")
+		main.stack[-1].preview = G.OPS.sponsor_offers()[1].name
+		G.uc()["kitp"] = 1
+		main.stack[-1].refresh()
+		await snap("kit_preview")
+		G.s.user["sponsor"] = G.OPS.sponsor_offers()[1]
+		G.uc()["kitp"] = 4
+		main.stack[-1].refresh()
+		await snap("kit_signed")
+		main.root("inbox")
+		await snap("kit_inbox")
+	if want.call("rail"):
+		for k in ["club", "manager", "world", "search", "options"]:
+			main.root("home")
+			main.open_menu(k)
+			await snap("menu_" + k)
+		main.close_menu()
 	if want.call("settings"):
 		main.root("settings", {"grp": "options"})
 		await snap("settings")

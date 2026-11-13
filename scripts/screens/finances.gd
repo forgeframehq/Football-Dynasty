@@ -34,7 +34,7 @@ func build():
 	v.add_child(UI.kv("Your salary", "%s a week" % G.money(G.OPS.salary()), UI.TEXT, 17))
 	var bh = UI.hb(6)
 	bh.add_child(UI.btn("Facilities", func(): UI.main.open("campus"), "secondary", "", 44))
-	bh.add_child(UI.btn("Sponsors", func(): UI.main.open("hub", {"kind": "sponsors", "grp": "club"}), "ghost", "", 44))
+	bh.add_child(UI.btn("Sponsors", func(): UI.main.open("kit"), "ghost", "", 44))
 	for x in bh.get_children():
 		x.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(bh)

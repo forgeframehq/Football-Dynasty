@@ -295,14 +295,68 @@ static func salary() -> int:
 	return G.nice(c.wage_budget * 0.012 * (0.5 + u.rep / 100.0))
 
 
+static func sponsor_now():
+	# this season's shirt sponsor, or null if none has been signed yet
+	var sp = G.s.user.get("sponsor")
+	if sp != null and int(sp.get("season", -1)) == G.s.season:
+		return sp
+	return null
+
+
+static func sponsor_list() -> Array:
+	return load("res://scripts/screens/hub.gd").SPONSORS
+
+
+static func sponsor_logo(nm: String) -> Texture2D:
+	var all = sponsor_list()
+	for i in all.size():
+		if all[i][0] == nm:
+			var path = "res://assets/sponsors/sponsor_%02d.png" % (i + 1)
+			if ResourceLoader.exists(path):
+				return load(path)
+	return null
+
+
+static func sponsor_offers() -> Array:
+	# three offers a season: all guaranteed money, a mix, or mostly win bonuses
+	var s = G.s
+	var c = G.uc()
+	var all = sponsor_list()
+	var rng = RandomNumberGenerator.new()
+	rng.seed = s.season * 977 + c.id * 13
+	var base = c.wage_budget * (0.06 + c.fac.commercial * 0.012)
+	var out = []
+	var used = []
+	for t in [["Guaranteed", 1.0, 0.0], ["Balanced", 0.72, 0.9], ["Win bonus", 0.4, 2.2]]:
+		var i = rng.randi() % all.size()
+		while i in used:
+			i = (i + 1) % all.size()
+		used.append(i)
+		out.append({"name": all[i][0], "sector": all[i][1], "type": t[0], "weekly": G.nice(base * t[1]), "win": G.nice(base * t[2]), "season": s.season})
+	return out
+
+
+static func sponsor_call(first := false):
+	# start of a season (or a new job): the offers are in and the manager has to pick one
+	var old = G.s.user.get("sponsor")
+	var names = []
+	for o in sponsor_offers():
+		names.append("%s (%s)" % [o.name, o.type.to_lower()])
+	var lead = "Three companies want their name on the shirt this season: %s." % ", ".join(names)
+	if not first and old != null:
+		lead = "Your deal with %s has run its course. %s" % [old.name, lead]
+	G.msg("Sponsor offers are in", lead + "\n\nA guaranteed deal pays the most each week; a win-bonus deal pays less each week and more for every win. The deal runs for the whole season and cannot be changed once signed. Until you choose, the club earns nothing from the shirt.\n\nOpen Kit & Sponsors to choose, and to set this season's kit.", "sponsor", null, true)
+
+
 static func week_money(c: Dictionary) -> Dictionary:
 	# the club's income and costs for the week so far (settled every Monday by weekly())
 	var s = G.s
 	var tier = s.leagues[c.lg].tier
 	var wages = G.squad_wages(c)
 	var sponsor = int(c.wage_budget * (0.86 + 0.03 * c.fac.commercial))
-	if s.user.get("sponsor") != null:
-		sponsor += int(s.user.sponsor.weekly)
+	var sp = sponsor_now()
+	if sp != null and c.id == s.user.club:
+		sponsor += int(sp.weekly)
 	var tv = int(c.wage_budget * 0.05)
 	var price = [46, 30, 20, 15][clampi(tier - 1, 0, 3)]
 	var fill = clamp(0.55 + (c.rep - 55.0) * 0.012 + (0.1 if c.form.count("W") >= 3 else 0.0), 0.35, 0.98)

@@ -5,7 +5,7 @@ extends "res://scripts/screens/screen.gd"
 const TITLES = {"dressing": "Dressing Room", "fans": "Fans", "sponsors": "Sponsors", "request": "Board Request", "report": "Team Report",
 	"tcentre": "Transfer Centre", "awards": "Awards", "scores": "Live Scores", "standards": "League Standards", "timeline": "Career Timeline",
 	"philosophy": "Philosophy", "status": "Game Status", "manual": "Manual", "achieve": "Achievements", "fame": "Hall of Fame",
-	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Identity", "analysis": "Match Analysis", "life": "Lifestyle", "contract": "My Contract", "invest": "Investments", "owner": "Club Ownership", "press": "Press Conference", "doc": "Season Documentary", "social": "Social"}
+	"editor": "Editor", "findclub": "Find Club", "rolefinder": "Role Finder", "identity": "Club Records", "analysis": "Match Analysis", "life": "Lifestyle", "contract": "My Contract", "invest": "Investments", "owner": "Club Ownership", "press": "Press Conference", "doc": "Season Documentary", "social": "Social"}
 const QUESTIONS = [["How confident are you of a result?", [["We will win. I have no doubt.", "bold"], ["We respect them, and we are ready.", "calm"], ["I only talk about my own team.", "flat"]]],
 	["Your star player has been quiet lately. Is he under pressure?", [["He is the best in the league. Watch him.", "bold"], ["Form comes and goes. He has my trust.", "calm"], ["Next question.", "flat"]]],
 	["The fans are asking for more attacking football.", [["They will get goals, I promise.", "bold"], ["We play to win, in whatever way it takes.", "calm"], ["The fans do not pick the team.", "cold"]]],
@@ -161,20 +161,7 @@ func _logo(name_: String, h: float) -> Control:
 
 
 func _offers() -> Array:
-	var s = G.s
-	var c = G.uc()
-	var rng = RandomNumberGenerator.new()
-	rng.seed = s.season * 977 + c.id * 13
-	var base = c.wage_budget * (0.06 + c.fac.commercial * 0.012)
-	var out = []
-	var used = []
-	for t in [["Guaranteed", 1.0, 0.0], ["Balanced", 0.72, 0.9], ["Win bonus", 0.4, 2.2]]:
-		var i = rng.randi() % SPONSORS.size()
-		while i in used:
-			i = (i + 1) % SPONSORS.size()
-		used.append(i)
-		out.append({"name": SPONSORS[i][0], "sector": SPONSORS[i][1], "type": t[0], "weekly": G.nice(base * t[1]), "win": G.nice(base * t[2]), "season": s.season})
-	return out
+	return G.OPS.sponsor_offers()
 
 
 func _sponsors(v: Control):
@@ -309,24 +296,7 @@ func _identity(v: Control):
 	tv.add_child(UI.lbl(c.stadium if c.stadium != "" else "Home ground", 18, UI.MUTED))
 	h.add_child(tv)
 	cv.add_child(h)
-	for key in ["c1", "c2"]:
-		cv.add_child(UI.caps("Primary colour" if key == "c1" else "Secondary colour", 16, UI.MUTED))
-		var sw = HFlowContainer.new()
-		sw.add_theme_constant_override("h_separation", 6)
-		sw.add_theme_constant_override("v_separation", 6)
-		for hex in ["ffffff", "111111", "d0021b", "8b0000", "f5a623", "f8e71c", "1e8e3e", "0b6e4f", "6cabdd", "1f4fbf", "0a1a5c", "6b2fb3", "ff6fb1", "7a4a1e", "9aa3ad", "e9c46a"]:
-			var on = str(c[key]).to_lower() == hex
-			var chip_ = UI.panel(Color(hex), 8, 0, 0, UI.TEXT if on else Color(1, 1, 1, 0.2))
-			chip_.get_theme_stylebox("panel").set_border_width_all(3 if on else 1)
-			chip_.custom_minimum_size = Vector2(44, 34)
-			var k = key
-			var hx = hex
-			UI.tap(chip_, func():
-				c[k] = hx
-				refresh(), true)
-			sw.add_child(chip_)
-		cv.add_child(sw)
-	cv.add_child(UI.wrap("Colours change the shield, the kit in matches and the stadium seats.", 17, UI.DIM))
+	cv.add_child(UI.btn("Kit & Sponsors", func(): UI.main.root("kit"), "secondary", "shirt", 50))
 	var rv = _card(v, "Records under you")
 	rv.add_child(UI.kv("Matches", str(s.user.p)))
 	rv.add_child(UI.kv("Won / drawn / lost", "%d / %d / %d" % [s.user.w, s.user.d, s.user.l]))
