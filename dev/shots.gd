@@ -29,6 +29,11 @@ func run(m):
 		if a.begins_with("days="):
 			days = int(a.substr(5))
 	var want = func(k): return only.is_empty() or k in only
+	if "--intro" in OS.get_cmdline_user_args():
+		await snap("intro_card", 0.9)
+		await snap("intro_film", 4.0)
+		await snap("intro_title", 6.6)
+		main._end_intro()
 	if want.call("menu"):
 		await snap("menu")
 	if want.call("new"):

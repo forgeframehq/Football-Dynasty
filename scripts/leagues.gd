@@ -439,6 +439,7 @@ static func rollover():
 			else:
 				c.budget = G.nice(max(0.0, c.budget) * 0.6 + base * 0.6 + prize)
 	s.season += 1
+	G.MK.before_return()
 	G.OPS.return_loans()
 	var promoted_youth = []
 	for pid in ucl.players:
@@ -460,6 +461,13 @@ static func rollover():
 				retired.append(G.pname(p))
 			remove_player(p)
 			continue
+		if p.has("pre") and p.club >= 0 and p.cend <= s.season:
+			# he signed a pre-contract during the season and now moves on a free transfer
+			if p.club == ucl.id:
+				left.append(G.pname(p))
+			G.MK.fulfil_pre(p)
+			continue
+		p.erase("pre")
 		if p.club >= 0 and p.cend <= s.season:
 			var c = s.clubs[p.club]
 			if p.club == ucl.id:
@@ -526,6 +534,7 @@ static func rollover():
 	s.negos = {}
 	s.deals = {}
 	s.offers = []
+	G.MK.after_rollover()
 	generate_fixtures()
 	u.obj = objective(ucl)
 	G.fix_lineup()

@@ -307,6 +307,7 @@ static func week_money(c: Dictionary) -> Dictionary:
 	for k in FAC:
 		levels += c.fac[k]
 	var upkeep = int(c.wage_budget * 0.011 * levels)
+	wages += G.MK.loan_wages(c)
 	return {"tickets": tickets, "sponsor": sponsor, "tv": tv, "wages": wages, "upkeep": upkeep, "home": c.fin.home, "net": sponsor + tv + tickets - wages - upkeep}
 
 

@@ -10,6 +10,7 @@ const OPS = preload("res://scripts/club_ops.gd")
 const PS = preload("res://scripts/persona.gd")
 const DL = preload("res://scripts/deals.gd")
 const TC = preload("res://scripts/tac.gd")
+const MK = preload("res://scripts/market.gd")
 
 const SAVE_V = 2
 var slot := 0
@@ -217,7 +218,9 @@ func available(p: Dictionary) -> bool:
 func squad_wages(c: Dictionary) -> int:
 	var t = 0
 	for pid in c.players:
-		t += s.players[pid].wage
+		var p = s.players[pid]
+		# a loanee costs only the share of his wages agreed with his club
+		t += int(p.wage * float(p.lw)) if p.has("lw") else int(p.wage)
 	return t
 
 
@@ -980,6 +983,7 @@ func apply_match(sim):
 		var o = sim.sd[1 - ui]
 		var u = s.user
 		TC.after_match(sim, ui)
+		MK.pay_bonuses(sim, ui)
 		u.p += 1
 		var pts = 1
 		if t.goals > o.goals:
@@ -1061,9 +1065,8 @@ func start_of_day():
 	if window_open():
 		TR.daily()
 		if cur.day == 31 and (cur.month == 8 or cur.month == 1):
-			for i in 30:
-				TR.ai_deal()
-			msg("Deadline day", "It is the last day of the transfer window. Clubs are scrambling to get deals done — any business you want to do has to happen today.", "info", null, true)
+			MK.dd_start()
+			msg("Deadline day", "It is the last day of the transfer window, and it runs hour by hour until 23:00. Open Deadline Day from your to-do list or the Transfer Centre to follow it live: late bids for your players, agents with cut-price offers, and deals going through everywhere.\n\nAny business you want to do has to happen today. A fee agreed today brings the player in to talk terms the same evening.", "info", null, true)
 	DL.tick()
 	TR.expire_offers()
 	LG.update_playoffs()
@@ -1075,6 +1078,7 @@ func start_of_day():
 	if cur.day == 15:
 		refresh_jobs()
 	OPS.daily()
+	MK.daily()
 	if s.day == ymd(s.season + 1, 6, 12):
 		LG.rollover()
 		stop_flag = true

@@ -5,14 +5,17 @@ const BADGE = preload("res://scripts/widgets/badge.gd")
 const BAR = preload("res://scripts/widgets/bar.gd")
 const FLAG = preload("res://scripts/widgets/flag.gd")
 
-const BG = Color("090d16")
-const BG2 = Color("0f1522")
-const CARD = Color("141b2b")
-const CARD2 = Color("1b2438")
+# One colour scheme for the whole game, taken from the Football Dynasty 26 logo: deep purple-navy
+# surfaces, a purple accent, gold for highlights. Club colours appear only on badges, kits and markers.
+const BG = Color("0a0816")
+const BG2 = Color("110d22")
+const CARD = Color("17132b")
+const CARD2 = Color("201a3b")
+const BRAND = Color("9a5cff")
 const LINE = Color(1, 1, 1, 0.07)
 const TEXT = Color("f3f6fb")
-const MUTED = Color("8b96ab")
-const DIM = Color("5b6680")
+const MUTED = Color("958fb0")
+const DIM = Color("625c82")
 const GOLD = Color("e9c46a")
 const GREEN = Color("2ee59d")
 const RED = Color("ff5c72")
@@ -20,7 +23,7 @@ const AMBER = Color("f6ad3c")
 const BLUE = Color("4da3ff")
 const LINE_COL = [Color("f6ad3c"), Color("4da3ff"), Color("2ee59d"), Color("ff6b81")]
 
-var accent: Color = GOLD
+var accent: Color = BRAND
 var fonts: Dictionary = {}
 var icon_src: Dictionary = {}
 var icon_cache: Dictionary = {}
@@ -122,18 +125,9 @@ func ambience(on: bool):
 		players["crowd"].stop()
 
 
-func set_accent_from(c: Dictionary):
-	var a = Color(c.c1)
-	var b = Color(c.c2)
-	var pick = a if a.s * a.v >= b.s * b.v else b
-	if pick.s < 0.25:
-		accent = GOLD
-		return
-	if pick.v < 0.75:
-		pick = Color.from_hsv(pick.h, min(pick.s, 0.8), 0.85)
-	if pick.get_luminance() < 0.28:
-		pick = pick.lightened(0.35)
-	accent = pick
+func set_accent_from(_c: Dictionary):
+	# kept for callers; the accent no longer follows the club
+	accent = BRAND
 
 
 func on_color(c: Color) -> Color:

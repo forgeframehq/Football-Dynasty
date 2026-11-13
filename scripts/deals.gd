@@ -192,8 +192,14 @@ static func submit_bid(d: Dictionary, fee: int, inst: int, addon: int, sellon: i
 		return {"ok": true, "res": "accept", "text": "Your %s offer meets the release clause in %s's contract. %s cannot refuse." % [G.money(fee), G.pname(p), c.name]}
 	var ratio = pv / max(1.0, a)
 	if ratio >= (0.92 if final else 0.95):
-		_agree(d, "We have a deal at %s%s%s." % [G.money(fee), swap_txt, extras(d)])
-		return {"ok": true, "res": "accept", "text": "“We have a deal.” %s accept %s%s%s for %s." % [c.name, G.money(fee), swap_txt, extras(d), G.pname(p)]}
+		# a bigger club selling a promising youngster keeps a way to get him back
+		var bbt = ""
+		d["bb"] = 0
+		if G.age(p) <= 21 and p.pot >= p.ovr + 5 and c.rep >= uc.rep + 2 and fee > 500000:
+			d.bb = G.nice(max(fee, G.value(p)) * 1.8)
+			bbt = " They insist on a buy-back clause at %s for the next three seasons." % G.money(int(d.bb))
+		_agree(d, "We have a deal at %s%s%s.%s" % [G.money(fee), swap_txt, extras(d), bbt])
+		return {"ok": true, "res": "accept", "text": "“We have a deal.” %s accept %s%s%s for %s.%s" % [c.name, G.money(fee), swap_txt, extras(d), G.pname(p), bbt]}
 	if final:
 		kill(d, 21)
 		say(d, "club", "Refused the final offer and ended the talks.")
@@ -273,6 +279,13 @@ static func _agree(d: Dictionary, line: String, msg_text := ""):
 	d.exp = G.s.day + 10
 	d.ppat = 100.0
 	say(d, "club", line)
+	if G.MK.is_deadline() and G.window_open():
+		# no tomorrow on deadline day: his agent brings him straight over
+		d.meet = G.s.day
+		d.stage = "talks"
+		say(d, "agent", "Came straight over: the window shuts tonight.")
+		G.msg("%s: fee agreed, talks tonight" % G.pname(p), "%s have accepted your offer for %s. With the window closing at 23:00 his agent has brought him straight over: agree his contract today or the deal is off until the next window." % [c.name, G.pfull(p)], "deal", p.id)
+		return
 	var swap_txt = (" plus %s" % G.pname(G.s.players[d.swap])) if d.swap >= 0 and G.s.players.has(d.swap) else ""
 	var body = msg_text if msg_text != "" else "%s have accepted %s%s%s for %s." % [c.name, G.money(d.fee), swap_txt, extras(d), G.pfull(p)]
 	G.msg("%s: fee agreed" % G.pname(p), body + "\n\n%s and his agent will come in to discuss personal terms on %s. The agreement with %s stands for 10 days." % [G.pname(p), G.fmt_date(d.meet), c.short], "deal", p.id)
@@ -456,6 +469,8 @@ static func offer_terms(d: Dictionary, t: Dictionary) -> Dictionary:
 		return {"res": "error", "text": "You need %s today (first payment, signing-on and agent fees) but have %s." % [G.money(upfront(d, t)), G.money(uc.budget)]}
 	if own and p.mor < 35:
 		return {"res": "reject", "text": "%s is unhappy and refuses to discuss a new deal right now." % G.pname(p)}
+	if own and p.has("pre"):
+		return {"res": "error", "text": "%s has already signed a pre-contract with %s. It is too late for a new deal." % [G.pname(p), G.s.clubs[int(p.pre.club)].name]}
 	if d.mode == "buy" and not G.window_open():
 		return {"res": "error", "text": "The window is closed. The move cannot be registered until it reopens."}
 	if d.mode == "buy" and d.swap >= 0 and (not G.s.players.has(d.swap) or G.s.players[d.swap].club != uc.id):
@@ -536,6 +551,8 @@ static func complete(d: Dictionary, t: Dictionary):
 				var q = s.players[d.swap]
 				G.TR.move(q, from_id, 0, q.wage, 3)
 				G.msg("%s leaves in the %s deal" % [G.pname(q), G.pname(p)], "%s has joined %s as part of the agreement that brought %s to the club." % [G.pfull(q), s.clubs[from_id].name, G.pfull(p)], "info")
+			if int(d.get("bb", 0)) > 0:
+				p["bb"] = {"club": from_id, "fee": int(d.bb), "until": s.season + 3}
 		G.PS.learn(p, G.PS.country_of(uc.id))
 		G.scrap("Signed %s" % G.pname(p), "%s joined%s on a %d-year contract." % [G.pfull(p), (" for " + G.money(d.fee)) if d.fee > 0 else " on a free transfer", t.years])
 		G.SOC.on_signing(p, d.fee)
@@ -681,9 +698,10 @@ static func _promises():
 
 # ---------------------------------------------------------------- selling
 
-static func counter_sale(o: Dictionary, fee: int, sellon: int):
+static func counter_sale(o: Dictionary, fee: int, sellon: int, clause := 0):
 	o["counter"] = fee
 	o["csell"] = sellon
+	o["cclause"] = clause
 	o["wait"] = G.s.day + 1
 	o.exp = max(o.exp, G.s.day + 4)
 
@@ -699,11 +717,13 @@ static func _sales():
 		var so = int(o.get("csell", 0))
 		o.erase("wait")
 		var limit = float(G.value(p)) * (1.25 if p.listed else 1.7) * G.rng.randf_range(0.92, 1.06)
-		var cost = want + so / 100.0 * G.value(p) * 0.35
+		var ccl = int(o.get("cclause", 0))
+		var cost = want + so / 100.0 * G.value(p) * 0.35 + [0.0, 0.1, 0.04][ccl] * G.value(p)
 		o["rounds"] = o.get("rounds", 0) + 1
 		if cost <= limit and want <= c.budget:
 			o.fee = want
 			o["sellon"] = so
+			o["clause"] = ccl
 			G.msg("%s: %s agree" % [G.pname(p), c.name], "%s have agreed to your terms: %s%s for %s.\n\nThe offer is on the table for you to accept." % [c.name, G.money(want), (" plus %d%% of any future sale" % so) if so > 0 else "", G.pfull(p)], "offer", o.id, true)
 		elif o.rounds >= 3 or cost > limit * 1.5:
 			s.offers.erase(o)

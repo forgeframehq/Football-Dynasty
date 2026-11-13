@@ -55,10 +55,19 @@ func build():
 	v.offset_top = 20
 	v.offset_bottom = -16
 	holder.add_child(v)
-	var t = UI.vb(-30)
-	t.add_child(UI.lbl("FOOTBALL", 92, UI.TEXT, "xbold"))
-	t.add_child(UI.lbl("DYNASTY", 92, UI.GOLD, "xbold"))
-	v.add_child(t)
+	if ResourceLoader.exists("res://assets/wordmark.png"):
+		var wm = TextureRect.new()
+		wm.texture = load("res://assets/wordmark.png")
+		wm.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		wm.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+		wm.custom_minimum_size = Vector2(500, 185)
+		wm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(wm)
+	else:
+		var t = UI.vb(-30)
+		t.add_child(UI.lbl("FOOTBALL", 92, UI.TEXT, "xbold"))
+		t.add_child(UI.lbl("DYNASTY", 92, UI.GOLD, "xbold"))
+		v.add_child(t)
 	v.add_child(UI.caps("Career manager  ·  Season 2026/27", 22, UI.MUTED))
 	v.add_child(UI.sp())
 	var newest = -1

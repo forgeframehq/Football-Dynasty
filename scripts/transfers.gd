@@ -117,6 +117,12 @@ static func move(p: Dictionary, to_id: int, fee: int, wage: int, years: int):
 	var from_id = p.club
 	p["prevc"] = from_id
 	p.erase("lsk")
+	for k in ["lw", "lterms", "bon", "bonp", "mrh", "lpay", "lrecall"]:
+		p.erase(k)
+	if p.has("pre") and int(p.pre.club) != to_id:
+		p.erase("pre")
+	if p.has("bb") and int(p.bb.club) == to_id:
+		p.erase("bb")
 	var from_name = "Free agent"
 	if from_id >= 0:
 		var fc = s.clubs[from_id]
@@ -239,6 +245,8 @@ static func accept_offer(o: Dictionary):
 	move(p, o.from, o.fee, max(p.wage, G.wage_for(p.ovr, G.age(p))), G.rng.randi_range(2, 4))
 	if o.get("sellon", 0) > 0:
 		p["sellon"] = [G.s.user.club, o.sellon]
+	if int(o.get("clause", 0)) > 0:
+		G.MK.set_sale_clause(p, int(o.clause), int(o.fee))
 	G.msg("%s sold" % G.pname(p), "%s has completed his move to %s for %s. The fee has been added to your transfer budget." % [G.pfull(p), c.name, G.money(o.fee)], "info")
 
 
@@ -272,7 +280,7 @@ static func ai_deal():
 		if seller.id == buyer.id or seller.id == s.user.club or seller.players.size() <= 21:
 			continue
 		var p = s.players[seller.players[rng.randi() % seller.players.size()]]
-		if p.ovr < buyer.rep - 1 or p.ovr > buyer.rep + 6 or G.age(p) > 30 or p.get("loan", -1) >= 0:
+		if p.ovr < buyer.rep - 1 or p.ovr > buyer.rep + 6 or G.age(p) > 30 or p.get("loan", -1) >= 0 or p.has("pre") or p.has("mrh"):
 			continue
 		if seller.rep > buyer.rep + 2 and not p.listed:
 			continue
@@ -297,6 +305,8 @@ static func ai_deal():
 				cover += 1
 		if cover <= [2, 6, 6, 4][line]:
 			continue
+		if G.MK.hold_for_match(p, buyer, fee):
+			return
 		move(p, buyer.id, fee, max(p.wage, G.wage_for(p.ovr, G.age(p))), rng.randi_range(2, 5))
 		return
 

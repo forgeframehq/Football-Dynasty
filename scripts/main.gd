@@ -70,13 +70,115 @@ func _ready():
 		return
 	_build()
 	root("menu")
-	UI.music(true)
+	if ("--shots" in ua or "--uitest" in ua) and not ("--intro" in ua):
+		UI.music(true)
+	elif not _play_intro():
+		UI.music(true)
 	if "--uitest" in ua:
 		dev = load("res://dev/uitest.gd").new()
 		dev.run(self)
 	if "--shots" in ua:
 		dev = load("res://dev/shots.gd").new()
 		dev.run(self)
+
+
+# ---------------------------------------------------------------- intro film
+
+const INTRO_PATH = "res://assets/video/intro.ogv"
+const INTRO_LEN = 11.5
+var intro_node: Control = null
+
+
+func _play_intro() -> bool:
+	# studio card, then the film, the game's title over its last shot, then the menu. Skip at any time.
+	if not ResourceLoader.exists(INTRO_PATH):
+		return false
+	var o = Control.new()
+	o.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	o.mouse_filter = Control.MOUSE_FILTER_STOP
+	o.z_index = 100
+	var black = ColorRect.new()
+	black.color = Color.BLACK
+	black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	black.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	o.add_child(black)
+	var ar = AspectRatioContainer.new()
+	ar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ar.ratio = 736.0 / 400.0
+	ar.stretch_mode = AspectRatioContainer.STRETCH_COVER
+	ar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vp = VideoStreamPlayer.new()
+	vp.stream = load(INTRO_PATH)
+	vp.expand = true
+	vp.volume_db = -4.0 if G.settings.get("sound", true) else -80.0
+	vp.modulate.a = 0.0
+	vp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ar.add_child(vp)
+	o.add_child(ar)
+	# studio card
+	var card = UI.vb(2)
+	card.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	card.grow_vertical = Control.GROW_DIRECTION_BOTH
+	var c1 = UI.lbl("FORGEFRAME", 54, UI.TEXT, "xbold")
+	c1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var c2 = UI.caps("presents", 18, UI.MUTED)
+	c2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card.add_child(c1)
+	card.add_child(c2)
+	card.modulate.a = 0.0
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	o.add_child(card)
+	# the title, shown over the last shot
+	var wm = TextureRect.new()
+	if ResourceLoader.exists("res://assets/wordmark.png"):
+		wm.texture = load("res://assets/wordmark.png")
+	wm.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	wm.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	wm.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	wm.offset_left = 240
+	wm.offset_right = -240
+	wm.offset_top = 90
+	wm.offset_bottom = -170
+	wm.modulate.a = 0.0
+	wm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	o.add_child(wm)
+	var skip = UI.btn("Skip", _end_intro, "ghost", "fast-forward", 46)
+	skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	skip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	skip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	skip.offset_right = -28 - safe.get_theme_constant("margin_right")
+	skip.offset_bottom = -22
+	skip.offset_left = skip.offset_right - 150
+	skip.offset_top = skip.offset_bottom - 46
+	o.add_child(skip)
+	add_child(o)
+	intro_node = o
+	var tw = o.create_tween()
+	tw.tween_property(card, "modulate:a", 1.0, 0.45)
+	tw.tween_interval(1.1)
+	tw.tween_property(card, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(func():
+		vp.play()
+		vp.modulate.a = 1.0)
+	tw.tween_interval(INTRO_LEN - 3.4)
+	tw.tween_property(wm, "modulate:a", 1.0, 0.9)
+	tw.tween_interval(3.0)
+	tw.tween_callback(_end_intro)
+	return true
+
+
+func _end_intro():
+	if intro_node == null or not is_instance_valid(intro_node):
+		return
+	var o = intro_node
+	intro_node = null
+	o.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tw = create_tween()
+	tw.tween_property(o, "modulate:a", 0.0, 0.45)
+	tw.tween_callback(func():
+		o.queue_free()
+		UI.music(true))
 
 
 func _build():
@@ -246,6 +348,9 @@ func open(sname: String, args := {}):
 
 
 func back():
+	if intro_node != null:
+		_end_intro()
+		return
 	if sheet_node != null:
 		close_sheet()
 		return
@@ -293,10 +398,7 @@ func _clear(n: Node):
 
 
 func _update_chrome():
-	if G.active:
-		UI.set_accent_from(G.uc())
-	else:
-		UI.accent = UI.GOLD
+	UI.accent = UI.BRAND
 	glow.modulate = UI.accent
 	var on = uses_chrome()
 	rail.visible = on
