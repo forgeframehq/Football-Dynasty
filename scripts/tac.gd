@@ -385,6 +385,7 @@ static func weekly():
 					p.sk.append(l[0])
 					G.msg("%s has learned %s" % [G.pname(p), SKILLS[l[0]].n], "%s has finished his work on the training ground and now has the %s skill.\n\n%s" % [G.pfull(p), SKILLS[l[0]].n, SKILLS[l[0]].d])
 	roll_arrows()
+	totw_build()
 
 
 static func roll_arrows():
@@ -397,6 +398,63 @@ static func roll_arrows():
 		var base = clamp((float(p.form) - 6.6) * 1.6, -1.2, 1.2)
 		var v = base + rng.randfn(0.0, 1.1 if streaky else 0.55)
 		p["arw"] = clampi(int(round(v)), -2 if streaky else -1, 2 if streaky else 1)
+
+
+static func totw_note(sim):
+	# remember the week's best performances in the top divisions
+	var s = G.s
+	var f = sim.fx
+	if f.get("fr", false) or f.lg < 0 or f.lg >= s.leagues.size() or s.leagues[f.lg].tier != 1 or s.leagues[f.lg].get("roe", false):
+		return
+	if not s.has("totw_pool"):
+		s["totw_pool"] = []
+	for pid in sim.pm:
+		var q = sim.pm[pid]
+		if q.tin >= 0 and q.r >= 7.4:
+			s.totw_pool.append([pid, q.r, q.g, q.a])
+
+
+static func totw_build():
+	# Mondays: the best eleven of the last seven days, one keeper, four defenders, three midfielders, three forwards
+	var s = G.s
+	var pool = s.get("totw_pool", [])
+	s["totw_pool"] = []
+	if pool.size() < 30:
+		return
+	pool.sort_custom(func(x, y): return x[1] > y[1])
+	var need = [1, 4, 3, 3]
+	var got = [0, 0, 0, 0]
+	var xi = []
+	var seen = {}
+	for e in pool:
+		if seen.has(e[0]) or not s.players.has(e[0]):
+			continue
+		var p = s.players[e[0]]
+		var l = G.LINE[p.pos]
+		if got[l] >= need[l]:
+			continue
+		got[l] += 1
+		seen[e[0]] = true
+		xi.append([e[0], e[1], e[2], e[3], l])
+		if xi.size() == 11:
+			break
+	if xi.size() < 11:
+		return
+	xi.sort_custom(func(x, y): return x[4] < y[4] if x[4] != y[4] else x[1] > y[1])
+	s["totw"] = {"day": s.day, "xi": xi}
+	var best = xi[0]
+	for e in xi:
+		if e[1] > best[1]:
+			best = e
+	G.news("Team of the Week: %s leads the way with a %.1f rating." % [G.pname(s.players[best[0]]), best[1]])
+	var mine = []
+	for e in xi:
+		var p = s.players[e[0]]
+		if p.club == s.user.club:
+			mine.append(G.pname(p))
+			p.mor = min(100, p.mor + 6)
+	if mine.size() > 0:
+		G.msg("Team of the Week", "%s %s been named in the Team of the Week. It has given the dressing room a lift.\n\nThe full eleven is under World > Team of the Week." % [" and ".join(mine), "has" if mine.size() == 1 else "have"], "info")
 
 
 static func form_type(p: Dictionary) -> int:

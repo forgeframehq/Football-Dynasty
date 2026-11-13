@@ -969,6 +969,7 @@ func apply_match(sim):
 			s.players[t.xi[0]].ss.cs += 1
 	if sim.motm >= 0:
 		s.players[sim.motm].ss.mom += 1
+	TC.totw_note(sim)
 	if f.get("comp", "") != "":
 		CP.on_result(f)
 	if f.h == ucid:

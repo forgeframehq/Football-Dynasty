@@ -2,7 +2,7 @@ extends "res://scripts/screens/screen.gd"
 # Ready-made player lists: medical centre, contracts, top players, smart searches.
 
 const TITLES = {"medical": "Medical Centre", "contracts": "Contracts", "top50": "Top 50 Players", "wonderkids": "Wonderkids",
-	"bargains": "Bargains", "expiring": "Expiring Contracts", "free": "Free Agents", "listed": "Transfer Listed", "similar": "Similar Players", "role": "Role Finder", "pos": "Best Available"}
+	"bargains": "Bargains", "expiring": "Expiring Contracts", "free": "Free Agents", "listed": "Transfer Listed", "similar": "Similar Players", "role": "Role Finder", "pos": "Best Available", "totw": "Team of the Week"}
 
 
 func build():
@@ -24,6 +24,22 @@ func build():
 		note = "Medical centre level %d. %s" % [G.OPS.lvl("medical"), G.OPS.effect_text("medical", G.OPS.lvl("medical"))]
 		if rows.is_empty():
 			note += "\n\nEveryone is fit and available."
+	elif kind == "totw":
+		var tw = s.get("totw", null)
+		if tw != null:
+			for e in tw.xi:
+				if not s.players.has(e[0]):
+					continue
+				var p = s.players[e[0]]
+				var bits = []
+				if e[2] > 0:
+					bits.append("%d goal%s" % [e[2], "" if e[2] == 1 else "s"])
+				if e[3] > 0:
+					bits.append("%d assist%s" % [e[3], "" if e[3] == 1 else "s"])
+				rows.append([p, "%s · rated %.1f%s" % [s.clubs[p.club].name if p.club >= 0 else "Free agent", e[1], (" · " + ", ".join(bits)) if bits.size() > 0 else ""], 0])
+			note = "The best eleven from the top divisions for the week to %s. Players named here get a morale lift." % G.fmt_date(tw.day)
+		else:
+			note = "The first Team of the Week is named on the Monday after the leagues start."
 	elif kind == "contracts":
 		for pid in c.players:
 			var p = s.players[pid]

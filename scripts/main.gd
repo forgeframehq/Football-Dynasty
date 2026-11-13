@@ -571,6 +571,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("goal", "Live Scores", "Latest league results", func(): root("hub", {"kind": "scores", "grp": "world"})))
 		a.append(_row("list", "League Standards", "Leagues ranked", func(): root("hub", {"kind": "standards", "grp": "world"})))
 		a.append(_row("chart-bar", "Player Stats", "Scorers, assists, ratings", func(): root("stats", {"lg": c.lg})))
+		a.append(_row("award", "Team of the Week", "The best eleven of the last seven days", func(): root("lists", {"kind": "totw", "grp": "world"})))
 		a.append(_row("crown", "Top 50 Players", "Best in the world", func(): root("lists", {"kind": "top50", "grp": "world"})))
 		a.append(_row("sparkles", "Wonderkids", "Best aged 21 or under", func(): root("lists", {"kind": "wonderkids", "grp": "world"})))
 	elif key == "search":
