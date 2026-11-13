@@ -13,7 +13,7 @@ var f: Dictionary
 var sim = null
 var stage := "pre"
 var us := 0
-var speed := 0
+var speed: int = int(G.settings.get("speed", 0))
 var paused := false
 var acc := 0.0
 var hold := 0.0

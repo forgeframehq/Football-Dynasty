@@ -5,17 +5,25 @@ const BADGE = preload("res://scripts/widgets/badge.gd")
 const BAR = preload("res://scripts/widgets/bar.gd")
 const FLAG = preload("res://scripts/widgets/flag.gd")
 
-# One colour scheme for the whole game, taken from the Football Dynasty 26 logo: deep purple-navy
-# surfaces, a purple accent, gold for highlights. Club colours appear only on badges, kits and markers.
-const BG = Color("0a0816")
-const BG2 = Color("110d22")
-const CARD = Color("17132b")
-const CARD2 = Color("201a3b")
-const BRAND = Color("9a5cff")
+# The default look comes from the Football Dynasty 26 logo: deep purple-navy surfaces, a purple accent,
+# gold for highlights. Settings offers other skins; these seven are the colours a skin changes.
+var BG: Color = Color("0a0816")
+var BG2: Color = Color("110d22")
+var CARD: Color = Color("17132b")
+var CARD2: Color = Color("201a3b")
+var BRAND: Color = Color("9a5cff")
+var MUTED: Color = Color("958fb0")
+var DIM: Color = Color("625c82")
+var RAIL: Color = Color("0b0919")
+const SKINS = [
+	{"id": "dynasty", "name": "Dynasty", "sub": "Purple, gold", "bg": "0a0816", "bg2": "110d22", "card": "17132b", "card2": "201a3b", "brand": "9a5cff", "muted": "958fb0", "dim": "625c82", "rail": "0b0919"},
+	{"id": "midnight", "name": "Midnight", "sub": "Navy and blue", "bg": "070b15", "bg2": "0c1220", "card": "121a2c", "card2": "1b2640", "brand": "4da3ff", "muted": "8c98b0", "dim": "5a657c", "rail": "080d18"},
+	{"id": "pitch", "name": "Pitch", "sub": "Dark green", "bg": "06110c", "bg2": "0a1912", "card": "10231a", "card2": "183326", "brand": "2ee59d", "muted": "8aa89a", "dim": "587265", "rail": "07140e"},
+	{"id": "crimson", "name": "Crimson", "sub": "Deep red", "bg": "130608", "bg2": "1c0a0e", "card": "271016", "card2": "381720", "brand": "ff5c72", "muted": "b0909a", "dim": "7c5c66", "rail": "16070a"},
+	{"id": "graphite", "name": "Graphite", "sub": "Black, gold", "bg": "0b0b0d", "bg2": "121215", "card": "1a1a1f", "card2": "26262d", "brand": "e9c46a", "muted": "9a9aa6", "dim": "66666f", "rail": "0d0d10"},
+]
 const LINE = Color(1, 1, 1, 0.07)
 const TEXT = Color("f3f6fb")
-const MUTED = Color("958fb0")
-const DIM = Color("625c82")
 const GOLD = Color("e9c46a")
 const GREEN = Color("2ee59d")
 const RED = Color("ff5c72")
@@ -23,7 +31,7 @@ const AMBER = Color("f6ad3c")
 const BLUE = Color("4da3ff")
 const LINE_COL = [Color("f6ad3c"), Color("4da3ff"), Color("2ee59d"), Color("ff6b81")]
 
-var accent: Color = BRAND
+var accent: Color = Color("9a5cff")
 var fonts: Dictionary = {}
 var icon_src: Dictionary = {}
 var icon_cache: Dictionary = {}
@@ -46,37 +54,187 @@ func _ready():
 		f.close()
 
 
+signal song_changed
+
+# The soundtrack. Each entry is [file name in assets/music, title, length].
+const SONGS = [
+	["golden_hour", "Golden Hour", "4:37"],
+	["fever_dream", "Fever Dream", "4:22"],
+	["hands_up_tonight", "Hands Up Tonight", "4:04"],
+	["running_in_colour", "Running in Colour", "3:48"],
+	["after_the_lights", "After the Lights", "4:46"],
+	["we_own_the_night", "We Own the Night", "4:40"],
+	["no_saints", "No Saints", "4:47"],
+]
 var music_pl: AudioStreamPlayer = null
 var music_i := 0
+var song_cache: Array = []
+var song_cached := false
+
+
+func skin() -> Dictionary:
+	var id = G.settings.get("skin", "dynasty")
+	for k in SKINS:
+		if k.id == id:
+			return k
+	return SKINS[0]
+
+
+func apply_skin():
+	var k = skin()
+	BG = Color(k.bg)
+	BG2 = Color(k.bg2)
+	CARD = Color(k.card)
+	CARD2 = Color(k.card2)
+	BRAND = Color(k.brand)
+	MUTED = Color(k.muted)
+	DIM = Color(k.dim)
+	RAIL = Color(k.rail)
+	apply_accent()
+
+
+func apply_accent():
+	# the accent is the skin's colour, or the club's own colour when that option is on
+	accent = BRAND
+	if G.settings.get("club_accent", false) and G.active and G.s.has("user"):
+		var c = G.uc()
+		if c is Dictionary and c.has("c1"):
+			var col = Color(c.c1)
+			if col.get_luminance() < 0.16 and c.has("c2"):
+				col = Color(c.c2)
+			if col.get_luminance() < 0.16:
+				col = col.lightened(0.45)
+			accent = col
+
+
+func vol_db(key: String, full_db: float) -> float:
+	# sliders run 0-100; the default of 70 sits about 3 dB under full
+	var v = float(G.settings.get(key, 70))
+	if v <= 0.0:
+		return -80.0
+	return full_db + linear_to_db(v / 100.0)
+
+
+func songs() -> Array:
+	# every track shipped with the game: the named soundtrack, then any extra track_N.mp3 files
+	if song_cached:
+		return song_cache
+	song_cached = true
+	for sg in SONGS:
+		var path = "res://assets/music/%s.mp3" % sg[0]
+		if ResourceLoader.exists(path):
+			song_cache.append({"id": sg[0], "title": sg[1], "len": sg[2], "path": path})
+	for i in range(1, 13):
+		var p2 = "res://assets/music/track_%d.mp3" % i
+		if ResourceLoader.exists(p2):
+			song_cache.append({"id": "track_%d" % i, "title": "Track %d" % i, "len": "", "path": p2})
+	return song_cache
+
+
+func song_on(id: String) -> bool:
+	return not (id in G.settings.get("songs_off", []))
 
 
 func music_tracks() -> Array:
-	# drop tracks into assets/music as track_1.mp3, track_2.mp3, ... and they play in order
-	var a = []
-	for i in range(1, 13):
-		var path = "res://assets/music/track_%d.mp3" % i
-		if ResourceLoader.exists(path):
-			a.append(path)
-	return a
+	return songs()
+
+
+func music_on() -> bool:
+	return G.settings.get("music", true) and float(G.settings.get("vol_music", 70)) > 0.0
+
+
+func now_playing() -> int:
+	# index into songs() of the track playing, or -1
+	if music_pl == null or not music_pl.playing or songs().is_empty():
+		return -1
+	return music_i % songs().size()
+
+
+func _music_pl() -> AudioStreamPlayer:
+	if music_pl == null:
+		music_pl = AudioStreamPlayer.new()
+		add_child(music_pl)
+		music_pl.finished.connect(func(): music_step(1))
+	music_pl.volume_db = vol_db("vol_music", -17.0)
+	return music_pl
 
 
 func music(on: bool):
-	var tr = music_tracks()
+	var tr = songs()
 	if tr.is_empty():
 		return
-	if music_pl == null:
-		music_pl = AudioStreamPlayer.new()
-		music_pl.volume_db = -20.0
-		add_child(music_pl)
-		music_pl.finished.connect(func():
-			music_i += 1
-			music(true))
-	if on and G.settings.get("music", true):
-		if not music_pl.playing:
-			music_pl.stream = load(tr[music_i % tr.size()])
-			music_pl.play()
+	var pl = _music_pl()
+	if on and music_on():
+		if not pl.playing:
+			music_i = posmod(music_i, tr.size())
+			if not song_on(tr[music_i].id):
+				music_step(1)
+				return
+			pl.stream = load(tr[music_i].path)
+			pl.play()
+			song_changed.emit()
+	elif pl.playing:
+		pl.stop()
+		song_changed.emit()
+
+
+func music_play(i: int):
+	# play one named track now, whether or not it is in the rotation
+	var tr = songs()
+	if tr.is_empty():
+		return
+	G.settings["music"] = true
+	if float(G.settings.get("vol_music", 70)) <= 0.0:
+		G.settings["vol_music"] = 70
+	G.save_settings()
+	var pl = _music_pl()
+	music_i = posmod(i, tr.size())
+	pl.stream = load(tr[music_i].path)
+	pl.play()
+	song_changed.emit()
+
+
+func music_step(dir: int):
+	# next or previous track in the rotation; shuffle picks any other enabled track
+	var tr = songs()
+	var live = []
+	for i in tr.size():
+		if song_on(tr[i].id):
+			live.append(i)
+	if live.is_empty() or not music_on():
+		if music_pl != null:
+			music_pl.stop()
+		song_changed.emit()
+		return
+	var cur = posmod(music_i, tr.size())
+	var nxt = live[0]
+	if G.settings.get("shuffle", false) and live.size() > 1:
+		nxt = cur
+		while nxt == cur:
+			nxt = live[randi() % live.size()]
 	else:
-		music_pl.stop()
+		for k in range(1, tr.size() + 1):
+			var j = posmod(cur + k * dir, tr.size())
+			if j in live:
+				nxt = j
+				break
+	music_i = nxt
+	var pl = _music_pl()
+	pl.stream = load(tr[nxt].path)
+	pl.play()
+	song_changed.emit()
+
+
+func apply_volumes():
+	if music_pl != null:
+		music_pl.volume_db = vol_db("vol_music", -17.0)
+		if not music_on() and music_pl.playing:
+			music_pl.stop()
+			song_changed.emit()
+	if players.has("crowd"):
+		players["crowd"].volume_db = vol_db("vol_crowd", -13.0)
+		if not G.settings.get("sound", true):
+			players["crowd"].stop()
 
 
 func _stream(nm: String):
@@ -98,7 +256,10 @@ func sfx(nm: String, db := -6.0):
 		pl.stream = st
 		add_child(pl)
 		players[nm] = pl
-	players[nm].volume_db = db
+	var d = vol_db("vol_sfx", db + 3.0)
+	if d <= -79.0:
+		return
+	players[nm].volume_db = d
 	players[nm].play()
 
 
@@ -115,10 +276,10 @@ func ambience(on: bool):
 			st.loop_end = int(st.get_length() * st.mix_rate)
 		var pl = AudioStreamPlayer.new()
 		pl.stream = st
-		pl.volume_db = -16.0
 		add_child(pl)
 		players["crowd"] = pl
-	if on and G.settings.get("sound", true):
+	players["crowd"].volume_db = vol_db("vol_crowd", -13.0)
+	if on and G.settings.get("sound", true) and float(G.settings.get("vol_crowd", 70)) > 0.0:
 		if not players["crowd"].playing:
 			players["crowd"].play()
 	else:
@@ -126,8 +287,8 @@ func ambience(on: bool):
 
 
 func set_accent_from(_c: Dictionary):
-	# kept for callers; the accent no longer follows the club
-	accent = BRAND
+	# kept for callers; the accent follows the skin (or the club, if that option is on)
+	apply_accent()
 
 
 func on_color(c: Color) -> Color:

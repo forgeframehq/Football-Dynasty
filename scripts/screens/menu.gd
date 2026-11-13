@@ -2,6 +2,7 @@ extends "res://scripts/screens/screen.gd"
 # Title screen: stadium at night, continue / new / load.
 
 var art: TextureRect
+var song_box: VBoxContainer = null
 
 
 func build():
@@ -99,16 +100,75 @@ func build():
 		v.add_child(UI.sp(0, 10))
 		v.add_child(_item("Load Career", "save", "Three save slots", _load))
 	v.add_child(UI.sp(0, 10))
-	var snd = G.settings.get("sound", true)
-	v.add_child(_item("Sound", "volume-2" if snd else "volume-x", "On" if snd else "Off", func():
-		G.settings["sound"] = not snd
-		G.save_settings()
-		refresh()))
+	v.add_child(_item("Settings", "settings", "Sound, soundtrack, skins", func(): UI.main.open("settings")))
 	v.add_child(UI.sp(0, 16))
 	v.add_child(UI.lbl("v%s · personal build · not for distribution" % ProjectSettings.get_setting("application/config/version", ""), 16, UI.DIM))
+	_soundtrack(holder)
 	if not G.ui.get("sting", false):
 		G.ui["sting"] = true
 		UI.sfx("sting_start", -10.0)
+
+
+func _soundtrack(holder: Control):
+	# the song list, bottom right: what is playing, previous / pause / next, tap any song to play it
+	if UI.songs().is_empty():
+		return
+	var p = UI.panel(Color(0.03, 0.02, 0.07, 0.82), 16, 14, 10, Color(1, 1, 1, 0.12))
+	p.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	p.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	p.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	p.offset_right = -24
+	p.offset_bottom = -16
+	p.custom_minimum_size = Vector2(330, 0)
+	holder.add_child(p)
+	song_box = UI.vb(3)
+	p.add_child(song_box)
+	_fill_songs()
+	if not UI.song_changed.is_connected(_fill_songs):
+		UI.song_changed.connect(_fill_songs)
+
+
+func _fill_songs():
+	if song_box == null or not is_instance_valid(song_box):
+		return
+	for c in song_box.get_children():
+		song_box.remove_child(c)
+		c.queue_free()
+	var tr = UI.songs()
+	var now = UI.now_playing()
+	var h = UI.hb(6)
+	var tv = UI.vb(-4)
+	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tv.add_child(UI.caps("Soundtrack", 15, UI.GOLD))
+	tv.add_child(UI.lbl_fill(tr[now].title if now >= 0 else "Music off", 22, UI.TEXT, "disp"))
+	h.add_child(tv)
+	for it in [["chevron-left", func(): UI.music_step(-1)], ["pause" if now >= 0 else "play", _play_pause], ["chevron-right", func(): UI.music_step(1)]]:
+		var b = UI.panel(Color(1, 1, 1, 0.08), 10, 9, 7)
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		b.add_child(UI.icon(it[0], 20, UI.TEXT))
+		UI.tap(b, it[1], true)
+		h.add_child(b)
+	song_box.add_child(h)
+	song_box.add_child(UI.sp(0, 2))
+	for i in tr.size():
+		var playing = i == now
+		var r = UI.panel(Color(UI.accent, 0.22) if playing else Color(0, 0, 0, 0), 8, 8, 3)
+		var rh = UI.hb(8)
+		rh.add_child(UI.lbl("%d" % (i + 1), 16, UI.accent if playing else UI.DIM, "disp"))
+		rh.add_child(UI.lbl_fill(tr[i].title, 18, UI.TEXT if playing else (UI.MUTED if UI.song_on(tr[i].id) else UI.DIM), "semi" if playing else "body"))
+		rh.add_child(UI.lbl(tr[i].len, 15, UI.DIM, "cond"))
+		r.add_child(rh)
+		var idx = i
+		UI.tap(r, func(): UI.music_play(idx), true)
+		song_box.add_child(r)
+
+
+func _play_pause():
+	if UI.now_playing() >= 0:
+		UI.music_pl.stop()
+		UI.song_changed.emit()
+	else:
+		UI.music_play(UI.music_i)
 
 
 func _item(text: String, icon_name: String, sub: String, cb: Callable) -> Control:

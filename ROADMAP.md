@@ -147,3 +147,10 @@ Options
 - [x] Football Dynasty 26 name, app icon and wordmark; one purple and gold colour scheme that no longer follows the club
 - [x] Intro: ForgeFrame card, two-clip film, title over the last shot, Skip button
 - [ ] Trophy and promotion films: the game plays `assets/video/win_league.ogv`, `win_cup.ogv`, `win_euro.ogv`, `win_promo.ogv` if present; clips still to come from Sudhi (Kling)
+
+## Settings, skins and soundtrack (dev, after v0.7.0)
+- New `settings` screen (scripts/screens/settings.gd), opened from the title screen and from Options. Three panes: volume sliders (music, effects, match crowd), play order, intro film on/off; the soundtrack list (tap to play, tick = in rotation); skins, accent colour (skin or club), currency symbol, default match speed.
+- Everything is stored in `G.settings` (user://settings.dat): `vol_music`, `vol_sfx`, `vol_crowd` (0-100), `shuffle`, `songs_off`, `intro`, `skin`, `club_accent`, `cur`, `speed`. The old Sound and Music switches are migrated to volume levels on load.
+- Skins: `UI.SKINS` (Dynasty, Midnight, Pitch, Crimson, Graphite). `UI.BG, BG2, CARD, CARD2, BRAND, MUTED, DIM, RAIL` are now vars set by `UI.apply_skin()`; `UI.main.reskin()` recolours the frame and redraws the screen. Some screens still have hard-coded dark colours.
+- Soundtrack: seven songs in assets/music (128 kbps MP3, 29 MB), listed in `UI.SONGS` with titles and lengths. `UI.songs()`, `music_play(i)`, `music_step(dir)`, `now_playing()`, signal `song_changed`. The title screen has a Soundtrack panel bottom right with previous / pause / next.
+- Currency is a symbol change only (no conversion); `G.money()` is the single place it is applied.

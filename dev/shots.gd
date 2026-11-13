@@ -36,6 +36,10 @@ func run(m):
 		main._end_intro()
 	if want.call("menu"):
 		await snap("menu")
+	if want.call("settings0"):
+		main.open("settings")
+		await snap("settings_title")
+		main.back()
 	if want.call("new"):
 		main.open("new_career", {"slot": 0})
 		await snap("new_0")
@@ -86,6 +90,22 @@ func run(m):
 		await snap("fixtures_round")
 		main.root("clubview", {"cid": 2})
 		await snap("clubview")
+	if want.call("settings"):
+		main.root("settings", {"grp": "options"})
+		await snap("settings")
+	if want.call("skins"):
+		for k in ["midnight", "pitch", "crimson", "graphite"]:
+			G.settings["skin"] = k
+			main.root("home")
+			main.reskin()
+			await snap("skin_" + k)
+		G.settings["skin"] = "dynasty"
+		G.settings["club_accent"] = true
+		main.root("squad")
+		main.reskin()
+		await snap("skin_club")
+		G.settings["club_accent"] = false
+		main.reskin()
 	if want.call("exit"):
 		main.root("home")
 		main.back()

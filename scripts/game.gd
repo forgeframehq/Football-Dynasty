@@ -42,6 +42,15 @@ func load_settings():
 		f.close()
 		if typeof(d) == TYPE_DICTIONARY:
 			settings.merge(d, true)
+	# older builds had plain on/off switches; they become volume levels
+	if not settings.get("sound", true):
+		settings["vol_sfx"] = 0
+		settings["vol_crowd"] = 0
+		settings["sound"] = true
+	if not settings.get("music", true):
+		settings["vol_music"] = 0
+		settings["music"] = true
+	UI.apply_skin()
 
 
 func save_settings():
@@ -197,18 +206,18 @@ func nice(v: float) -> int:
 
 func money(v) -> String:
 	var n = float(v)
-	var sg = "-" if n < 0 else ""
+	var sg = ("-" if n < 0 else "") + str(settings.get("cur", "€"))
 	n = abs(n)
 	if n >= 1e9:
-		return "%s€%.2fB" % [sg, n / 1e9]
+		return "%s%.2fB" % [sg, n / 1e9]
 	if n >= 1e6:
 		var t = "%.1f" % (n / 1e6)
 		if t.ends_with(".0") or n >= 1e8:
 			t = "%d" % int(round(n / 1e6))
-		return "%s€%sM" % [sg, t]
+		return "%s%sM" % [sg, t]
 	if n >= 1e3:
-		return "%s€%dK" % [sg, int(round(n / 1e3))]
-	return "%s€%d" % [sg, int(n)]
+		return "%s%dK" % [sg, int(round(n / 1e3))]
+	return "%s%d" % [sg, int(n)]
 
 
 func available(p: Dictionary) -> bool:

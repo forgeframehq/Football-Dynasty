@@ -31,6 +31,7 @@ const SCREENS = {
 	"trophies": preload("res://scripts/screens/trophies.gd"),
 	"scouting": preload("res://scripts/screens/scouting.gd"),
 	"deadline": preload("res://scripts/screens/deadline.gd"),
+	"settings": preload("res://scripts/screens/settings.gd"),
 	"lists": preload("res://scripts/screens/lists.gd"),
 	"hub": preload("res://scripts/screens/hub.gd"),
 	"search": preload("res://scripts/screens/search.gd"),
@@ -47,6 +48,7 @@ var topbar: PanelContainer
 var safe: MarginContainer
 var overlay: Control
 var glow: TextureRect
+var bg: ColorRect
 var stack: Array = []
 var sheet_node: Control = null
 var menu_node: Control = null
@@ -96,7 +98,7 @@ var intro_node: Control = null
 
 func _play_intro() -> bool:
 	# studio card, then the film, the game's title over its last shot, then the menu. Skip at any time.
-	if not ResourceLoader.exists(INTRO_PATH):
+	if not ResourceLoader.exists(INTRO_PATH) or not G.settings.get("intro", true):
 		return false
 	var o = Control.new()
 	o.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -115,7 +117,7 @@ func _play_intro() -> bool:
 	var vp = VideoStreamPlayer.new()
 	vp.stream = load(INTRO_PATH)
 	vp.expand = true
-	vp.volume_db = -4.0 if G.settings.get("sound", true) else -80.0
+	vp.volume_db = UI.vol_db("vol_sfx", -1.0)
 	vp.modulate.a = 0.0
 	vp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ar.add_child(vp)
@@ -210,7 +212,7 @@ func play_pending_film():
 	var vp = VideoStreamPlayer.new()
 	vp.stream = load(path)
 	vp.expand = true
-	vp.volume_db = -4.0 if G.settings.get("sound", true) else -80.0
+	vp.volume_db = UI.vol_db("vol_sfx", -1.0)
 	vp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ar.add_child(vp)
 	o.add_child(ar)
@@ -244,7 +246,7 @@ func _end_intro():
 
 
 func _build():
-	var bg = ColorRect.new()
+	bg = ColorRect.new()
 	bg.color = UI.BG
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -273,7 +275,7 @@ func _build():
 	add_child(safe)
 	var frame = UI.hb(0)
 	safe.add_child(frame)
-	rail = UI.panel(Color("0b101a"), 0, 0, 0)
+	rail = UI.panel(UI.RAIL, 0, 0, 0)
 	rail.custom_minimum_size = Vector2(RAIL_W, 0)
 	rail.get_theme_stylebox("panel").border_color = UI.LINE
 	rail.get_theme_stylebox("panel").border_width_right = 1
@@ -459,8 +461,18 @@ func _clear(n: Node):
 		c.queue_free()
 
 
+func reskin():
+	# a new skin or accent was chosen: recolour the frame and redraw what is on screen
+	UI.apply_skin()
+	bg.color = UI.BG
+	rail.get_theme_stylebox("panel").bg_color = UI.RAIL
+	if stack.size() > 0:
+		stack[-1].refresh()
+	_update_chrome()
+
+
 func _update_chrome():
-	UI.accent = UI.BRAND
+	UI.apply_accent()
 	glow.modulate = UI.accent
 	var on = uses_chrome()
 	rail.visible = on
@@ -482,7 +494,7 @@ func _rail_key() -> String:
 		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists"],
 		"manager": ["board", "trophies", "jobs", "life"], "world": ["table", "comps", "stats", "clubview"],
 		"search": ["search", "transfers", "scouting", "player", "nego", "compare"]}
-	if nm == "lists" or nm == "hub":
+	if nm == "lists" or nm == "hub" or nm == "settings":
 		return str(stack[0].args.get("grp", "club"))
 	for k in groups:
 		if nm in groups[k]:
@@ -750,29 +762,16 @@ func menu_items(key: String) -> Array:
 		a.append(_row("shield", "Find Club", "Search every club", func(): root("hub", {"kind": "findclub", "grp": "search"})))
 		a.append(_row("briefcase", "Jobs", "Clubs interested in you", func(): root("jobs")))
 	elif key == "options":
-		var snd = G.settings.get("sound", true)
 		a.append(_row("save", "Save Game", "Saved automatically each day", func():
 			G.save_game()
 			close_menu()
 			UI.toast("Game saved", UI.GREEN)))
-		a.append(_row("volume-2" if snd else "volume-x", "Sound", "On" if snd else "Off", func():
-			G.settings["sound"] = not snd
-			G.save_settings()
-			if not G.settings["sound"]:
-				UI.ambience(false)
-			open_menu("options")))
+		a.append(_row("settings", "Settings", "Sound, soundtrack, skins", func(): root("settings", {"grp": "options"})))
 		a.append(_row("award", "Achievements", "Career milestones", func(): root("hub", {"kind": "achieve", "grp": "options"})))
 		a.append(_row("play", "Season Documentary", "Your season, replayed", func(): root("hub", {"kind": "doc", "grp": "options"})))
 		a.append(_row("crown", "Hall of Fame", "Honours and scrapbook", func(): root("hub", {"kind": "fame", "grp": "options"})))
 		a.append(_row("pencil", "Editor", "On" if G.settings.get("editor", false) else "Off", func(): root("hub", {"kind": "editor", "grp": "options"})))
 		a.append(_row("book-open", "Manual", "How to play", func(): root("hub", {"kind": "manual", "grp": "options"})))
-		if not UI.music_tracks().is_empty():
-			var mus = G.settings.get("music", true)
-			a.append(_row("volume-2" if mus else "volume-x", "Music", "On" if mus else "Off", func():
-				G.settings["music"] = not mus
-				G.save_settings()
-				UI.music(not mus)
-				open_menu("options")))
 		a.append(_row("log-out", "Exit to Menu", "Saves first", func():
 			G.save_game()
 			G.active = false
