@@ -120,3 +120,8 @@ Options
 - [x] "Leave the game?" and every other confirm pop-up showed no buttons (bare `wrap()` in a lambda called the built-in maths function)
 - [x] Camera cut-out: the rail background now runs to the screen edge and the icon column is narrower, so the strip beside the notch is no longer dead space
 - [x] Tactics (v0.6.2): pitch takes the full height on every tab (tabs and buttons moved above the list), goalkeeper's name no longer cut off, right side no longer runs off the screen on notched phones
+- [x] Player profile (on `dev`, not in an APK yet): all 18 attributes visible without scrolling; condition, morale, form, average rating, apps and goals moved up beside age, value and wage
+
+## Agreed, not built (12 Nov)
+- [ ] Tactics system: playstyles with manager proficiency, more Defence/Attack options, individual instructions, player skills, manager link-up plays, team style fit, condition arrows, weak foot and injury resistance, Team of the Week (spec: project doc `TACTICS_PLAN.md`)
+- [ ] Transfer system: two-day deal flow with patience bars and a "what he wants" panel, recruitment brief, loans, swaps, pre-contracts, buy-backs, players with their own minds (spec: project doc `TRANSFER_PLAN.md`)

@@ -49,11 +49,12 @@ func _input(e: InputEvent):
 
 
 func _cell(text: String, val: String, col: Color, hi := false) -> Control:
-	var r = UI.panel(Color(UI.accent, 0.16) if hi else Color(1, 1, 1, 0.03), 4, 10, 3)
+	var r = UI.panel(Color(UI.accent, 0.16) if hi else Color(1, 1, 1, 0.03), 4, 10, 2)
 	var h = UI.hb(8)
 	h.add_child(UI.lbl_fill(text, 20, UI.TEXT if hi else UI.MUTED))
 	var b = UI.panel(Color(col, 0.9), 4, 0, 0)
-	b.custom_minimum_size = Vector2(48, 28)
+	b.custom_minimum_size = Vector2(48, 26)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var l = UI.lbl(val, 20, Color("0a0e17"), "xbold")
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -113,10 +114,10 @@ func _page(p: Dictionary, own: bool, free: bool):
 		h.add_child(col)
 		var top = UI.hb(10)
 		var card = UI.panel(Color(UI.ovr_color(p.ovr), 0.16), 12, 14, 8, UI.ovr_color(p.ovr))
-		card.custom_minimum_size = Vector2(190, 0)
+		card.custom_minimum_size = Vector2(170, 0)
 		var cv = UI.vb(-4)
 		cv.alignment = BoxContainer.ALIGNMENT_CENTER
-		var big = UI.lbl(str(p.ovr), 70, UI.ovr_color(p.ovr), "xbold")
+		var big = UI.lbl(str(p.ovr), 62, UI.ovr_color(p.ovr), "xbold")
 		big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cv.add_child(big)
 		var nm = UI.lbl((p.ln if p.cn == "" else p.cn).to_upper(), 22, UI.TEXT, "xbold")
@@ -128,47 +129,57 @@ func _page(p: Dictionary, own: bool, free: bool):
 		cv.add_child(pt)
 		card.add_child(cv)
 		top.add_child(card)
-		var info = UI.panel(UI.CARD, 12, 12, 8, UI.LINE)
+		# facts on the first line, how he is doing right now on the second: nothing to scroll for
+		var info = UI.panel(UI.CARD, 12, 12, 6, UI.LINE)
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var iv = UI.vb(6)
+		var iv = UI.vb(4)
 		iv.alignment = BoxContainer.ALIGNMENT_CENTER
 		var r1 = UI.hb(6)
 		r1.add_child(_info("%d/%d/%d" % [p.bd, p.bm, p.by], "%d yrs" % G.age(p)))
 		r1.add_child(_info("Value", G.money(G.value(p))))
-		r1.add_child(_info("Wage", "%s" % G.money(p.wage)))
-		iv.add_child(r1)
-		var r2 = UI.hb(6)
-		var nb = UI.hb(6)
-		nb.alignment = BoxContainer.ALIGNMENT_CENTER
+		r1.add_child(_info("Wage a week", G.money(p.wage)))
+		r1.add_child(_info("Contract to", "—" if free else "June %d" % p.cend, UI.AMBER if (not free and p.cend <= s.season + 1) else UI.TEXT))
+		var nb = UI.vb(-4)
 		nb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nb.add_child(UI.flag(p.nat, 30))
-		nb.add_child(UI.lbl(p.nat, 20, UI.TEXT, "semi"))
-		r2.add_child(nb)
-		r2.add_child(_info("Contract expiry", "—" if free else "30/6/%d" % p.cend, UI.AMBER if (not free and p.cend <= s.season + 1) else UI.TEXT))
-		iv.add_child(r2)
+		var fl = UI.hb(0)
+		fl.alignment = BoxContainer.ALIGNMENT_CENTER
+		fl.add_child(UI.flag(p.nat, 30))
+		nb.add_child(fl)
+		var nl = UI.lbl(p.nat, 15, UI.MUTED)
+		nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		nl.clip_text = true
+		nb.add_child(nl)
+		r1.add_child(nb)
+		iv.add_child(r1)
 		iv.add_child(UI.divider())
-		var r3 = UI.hb(8)
-		r3.alignment = BoxContainer.ALIGNMENT_CENTER
-		if club != null:
-			r3.add_child(UI.badge(club, 30))
-			r3.add_child(UI.lbl("%s · %s" % [club.name, s.leagues[club.lg].name], 20, UI.TEXT, "semi"))
-		else:
-			r3.add_child(UI.lbl("Free agent", 20, UI.GREEN, "semi"))
-		r3.add_child(UI.chip(status.to_upper(), Color(UI.GREEN, 0.14), UI.GREEN, 15))
-		iv.add_child(r3)
+		var played = p.ss.ap > 0
+		var r2 = UI.hb(6)
+		r2.add_child(_info("Condition", "%d%%" % int(p.cond), UI.cond_color(p.cond)))
+		r2.add_child(_info("Morale", str(int(p.mor)), UI.cond_color(p.mor + 10)))
+		r2.add_child(_info("Form", "%.1f" % p.form if played else "-", (UI.GREEN if p.form >= 7.0 else UI.TEXT) if played else UI.DIM))
+		r2.add_child(_info("Av. rating", "%.2f" % G.avg_rating(p) if played else "-", UI.TEXT if played else UI.DIM))
+		r2.add_child(_info("Apps · goals", "%d · %d" % [p.ss.ap, p.ss.g]))
+		iv.add_child(r2)
 		info.add_child(iv)
 		top.add_child(info)
 		var pm = PosMap.new()
 		pm.p = p
 		pm.xy = POS_XY
-		pm.custom_minimum_size = Vector2(150, 176)
+		pm.custom_minimum_size = Vector2(124, 146)
 		pm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		top.add_child(pm)
 		col.add_child(top)
 		var strip = UI.hb(8)
-		strip.add_child(UI.lbl_fill(best_role.n, 22, UI.TEXT, "bold"))
-		strip.add_child(UI.lbl("%s%s · %s foot · %d★ skills · %d★ weak foot" % [p.pos, (" / " + " / ".join(p.alt)) if p.alt.size() > 0 else "", "Left" if p.foot == "L" else "Right", p.sm, p.wf], 17, UI.MUTED))
+		strip.add_child(UI.lbl(best_role.n, 21, UI.TEXT, "bold"))
+		strip.add_child(UI.chip(status.to_upper(), Color(UI.GREEN, 0.14), UI.GREEN, 14))
+		if p.inj > 0:
+			strip.add_child(UI.chip("INJURED · %s" % G.inj_text(p.inj).to_upper(), Color(UI.RED, 0.16), UI.RED, 14))
+		elif p.susp > 0:
+			strip.add_child(UI.chip("SUSPENDED", Color(UI.RED, 0.16), UI.RED, 14))
+		strip.add_child(UI.sp())
+		strip.add_child(UI.lbl("%s%s · %s foot · %d★ skills · %d★ weak foot" % [p.pos, (" / " + " / ".join(p.alt)) if p.alt.size() > 0 else "", "Left" if p.foot == "L" else "Right", p.sm, p.wf], 16, UI.MUTED))
 		col.add_child(strip)
+		# every attribute on screen at once: three columns that share whatever height is left
 		var grid = UI.hb(8)
 		grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		var keys = best_role.k
@@ -180,18 +191,11 @@ func _page(p: Dictionary, own: bool, free: bool):
 					gv.add_child(_cell(G.GK_STAT_NAMES[i], str(p.st[i]), UI.ovr_color(p.st[i])))
 			else:
 				for i in range(ci * 6, ci * 6 + 6):
-					gv.add_child(_cell(G.RL.ATTR[i], str(p.at[i]), UI.ovr_color(p.at[i]), i in keys))
-			if ci == 2:
-				gv.add_child(_cell("Condition", "%d%%" % int(p.cond), UI.cond_color(p.cond)))
-				gv.add_child(_cell("Morale", str(int(p.mor)), UI.cond_color(p.mor + 10)))
-			elif ci == 1:
-				gv.add_child(_cell("Form", "%.1f" % p.form if p.ss.ap > 0 else "-", UI.GREEN if p.form >= 7.0 else Color("9aa3b5")))
-				gv.add_child(_cell("Av. rating", "%.2f" % G.avg_rating(p) if p.ss.ap > 0 else "-", Color("9aa3b5")))
-			else:
-				gv.add_child(_cell("Apps", str(p.ss.ap), Color("9aa3b5")))
-				gv.add_child(_cell("Goals", str(p.ss.g), Color("9aa3b5")))
+					var cell = _cell(G.RL.ATTR[i], str(p.at[i]), UI.ovr_color(p.at[i]), i in keys)
+					cell.size_flags_vertical = Control.SIZE_EXPAND_FILL
+					gv.add_child(cell)
 			grid.add_child(gv)
-		col.add_child(UI.scroll(grid))
+		col.add_child(grid)
 	elif page == 1:
 		var a = pane(0, 8)
 		h.add_child(a[0])

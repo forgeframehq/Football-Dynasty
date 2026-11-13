@@ -35,6 +35,8 @@ Standing rules:
 1. Finish the dense pass: only the small pages in `hub.gd` and `lists.gd` are left (training, finances, fixtures, club view, board and home were done in v0.6.1).
 2. Get phone feedback on v0.6.1: table text size (18–19), the rail beside the camera cut-out, the confirm pop-ups.
 2b. Tactics system: fully agreed on 12 Nov, spec in the project doc `claude/TACTICS_PLAN.md`. Sudhi said "lock it in, but don't build yet" and "don't build the APK": wait for his go, then commit without pushing to `main` until he asks for an APK.
+2c. Transfer system: also agreed on 12 Nov (two-day EA FC-style deal flow, "what he wants" panel, recruitment brief, loans, swaps, pre-contracts, buy-backs, player minds). Spec in the project doc `claude/TRANSFER_PLAN.md`. Same rule: wait for his go.
+2d. Work since v0.6.2 is on branch `dev`, not `main` (no APK was wanted): player profile page 1 rebuilt so all attributes show without scrolling and condition/morale/form/apps sit in the header. Merge `dev` into `main` when he asks for an APK.
 3. World system: continent > nation > competition > club picker; up to five playable nations (club's nation locked); background real nations with estimated results; placeholder nations generated on first open; generated players scoutable and buyable but with capped, uncertain potential and fair prices (no wonderkid loophole). Needs nation/continent table and an open-source flag set.
 4. Transfer extras: deadline-day live event, loans through the talks screen, swaps, shortlist alerts.
 5. Match depth: two-legged ties, extra time, shoot-outs, opposition instructions, tactical familiarity, partnerships.
@@ -64,7 +66,7 @@ Standing rules:
 - The ElevenLabs API key was pasted in chat; it should be regenerated and must never go in the repo.
 - `godot --check-only -s file` falsely reports "Identifier not found: G". Use `--import`, shots and selftest.
 - `c.build` is `null` when idle. Zero-size custom-draw controls get culled. Literal `%` in format strings is `%%`.
-- AI clubs may have an empty `xi`; use `c.players`.
+- AI clubs may have an empty `xi`; use `c.players`. A script error inside `dev/shots.gd` makes the screenshot run hang rather than exit: kill it and read the output.
 - `G.TR.move()` clears release clause, sell-on and role promise; set new ones after it.
 - Fixtures are not sorted by day once cups are added.
 - City sprites need `tools/prep_iso.py`. Check ChatGPT image packs for slivers and fake transparency.

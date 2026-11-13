@@ -119,7 +119,7 @@ func run(m):
 			main.stack[-1].page = pg
 			main.stack[-1].refresh()
 			await snap("player_p%d" % pg)
-		main.root("player", {"pid": G.s.clubs[2].xi[9]})
+		main.root("player", {"pid": G.s.clubs[2].players[0]})
 		await snap("player_other")
 		main.root("clubview", {"cid": 2})
 		await snap("clubview")
