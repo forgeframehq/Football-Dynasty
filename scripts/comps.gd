@@ -281,6 +281,7 @@ static func _finish(comp: Dictionary):
 	if comp.winner == s.user.club:
 		var u = s.user
 		u.trophies.append("%s %s" % [comp.name, G.season_name()])
+		u["film"] = "euro" if comp.kind == "euro" else "cup"
 		u.conf = min(100.0, u.conf + (18 if comp.id == "ucl" else 10))
 		u.rep = min(100.0, u.rep + (8 if comp.id == "ucl" else 4))
 		G.msg("%s winners!" % comp.name, "You have won the %s with %s. The board and the fans are overjoyed." % [comp.name, c.name], "board", null, true)

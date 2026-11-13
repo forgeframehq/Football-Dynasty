@@ -30,6 +30,7 @@ const SCREENS = {
 	"training": preload("res://scripts/screens/training.gd"),
 	"trophies": preload("res://scripts/screens/trophies.gd"),
 	"scouting": preload("res://scripts/screens/scouting.gd"),
+	"deadline": preload("res://scripts/screens/deadline.gd"),
 	"lists": preload("res://scripts/screens/lists.gd"),
 	"hub": preload("res://scripts/screens/hub.gd"),
 	"search": preload("res://scripts/screens/search.gd"),
@@ -64,6 +65,10 @@ func _ready():
 	var ua = OS.get_cmdline_user_args()
 	if "--prof" in ua:
 		load("res://dev/prof.gd").run(self)
+		return
+	if "--mktest" in ua:
+		load("res://dev/mktest.gd").run(self)
+		get_tree().quit()
 		return
 	if "--selftest" in ua:
 		load("res://dev/selftest.gd").run(self)
@@ -120,11 +125,20 @@ func _play_intro() -> bool:
 	card.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	card.grow_vertical = Control.GROW_DIRECTION_BOTH
-	var c1 = UI.lbl("FORGEFRAME", 54, UI.TEXT, "xbold")
-	c1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if ResourceLoader.exists("res://assets/forgeframe.png"):
+		var sl = TextureRect.new()
+		sl.texture = load("res://assets/forgeframe.png")
+		sl.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		sl.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		sl.custom_minimum_size = Vector2(460, 420)
+		sl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(sl)
+	else:
+		var c1 = UI.lbl("FORGEFRAME", 54, UI.TEXT, "xbold")
+		c1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(c1)
 	var c2 = UI.caps("presents", 18, UI.MUTED)
 	c2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	card.add_child(c1)
 	card.add_child(c2)
 	card.modulate.a = 0.0
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -155,8 +169,8 @@ func _play_intro() -> bool:
 	add_child(o)
 	intro_node = o
 	var tw = o.create_tween()
-	tw.tween_property(card, "modulate:a", 1.0, 0.45)
-	tw.tween_interval(1.1)
+	tw.tween_property(card, "modulate:a", 1.0, 0.5)
+	tw.tween_interval(1.7)
 	tw.tween_property(card, "modulate:a", 0.0, 0.4)
 	tw.tween_callback(func():
 		vp.play()
@@ -166,6 +180,54 @@ func _play_intro() -> bool:
 	tw.tween_interval(3.0)
 	tw.tween_callback(_end_intro)
 	return true
+
+
+func play_pending_film():
+	# a trophy or promotion was won: play its film once, if one has been added to the game
+	if not G.active or intro_node != null:
+		return
+	var kind = str(G.s.user.get("film", ""))
+	if kind == "":
+		return
+	G.s.user.erase("film")
+	var path = "res://assets/video/win_%s.ogv" % kind
+	if not ResourceLoader.exists(path):
+		return
+	var o = Control.new()
+	o.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	o.mouse_filter = Control.MOUSE_FILTER_STOP
+	o.z_index = 100
+	var black = ColorRect.new()
+	black.color = Color.BLACK
+	black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	black.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	o.add_child(black)
+	var ar = AspectRatioContainer.new()
+	ar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ar.ratio = 16.0 / 9.0
+	ar.stretch_mode = AspectRatioContainer.STRETCH_COVER
+	ar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vp = VideoStreamPlayer.new()
+	vp.stream = load(path)
+	vp.expand = true
+	vp.volume_db = -4.0 if G.settings.get("sound", true) else -80.0
+	vp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ar.add_child(vp)
+	o.add_child(ar)
+	var skip = UI.btn("Skip", _end_intro, "ghost", "fast-forward", 46)
+	skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	skip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	skip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	skip.offset_right = -28 - safe.get_theme_constant("margin_right")
+	skip.offset_bottom = -22
+	skip.offset_left = skip.offset_right - 150
+	skip.offset_top = skip.offset_bottom - 46
+	o.add_child(skip)
+	add_child(o)
+	intro_node = o
+	UI.music(false)
+	vp.finished.connect(_end_intro)
+	vp.play()
 
 
 func _end_intro():

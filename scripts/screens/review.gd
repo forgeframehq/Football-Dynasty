@@ -5,6 +5,7 @@ extends "res://scripts/screens/screen.gd"
 func build():
 	var s = G.s
 	var rv = s.review
+	UI.main.play_pending_film.call_deferred()
 	if rv == null:
 		UI.main.call_deferred("root", "home")
 		return

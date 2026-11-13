@@ -30,8 +30,8 @@ func run(m):
 			days = int(a.substr(5))
 	var want = func(k): return only.is_empty() or k in only
 	if "--intro" in OS.get_cmdline_user_args():
-		await snap("intro_card", 0.9)
-		await snap("intro_film", 4.0)
+		await snap("intro_card", 1.2)
+		await snap("intro_film", 4.4)
 		await snap("intro_title", 6.6)
 		main._end_intro()
 	if want.call("menu"):
@@ -91,6 +91,30 @@ func run(m):
 		main.back()
 		await snap("exit", 0.6)
 		main.close_sheet()
+	if want.call("market"):
+		G.MK.brief_start({"pos": "CB", "age": 1, "fee": 3, "foot": 0, "style": true, "link": ""})
+		G.s.scout.brief.done = G.s.day
+		G.MK.daily()
+		main.root("scouting")
+		await snap("scouting_brief")
+		var lp = null
+		for pid in G.s.clubs[6].players:
+			var q = G.s.players[pid]
+			if G.age(q) <= 21 and G.MK.loan_view(q).ok:
+				lp = q
+				break
+		if lp != null:
+			main.root("player", {"pid": lp.id, "page": 5})
+			await snap("player_manage")
+			main.stack[-1]._loan_in(lp)
+			await snap("loan_sheet", 0.7)
+			main.close_sheet()
+		G.MK.dd_start()
+		for i in 9:
+			G.MK.dd_hour()
+		main.root("deadline")
+		await snap("deadline")
+		G.s.erase("dd")
 	if want.call("menus"):
 		main.root("home")
 		for k in ["club", "manager", "world", "search", "options"]:

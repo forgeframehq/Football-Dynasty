@@ -469,8 +469,8 @@ static func offer_terms(d: Dictionary, t: Dictionary) -> Dictionary:
 		return {"res": "error", "text": "You need %s today (first payment, signing-on and agent fees) but have %s." % [G.money(upfront(d, t)), G.money(uc.budget)]}
 	if own and p.mor < 35:
 		return {"res": "reject", "text": "%s is unhappy and refuses to discuss a new deal right now." % G.pname(p)}
-	if own and p.has("pre"):
-		return {"res": "error", "text": "%s has already signed a pre-contract with %s. It is too late for a new deal." % [G.pname(p), G.s.clubs[int(p.pre.club)].name]}
+	if own and p.has("prec"):
+		return {"res": "error", "text": "%s has already signed a pre-contract with %s. It is too late for a new deal." % [G.pname(p), G.s.clubs[int(p.prec.club)].name]}
 	if d.mode == "buy" and not G.window_open():
 		return {"res": "error", "text": "The window is closed. The move cannot be registered until it reopens."}
 	if d.mode == "buy" and d.swap >= 0 and (not G.s.players.has(d.swap) or G.s.players[d.swap].club != uc.id):
@@ -522,7 +522,7 @@ static func complete(d: Dictionary, t: Dictionary):
 	d.terms = t.duplicate()
 	if d.mode == "pre":
 		# signed now, joins when his contract runs out in June
-		p["pre"] = {"club": uc.id, "wage": int(t.wage), "years": int(t.years), "role": int(t.role), "rc": int(t.rc), "bon": bonus_amounts(p, t.wage, int(t.get("bon", 0)))}
+		p["prec"] = {"club": uc.id, "wage": int(t.wage), "years": int(t.years), "role": int(t.role), "rc": int(t.rc), "bon": bonus_amounts(p, t.wage, int(t.get("bon", 0)))}
 		uc.budget -= int(t.sign) + int(t.agent)
 		d.stage = "done"
 		say(d, "agent", "Pre-contract signed.")

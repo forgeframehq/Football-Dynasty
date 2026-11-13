@@ -361,6 +361,21 @@ func _page(p: Dictionary, own: bool, free: bool):
 				offers += 1
 		v.add_child(UI.kv("Transfer offers", str(offers) if offers > 0 else "None"))
 		v.add_child(UI.kv("Years left", str(max(0, p.cend - s.season - 1)) if not free else "-"))
+		if p.has("bon"):
+			var bits = []
+			if int(p.bon.ab) > 0: bits.append("%s an appearance" % G.money(int(p.bon.ab)))
+			if int(p.bon.gb) > 0: bits.append("%s a goal" % G.money(int(p.bon.gb)))
+			if int(p.bon.cs) > 0: bits.append("%s a clean sheet" % G.money(int(p.bon.cs)))
+			v.add_child(UI.kv("Bonuses", ", ".join(bits), UI.TEXT, 18))
+			v.add_child(UI.kv("Bonuses paid this spell", G.money(int(p.get("bonp", 0))), UI.TEXT, 18))
+		if p.has("bb"):
+			v.add_child(UI.kv("Buy-back clause", "%s for %s" % [s.clubs[int(p.bb.club)].short, G.money(int(p.bb.fee))], UI.AMBER, 18))
+		if int(p.get("mr", -1)) >= 0:
+			v.add_child(UI.kv("Matching right", s.clubs[int(p.mr)].short, UI.AMBER, 18))
+		if p.has("prec"):
+			v.add_child(UI.kv("Pre-contract", "Joins %s in June" % s.clubs[int(p.prec.club)].short, UI.RED if own else UI.GREEN, 18))
+		if p.has("lterms") and own:
+			v.add_child(UI.kv("Loan terms", "%s%s" % [G.MK.OPT_TXT[int(p.lterms.opt)], (" at %s" % G.money(int(p.lterms.fee))) if int(p.lterms.opt) > 0 else ""], UI.TEXT, 18))
 	else:
 		var a = pane(0, 8)
 		h.add_child(a[0])
@@ -394,8 +409,8 @@ func _page(p: Dictionary, own: bool, free: bool):
 		for i in range(hist.size() - 1, -1, -1):
 			var r = hist[i]
 			v.add_child(_hrow([G.season_name(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]), "%.2f" % r[5]], UI.TEXT))
-		if p.has("pre") and p.pre[0] > 0:
-			v.add_child(_hrow(["Earlier", "Career to 2026", str(p.pre[0]), str(p.pre[1]), "", ""], UI.MUTED))
+		if p.has("prec") and p.prec[0] > 0:
+			v.add_child(_hrow(["Earlier", "Career to 2026", str(p.prec[0]), str(p.prec[1]), "", ""], UI.MUTED))
 		var cp2 = G.PS.caps(p)
 		if cp2[0] > 0:
 			v.add_child(_hrow(["Intl", p.nat, str(cp2[0]), str(cp2[1]), "", ""], UI.accent))
@@ -438,7 +453,12 @@ func build():
 	if loaned_in:
 		v.add_child(_note("clock", "On loan from %s until the end of the season." % s.clubs[p.loan].name, UI.BLUE))
 	if loaned_out:
-		v.add_child(_note("clock", "Your player — on loan at %s until the end of the season." % s.clubs[p.club].name, UI.BLUE))
+		v.add_child(_note("clock", "Your player, on loan at %s until the end of the season.%s" % [s.clubs[p.club].name, " You kept a recall clause." if p.get("lrecall", false) else ""], UI.BLUE))
+		if G.MK.can_recall(p):
+			v.add_child(UI.btn("Recall from loan", func():
+				G.MK.recall(p)
+				UI.toast("%s is back" % G.pname(p), UI.GREEN)
+				refresh(), "secondary", "repeat", 60))
 	if own and not loaned_in:
 		if p.get("youth", false):
 			v.add_child(UI.btn("Promote to first team", func():
@@ -492,19 +512,13 @@ func build():
 		v.add_child(UI.btn("Offer contract", func(): UI.main.open("nego", {"pid": p.id, "mode": "free"}), "primary", "handshake"))
 	elif not own and not loaned_out:
 		_scout_btn(v, p)
+		_special(v, p)
 		v.add_child(UI.btn("Approach %s" % s.clubs[p.club].short, func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"}), "primary", "handshake"))
 		if G.window_open():
 			var ap = UI.caps("Asking price around %s%s" % [G.money(G.TR.asking_price(p)), (" · release clause %s" % G.money(p.rc)) if p.get("rc", 0) > 0 else ""], 19, UI.MUTED)
 			ap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			v.add_child(ap)
-			v.add_child(UI.btn("Ask for a season loan", func():
-				var r = G.OPS.can_loan_in(p)
-				if not r.ok:
-					UI.toast(r.why, UI.RED)
-					return
-				G.OPS.loan_in(p)
-				UI.toast("%s joins on loan" % G.pname(p), UI.GREEN)
-				refresh(), "secondary", "arrow-left-right", 68))
+			v.add_child(UI.btn("Ask about a loan", func(): _loan_in(p), "secondary", "arrow-left-right", 68))
 		else:
 			v.add_child(_note("clock", "The transfer window is closed. You can approach %s when it reopens." % G.pname(p), UI.MUTED))
 
@@ -530,6 +544,12 @@ func _bar(p: Dictionary):
 		if dl != null and dl.mode == "buy" and dl.stage != "dead" and dl.stage != "done":
 			lab = {"new": "Approach club", "club": "Fee talks", "deleg": "Assistant talking", "meet": "Meets tomorrow", "talks": "Agree terms"}.get(dl.stage, "Approach club")
 		acts.append([lab, "handshake", "primary", func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"})])
+		if p.has("mrh") and int(p.get("mr", -1)) == s.user.club:
+			acts.append(["Match %s" % G.money(int(p.mrh.fee)), "", "gold", func(): _match_bid(p)])
+		elif G.MK.can_buy_back(p):
+			acts.append(["Buy back %s" % G.money(int(p.bb.fee)), "", "gold", func(): _buy_back(p)])
+		elif G.MK.can_pre(p).ok:
+			acts.append(["Pre-contract", "", "gold", func(): UI.main.open("nego", {"pid": p.id, "mode": "pre"})])
 	acts.append(["Compare", "users", "secondary", func(): _compare(p)])
 	acts.append(["Similar", "search", "secondary", func(): UI.main.open("lists", {"kind": "similar", "pid": p.id, "grp": "search"})])
 	if not own:
@@ -565,13 +585,132 @@ func _scout_btn(v: Control, p: Dictionary):
 			refresh(), "secondary", "search", 68))
 
 
+func _special(v: Control, p: Dictionary):
+	# the routes to a player that are not an ordinary bid: matched bid, buy-back, pre-contract
+	var s = G.s
+	if p.has("mrh") and int(p.get("mr", -1)) == s.user.club:
+		v.add_child(_note("clock", "%s have agreed to buy him for %s. Your matching right lets you take him instead until %s." % [s.clubs[int(p.mrh.club)].name, G.money(int(p.mrh.fee)), G.fmt_date(int(p.mrh.exp))], UI.AMBER))
+		v.add_child(UI.btn("Match the bid: %s" % G.money(int(p.mrh.fee)), func(): _match_bid(p), "gold", "handshake", 60))
+	elif int(p.get("mr", -1)) == s.user.club:
+		v.add_child(_note("info", "You hold a matching right on him: if his club accepts a bid, you get three days to match it.", UI.MUTED))
+	if G.MK.can_buy_back(p):
+		v.add_child(UI.btn("Use your buy-back clause: %s" % G.money(int(p.bb.fee)), func(): _buy_back(p), "gold", "repeat", 60))
+	var pc = G.MK.can_pre(p)
+	if pc.ok:
+		v.add_child(_note("file-text", "His contract ends in June. You can agree a pre-contract now and he joins on a free transfer in the summer.", UI.GREEN))
+		v.add_child(UI.btn("Offer a pre-contract", func(): UI.main.open("nego", {"pid": p.id, "mode": "pre"}), "gold", "file-text", 60))
+	elif pc.why != "":
+		v.add_child(_note("file-text", pc.why, UI.MUTED))
+
+
+func _match_bid(p: Dictionary):
+	var fee = int(p.mrh.fee)
+	if fee > G.uc().budget:
+		UI.toast("You need %s in the transfer budget" % G.money(fee), UI.RED)
+		return
+	p.erase("mrh")
+	p.erase("mr")
+	G.MK.agreed_deal(p, fee, "Matched the accepted bid of %s under your matching right." % G.money(fee))
+	UI.main.open("nego", {"pid": p.id, "mode": "buy"})
+
+
+func _buy_back(p: Dictionary):
+	var fee = int(p.bb.fee)
+	if not G.window_open():
+		UI.toast("The transfer window is closed", UI.RED)
+		return
+	if fee > G.uc().budget:
+		UI.toast("You need %s in the transfer budget" % G.money(fee), UI.RED)
+		return
+	UI.confirm("Buy back %s?" % G.pname(p), "Your clause lets you sign him for %s whatever his club thinks. He and his agent come in tomorrow to talk terms." % G.money(fee), "Use the clause", func():
+		p.erase("bb")
+		G.MK.agreed_deal(p, fee, "Buy-back clause used at %s." % G.money(fee))
+		UI.main.open("nego", {"pid": p.id, "mode": "buy"}))
+
+
+func _loan_in(p: Dictionary):
+	# a loan is a small negotiation of its own: wages, what happens next summer, and how much he plays
+	var lv = G.MK.loan_view(p)
+	if not lv.ok:
+		UI.toast(lv.why, UI.RED)
+		return
+	var val = float(G.value(p))
+	var st = {"share": 2, "opt": 0, "fee": float(G.nice(val * 1.1)), "starter": lv.young, "msg": ""}
+	var club = G.s.clubs[p.club]
+	var build_sheet: Callable
+	build_sheet = func(v):
+		v.add_child(UI.wrap("%s %s" % [club.name, "see him as part of their plans, so only a loan you must make permanent will interest them." if lv.core else ("want their young player to get games." if lv.young else "are open to a loan.")], 19, UI.MUTED))
+		if st.msg != "":
+			var rp = UI.panel(Color(UI.AMBER, 0.12), 10, 12, 6, Color(UI.AMBER, 0.4))
+			rp.add_child(UI.wrap(st.msg, 18, UI.TEXT))
+			v.add_child(rp)
+		v.add_child(UI.caps("You pay · %s a week" % G.money(int(p.wage * G.MK.SHARE[st.share])), 16, UI.accent))
+		v.add_child(UI.seg(["Half his wages", "Three quarters", "All of them"], st.share, func(i):
+			st.share = i
+			UI.close_sheet()
+			UI.sheet("Loan: %s" % G.pname(p), build_sheet), 17, 6))
+		v.add_child(UI.caps("Next summer", 16, UI.accent))
+		v.add_child(UI.seg(G.MK.OPT_TXT, st.opt, func(i):
+			st.opt = i
+			st.fee = float(G.nice(val * (1.1 if i == 1 else 0.95)))
+			UI.close_sheet()
+			UI.sheet("Loan: %s" % G.pname(p), build_sheet), 17, 6))
+		if st.opt > 0:
+			var fl = UI.lbl("%s %s" % ["You may buy him for" if st.opt == 1 else "You will buy him for", G.money(int(st.fee))], 22, UI.TEXT, "semi")
+			v.add_child(fl)
+			var sl = UI.slider(val * 0.6, val * 2.0, st.fee, max(1000.0, float(G.nice(val / 50.0))), func(x):
+				st.fee = x
+				fl.text = "%s %s" % ["You may buy him for" if st.opt == 1 else "You will buy him for", G.money(int(x))], true)
+			sl.custom_minimum_size = Vector2(0, 40)
+			v.add_child(sl)
+		v.add_child(UI.caps("Playing time", 16, UI.accent))
+		v.add_child(UI.seg(["No promise", "Promise first-team football"], 1 if st.starter else 0, func(i):
+			st.starter = i == 1
+			UI.close_sheet()
+			UI.sheet("Loan: %s" % G.pname(p), build_sheet), 17, 6))
+		if st.starter:
+			v.add_child(UI.lbl_fill("If he plays under 40% of league matches, they will recall him.", 15, UI.DIM))
+		v.add_child(UI.btn("Propose the loan", func():
+			var r = G.MK.loan_offer(p, st.share, st.opt, int(st.fee), st.starter)
+			if r.ok:
+				UI.close_sheet()
+				UI.sfx("cash")
+				UI.toast("%s joins on loan" % G.pname(p), UI.GREEN)
+				G.msg("%s joins on loan" % G.pname(p), r.text, "info")
+				refresh()
+			else:
+				st.msg = r.text
+				UI.sfx("error")
+				UI.close_sheet()
+				UI.sheet("Loan: %s" % G.pname(p), build_sheet), "primary", "handshake", 56))
+	UI.sheet("Loan: %s" % G.pname(p), build_sheet)
+
+
 func _loan_out(p: Dictionary):
-	UI.confirm("Loan out %s?" % G.pname(p), "Your staff will find him a club where he should play regularly. He returns at the end of the season.", "Send on loan", func():
-		var err = G.OPS.loan_out(p)
-		if err != "":
-			UI.toast(err, UI.RED)
-		else:
-			UI.main.back())
+	var st = {"pay": 2, "recall": true}
+	var build_sheet: Callable
+	build_sheet = func(v):
+		v.add_child(UI.wrap("Your staff will find him a club where he should play regularly. He returns at the end of the season. Paying part of his wages yourself opens the door to better clubs.", 19, UI.MUTED))
+		v.add_child(UI.caps("The other club pays", 16, UI.accent))
+		v.add_child(UI.seg(["Half his wages", "Three quarters", "All of them"], st.pay, func(i):
+			st.pay = i
+			UI.close_sheet()
+			UI.sheet("Loan out %s" % G.pname(p), build_sheet), 17, 6))
+		if st.pay < 2:
+			v.add_child(UI.lbl_fill("You keep paying %s a week." % G.money(int(p.wage * (1.0 - G.MK.SHARE[st.pay]))), 16, UI.AMBER))
+		v.add_child(UI.caps("Recall clause", 16, UI.accent))
+		v.add_child(UI.seg(["None", "I can recall him in January"], 1 if st.recall else 0, func(i):
+			st.recall = i == 1
+			UI.close_sheet()
+			UI.sheet("Loan out %s" % G.pname(p), build_sheet), 17, 6))
+		v.add_child(UI.btn("Send on loan", func():
+			var err = G.MK.loan_out(p, st.pay, st.recall)
+			UI.close_sheet()
+			if err != "":
+				UI.toast(err, UI.RED)
+			else:
+				UI.main.back(), "primary", "arrow-left-right", 56))
+	UI.sheet("Loan out %s" % G.pname(p), build_sheet)
 
 
 func _indiv(p: Dictionary):

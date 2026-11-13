@@ -411,9 +411,11 @@ static func rollover():
 	if title:
 		note = "Champions"
 		u.trophies.append("%s %s" % [s.leagues[old_lg].name, G.season_name()])
+		u["film"] = "league"
 		G.OPS.life().cash += G.OPS.salary() * 20
 		G.scrap("Champions", "%s won the %s" % [ucl.name, s.leagues[old_lg].name])
 	elif promoted:
+		u["film"] = "promo"
 		note = "Promoted"
 	elif relegated:
 		note = "Relegated"
@@ -461,13 +463,13 @@ static func rollover():
 				retired.append(G.pname(p))
 			remove_player(p)
 			continue
-		if p.has("pre") and p.club >= 0 and p.cend <= s.season:
+		if p.has("prec") and p.club >= 0 and p.cend <= s.season:
 			# he signed a pre-contract during the season and now moves on a free transfer
 			if p.club == ucl.id:
 				left.append(G.pname(p))
 			G.MK.fulfil_pre(p)
 			continue
-		p.erase("pre")
+		p.erase("prec")
 		if p.club >= 0 and p.cend <= s.season:
 			var c = s.clubs[p.club]
 			if p.club == ucl.id:

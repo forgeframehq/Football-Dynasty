@@ -56,8 +56,8 @@ static func can_pre(p: Dictionary) -> Dictionary:
 		return {"ok": false, "why": ""}
 	if not pre_window():
 		return {"ok": false, "why": "His contract ends in June. From 1 January you can agree a pre-contract with him."}
-	if p.has("pre"):
-		return {"ok": false, "why": "He has already agreed to join %s in the summer." % s.clubs[int(p.pre.club)].name}
+	if p.has("prec"):
+		return {"ok": false, "why": "He has already agreed to join %s in the summer." % s.clubs[int(p.prec.club)].name}
 	var w = G.TR.willing(p)
 	if not w.ok:
 		return {"ok": false, "why": w.why}
@@ -67,8 +67,8 @@ static func can_pre(p: Dictionary) -> Dictionary:
 static func fulfil_pre(p: Dictionary):
 	# called at the season rollover for a player whose contract has run out and who signed elsewhere
 	var s = G.s
-	var pre = p.pre
-	p.erase("pre")
+	var pre = p.prec
+	p.erase("prec")
 	var cid = int(pre.club)
 	if cid < 0 or cid >= s.clubs.size():
 		G.LG.release(p)
@@ -93,7 +93,7 @@ static func ai_pre():
 		return
 	for pid in uc.players:
 		var p = s.players[pid]
-		if p.cend > s.season + 1 or p.has("pre") or p.get("loan", -1) >= 0 or p.ovr < uc.rep - 8 or G.age(p) >= 34:
+		if p.cend > s.season + 1 or p.has("prec") or p.get("loan", -1) >= 0 or p.ovr < uc.rep - 8 or G.age(p) >= 34:
 			continue
 		if G.rng.randf() > 0.22:
 			continue
@@ -101,7 +101,7 @@ static func ai_pre():
 			var c = s.clubs[G.rng.randi() % s.clubs.size()]
 			if c.id == uc.id or abs(c.rep - p.ovr) > 6 or c.players.size() >= 30:
 				continue
-			p["pre"] = {"club": c.id, "wage": max(p.wage, G.wage_for(p.ovr, G.age(p))), "years": G.rng.randi_range(2, 4)}
+			p["prec"] = {"club": c.id, "wage": max(p.wage, G.wage_for(p.ovr, G.age(p))), "years": G.rng.randi_range(2, 4)}
 			p.mor = max(30, p.mor - 4)
 			G.news("%s will join %s on a free transfer when his contract ends in June." % [G.pfull(p), c.name])
 			G.msg("%s signs for %s" % [G.pname(p), c.name], "%s has agreed a pre-contract with %s and will leave on a free transfer when his deal runs out in June.\n\nHe stays with you until then. There is nothing you can do to stop it now: a new contract had to be agreed before he signed elsewhere." % [G.pfull(p), c.name], "contract", null, true)
@@ -424,7 +424,7 @@ static func agent_offer(panic := false) -> bool:
 		if c.id == uc.id or c.players.is_empty() or s.leagues[c.lg].get("roe", false):
 			continue
 		var p = s.players[c.players[G.rng.randi() % c.players.size()]]
-		if p.get("loan", -1) >= 0 or p.has("pre") or G.DL.find(p.id) != null or p.ovr < uc.rep - 5 or p.ovr > uc.rep + 4 or G.age(p) > 30:
+		if p.get("loan", -1) >= 0 or p.has("prec") or G.DL.find(p.id) != null or p.ovr < uc.rep - 5 or p.ovr > uc.rep + 4 or G.age(p) > 30:
 			continue
 		if not (p.listed or p.cend <= s.season + 1 or G.TR.squad_rank(p) >= 12):
 			continue
@@ -482,7 +482,7 @@ static func _brief_run():
 	var rows = []
 	for pid in s.players:
 		var p = s.players[pid]
-		if p.club == uc.id or p.has("pre"):
+		if p.club == uc.id or p.has("prec"):
 			continue
 		if p.pos != b.pos and not (b.pos in p.alt):
 			continue
@@ -535,7 +535,7 @@ static func dd() -> Dictionary:
 
 
 static func dd_start():
-	G.s["dd"] = {"day": G.s.day, "hour": 9, "left": 30, "feed": [], "deals": 0, "big": 0, "big_txt": ""}
+	G.s["dd"] = {"day": G.s.day, "hour": 9, "left": 90, "feed": [], "deals": 0, "big": 0, "big_txt": ""}
 	_dd_say("09:00", "The window closes at 23:00. Phones are ringing in every boardroom.", "info")
 
 
@@ -564,13 +564,16 @@ static func dd_hour() -> bool:
 	d.hour = int(d.hour) + 1
 	var clock = "%02d:00" % d.hour
 	var late = int(d.hour) >= 20
-	var n = min(int(d.left), 3 if late else 2)
-	for i in n:
-		var before = s.tx_log.size()
-		var top = s.tx_log[0] if before > 0 else null
+	# keep trying until a couple of deals go through this hour (more in the last hours)
+	var want = 3 if late else (2 if rng.randf() < 0.6 else 1)
+	var tries = 0
+	while want > 0 and tries < 8 and int(d.left) > 0:
+		tries += 1
+		var top = s.tx_log[0] if s.tx_log.size() > 0 else null
 		G.TR.ai_deal()
 		d.left = int(d.left) - 1
 		if s.tx_log.size() > 0 and not is_same(s.tx_log[0], top):
+			want -= 1
 			var x = s.tx_log[0]
 			d.deals = int(d.deals) + 1
 			if int(x.fee) > int(d.big):

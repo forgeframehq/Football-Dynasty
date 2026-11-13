@@ -119,8 +119,8 @@ static func move(p: Dictionary, to_id: int, fee: int, wage: int, years: int):
 	p.erase("lsk")
 	for k in ["lw", "lterms", "bon", "bonp", "mrh", "lpay", "lrecall"]:
 		p.erase(k)
-	if p.has("pre") and int(p.pre.club) != to_id:
-		p.erase("pre")
+	if p.has("prec") and int(p.prec.club) != to_id:
+		p.erase("prec")
 	if p.has("bb") and int(p.bb.club) == to_id:
 		p.erase("bb")
 	var from_name = "Free agent"
@@ -280,7 +280,7 @@ static func ai_deal():
 		if seller.id == buyer.id or seller.id == s.user.club or seller.players.size() <= 21:
 			continue
 		var p = s.players[seller.players[rng.randi() % seller.players.size()]]
-		if p.ovr < buyer.rep - 1 or p.ovr > buyer.rep + 6 or G.age(p) > 30 or p.get("loan", -1) >= 0 or p.has("pre") or p.has("mrh"):
+		if p.ovr < buyer.rep - 1 or p.ovr > buyer.rep + 6 or G.age(p) > 30 or p.get("loan", -1) >= 0 or p.has("prec") or p.has("mrh"):
 			continue
 		if seller.rep > buyer.rep + 2 and not p.listed:
 			continue

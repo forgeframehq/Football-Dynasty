@@ -24,6 +24,7 @@ var foot: Control
 var cfee := 0
 var csell := 0
 var swap := -1
+var cclause := 0
 
 
 func _init_state(p: Dictionary):
@@ -696,6 +697,16 @@ func _sell(v: Control, p: Dictionary):
 		v.add_child(_opt("Sell-on clause", ["None", "10%", "15%", "20%", "25%"], SELLON.find(csell), func(i):
 			csell = SELLON[i]
 			refresh()))
+		if G.age(p) <= 23:
+			v.add_child(_opt("Keep a way back", ["None", "Buy-back", "Right to match"], cclause, func(i):
+				cclause = i
+				refresh()))
+			if cclause == 1:
+				v.add_child(UI.wrap("For three seasons you could sign him back for %s, whatever they think." % G.money(G.MK.bb_fee(cfee)), 15, UI.DIM))
+			elif cclause == 2:
+				v.add_child(UI.wrap("If they ever accept a bid for him, you get three days to match it.", 15, UI.DIM))
+	if int(o.get("clause", 0)) > 0:
+		v.add_child(UI.wrap("Agreed with this offer: %s." % ("a buy-back clause at %s" % G.money(G.MK.bb_fee(int(o.fee))) if int(o.clause) == 1 else "the right to match any future bid"), 17, UI.GREEN))
 	var bh = UI.hb(8)
 	var a = UI.btn("Accept %s" % G.money(o.fee), func():
 		if G.uc().players.size() <= 18:
@@ -709,12 +720,13 @@ func _sell(v: Control, p: Dictionary):
 	bh.add_child(a)
 	if not o.has("wait"):
 		bh.add_child(UI.btn("Send counter", func():
-			G.DL.counter_sale(o, cfee, csell)
+			G.DL.counter_sale(o, cfee, csell, cclause)
 			reply = "Counter-offer sent."
 			reply_col = UI.accent
 			UI.sfx("message")
 			refresh(), "secondary", "mail", 58))
 	bh.add_child(UI.btn("Reject", func():
 		G.s.offers.erase(o)
+		G.MK.rejected_offer(o)
 		UI.main.back(), "danger", "x", 58))
 	foot.add_child(bh)

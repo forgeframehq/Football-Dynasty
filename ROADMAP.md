@@ -122,6 +122,28 @@ Options
 - [x] Tactics (v0.6.2): pitch takes the full height on every tab (tabs and buttons moved above the list), goalkeeper's name no longer cut off, right side no longer runs off the screen on notched phones
 - [x] Player profile (on `dev`, not in an APK yet): all 18 attributes visible without scrolling; condition, morale, form, average rating, apps and goals moved up beside age, value and wage
 
-## Agreed, not built (12 Nov)
-- [ ] Tactics system: playstyles with manager proficiency, more Defence/Attack options, individual instructions, player skills, manager link-up plays, team style fit, condition arrows, weak foot and injury resistance, Team of the Week (spec: project doc `TACTICS_PLAN.md`)
-- [ ] Transfer system: two-day deal flow with patience bars and a "what he wants" panel, recruitment brief, loans, swaps, pre-contracts, buy-backs, players with their own minds (spec: project doc `TRANSFER_PLAN.md`)
+## Tactics system (v0.7.0, on `dev`, not in an APK yet)
+- [x] Team playstyles: Possession Game, Quick Counter, Long Ball Counter, Out Wide, Long Ball; manager proficiency in each; choosing one sets its default instructions; the six old quick presets are gone, the three save slots stay
+- [x] Squad familiarity per player (new signings settle over about 10 to 15 matches) and a style fit number; fit is a bonus only
+- [x] Defence 7 options, Attack 8 options, each with a trade-off in the match engine
+- [x] Individual instructions: two attacking and two defensive slots (Counter Target, Attacking Full-back, Hug the Touchline, Anchoring, Tight Marking on a chosen opponent, Deep Line, Defensive Full-back)
+- [x] 24 player skills, generated for every player, learnable in training (up to 8), used by the engine and named in commentary; on the profile, training, scout reports and as a search filter
+- [x] Manager link-up plays: eight types, one at the start and one more per coaching badge, glowing line on the pitch, bronze/silver/gold with matches together; rival managers have a style and a link-up, shown before kick-off
+- [x] Weekly form arrows and form type, injury resistance, weak foot on the wrong flank, Team of the Week
+- [x] First-day setup (also on the first load of an older career): choose best playstyle, then first link-up
+- [ ] The pitch drawing does not yet illustrate the new options (line of engagement, compactness, build-up and so on)
+
+## Transfer system (v0.7.0, on `dev`)
+- [x] Two-day deals: day 1 fee talks with the club across the table (patience bar, final offer, player swap, delegate to the assistant); day 2 the player and his agent come in
+- [x] "What he wants" panel (essential and tradeable demands; fuller when he has been scouted), performance bonuses, agent patience bar
+- [x] Recruitment brief for the chief scout, with playstyle and link-up filters
+- [x] Loans with terms both ways: wage share, option or obligation to buy, playing-time promise, recall clause
+- [x] Pre-contracts from 1 January; rivals can sign yours
+- [x] Buy-back clauses and matching rights when selling players aged 23 or under; bigger clubs insist on a buy-back when selling you a prospect
+- [x] Players with their own minds: unsettled after a refused bid from a bigger club, heads turned, agents offering players
+- [x] Deadline day played hour by hour, with fees agreed that day bringing the player in the same evening
+
+## Presentation (v0.7.0, on `dev`)
+- [x] Football Dynasty 26 name, app icon and wordmark; one purple and gold colour scheme that no longer follows the club
+- [x] Intro: ForgeFrame card, two-clip film, title over the last shot, Skip button
+- [ ] Trophy and promotion films: the game plays `assets/video/win_league.ogv`, `win_cup.ogv`, `win_euro.ogv`, `win_promo.ogv` if present; clips still to come from Sudhi (Kling)

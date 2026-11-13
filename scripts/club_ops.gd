@@ -123,7 +123,11 @@ static func daily():
 			var p = s.players[q.pid]
 			var room = p.pot - p.ovr
 			var verdict = "a finished article" if room <= 1 else ("some room to grow" if room <= 4 else ("a real prospect" if room <= 9 else "a potential star"))
-			G.msg("Scout report: %s" % G.pname(p), "%s (%s, %d) is rated %d now with a potential of %d — %s. Value around %s." % [G.pfull(p), p.pos, G.age(p), p.ovr, p.pot, verdict, G.money(G.value(p))], "info", null, true)
+			var sk = G.TC.skill_names(p)
+			var extra = "\n\nSkills: %s." % (", ".join(sk) if sk.size() > 0 else "none of note")
+			extra += "\n%s" % G.TC.fit_text(p)
+			extra += "\nInjury record: %s. Form: %s." % [["fragile", "normal", "robust"][G.TC.inj_res(p) - 1], "streaky" if G.TC.form_type(p) == 1 else "steady"]
+			G.msg("Scout report: %s" % G.pname(p), "%s (%s, %d) is rated %d now with a potential of %d: %s. Value around %s.%s" % [G.pfull(p), p.pos, G.age(p), p.ovr, p.pot, verdict, G.money(G.value(p)), extra], "deal", p.id, true)
 	if sc.assign != null and s.day >= sc.next:
 		_assignment_report()
 	# position retraining

@@ -31,6 +31,7 @@ func build():
 	r2.add_child(_news())
 	if not G.s.user.get("tac_set", false):
 		_ask_tactics.call_deferred()
+	UI.main.play_pending_film.call_deferred()
 
 
 func _ask_tactics():
@@ -168,6 +169,11 @@ func todo_items(c: Dictionary) -> Array:
 	var nf = G.next_user_fixture()
 	if nf != null and nf.day - s.day <= 1 and int(s.user.get("press_day", -9)) < s.day - 1 and not nf.get("fr", false):
 		a.append(["megaphone", "Press conference before the match", UI.accent, func(): UI.main.open("hub", {"kind": "press", "grp": "manager"})])
+	var ddy = G.MK.dd()
+	if not ddy.is_empty() and int(ddy.hour) < 23:
+		a.push_front(["clock", "Deadline day is live: %d hours left" % (23 - int(ddy.hour)), UI.RED, func(): UI.main.open("deadline")])
+	if s.scout.has("brief_res") and int(s.scout.brief_res.day) >= s.day - 2:
+		a.append(["user-round-search", "Your chief scout's shortlist is in", UI.GREEN, func(): UI.main.root("scouting")])
 	var n = G.unread()
 	if n > 0:
 		a.append(["mail", "%d unread message%s" % [n, "" if n == 1 else "s"], UI.accent, func(): UI.main.root("inbox")])

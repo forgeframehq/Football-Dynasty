@@ -21,6 +21,9 @@ func build():
 	var a = pane(0, 3)
 	h.add_child(a[0])
 	var v = a[1]
+	var ddy = G.MK.dd()
+	if not ddy.is_empty():
+		v.add_child(UI.btn("Deadline day live · %s" % ("%02d:00" % int(ddy.hour) if int(ddy.hour) < 23 else "window shut"), func(): UI.main.open("deadline"), "danger" if int(ddy.hour) < 23 else "ghost", "clock", 46))
 	v.add_child(UI.caps("Your talks", 15, UI.accent))
 	var deals = G.DL.active()
 	if deals.size() == 0:
@@ -30,7 +33,7 @@ func build():
 		var mine = d.stage == "club" or d.stage == "talks"
 		var pid = p.id
 		var mode = d.mode
-		v.add_child(UI.trow([UI.ovr(p.ovr, 16), G.pname(p), STAGE[d.stage] if d.mode == "buy" else "Contract talks"], [34, 0, -128],
+		v.add_child(UI.trow([UI.ovr(p.ovr, 16), G.pname(p), STAGE.get(d.stage, "") if d.mode == "buy" else ("Pre-contract talks" if d.mode == "pre" else "Contract talks")], [34, 0, -190],
 			{"size": 18, "hi": mine, "cols": {2: UI.AMBER if mine else UI.MUTED}, "tap": func(): UI.main.open("nego", {"pid": pid, "mode": mode})}))
 	v.add_child(UI.caps("Bids for your players", 15, UI.accent))
 	if s.offers.size() == 0:
