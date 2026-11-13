@@ -34,7 +34,7 @@ Standing rules:
 ## What is left (suggested order)
 1. Finish the dense pass: only the small pages in `hub.gd` and `lists.gd` are left (training, finances, fixtures, club view, board and home were done in v0.6.1).
 2. Get phone feedback on v0.6.1: table text size (18–19), the rail beside the camera cut-out, the confirm pop-ups.
-2b. Tactics depth, proposed to Sudhi on 12 Nov and waiting for his answer (do not build before he agrees): eFootball-style team playstyles with manager proficiency, more Defence and Attack instructions, player skills, and link-up pairs between specific players.
+2b. Tactics system: fully agreed on 12 Nov, spec in the project doc `claude/TACTICS_PLAN.md`. Sudhi said "lock it in, but don't build yet" and "don't build the APK": wait for his go, then commit without pushing to `main` until he asks for an APK.
 3. World system: continent > nation > competition > club picker; up to five playable nations (club's nation locked); background real nations with estimated results; placeholder nations generated on first open; generated players scoutable and buyable but with capped, uncertain potential and fair prices (no wonderkid loophole). Needs nation/continent table and an open-source flag set.
 4. Transfer extras: deadline-day live event, loans through the talks screen, swaps, shortlist alerts.
 5. Match depth: two-legged ties, extra time, shoot-outs, opposition instructions, tactical familiarity, partnerships.
