@@ -123,15 +123,15 @@ func _overview(h: Control, lf: Dictionary, country: String):
 	lf.lang[lang] = prog
 	v2.add_child(UI.kv(lang, "Fluent" if prog >= 100 else ("%d%% · studying" % int(prog) if lf.study == lang else "%d%%" % int(prog)), UI.GREEN if prog >= 100 else UI.TEXT))
 	if prog < 100:
-		v2.add_child(UI.btn("Stop lessons" if lf.study == lang else "%s lessons · €400/wk" % lang, func():
+		v2.add_child(UI.btn("Stop lessons" if lf.study == lang else "%s lessons · %s/wk" % [lang, G.money(400)], func():
 			lf.study = "" if lf.study == lang else lang
 			refresh(), "secondary", "book-open", 46))
-	v2.add_child(UI.btn("Give €25K to a local cause", func(): _buy(lf, 25000, "The fans noticed your donation", func():
+	v2.add_child(UI.btn("Give %s to a local cause" % G.money(25000), func(): _buy(lf, 25000, "The fans noticed your donation", func():
 		u["fans"] = min(100.0, float(u.get("fans", 55.0)) + 3.0)), "secondary", "heart", 46))
 	var m = G.cur.month
 	if m == 6 or m == 7 or m == 12:
 		var went = int(lf.get("holiday", -1)) == G.s.season * 100 + m
-		v2.add_child(UI.btn("Holiday taken" if went else "Take a holiday · €15K", func():
+		v2.add_child(UI.btn("Holiday taken" if went else "Take a holiday · %s" % G.money(15000), func():
 			if went:
 				return
 			_buy(lf, 15000, "A week away. You come back fresh.", func():

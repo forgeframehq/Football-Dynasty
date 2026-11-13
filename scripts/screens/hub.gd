@@ -529,11 +529,11 @@ func _life(v: Control):
 	lf.lang[lang] = prog
 	cc.add_child(UI.kv(lang, "Fluent" if prog >= 100 else ("%d%% · studying" % int(prog) if lf.study == lang else "%d%%" % int(prog)), UI.GREEN if prog >= 100 else UI.TEXT))
 	if prog < 100:
-		cc.add_child(UI.btn("Stop lessons" if lf.study == lang else "Take %s lessons (€400 a week)" % lang, func():
+		cc.add_child(UI.btn("Stop lessons" if lf.study == lang else "Take %s lessons (%s a week)" % [lang, G.money(400)], func():
 			lf.study = "" if lf.study == lang else lang
 			refresh(), "secondary", "book-open", 50))
 		cc.add_child(UI.wrap("Fluency takes about five months and gives Motivation +1.", 17, UI.DIM))
-	cc.add_child(UI.btn("Give €25K to a local cause", func(): _buy(lf, 25000, "a donation the fans noticed", func():
+	cc.add_child(UI.btn("Give %s to a local cause" % G.money(25000), func(): _buy(lf, 25000, "a donation the fans noticed", func():
 		u["fans"] = min(100.0, float(u.get("fans", 55.0)) + 3.0)), "secondary", "heart", 50))
 	var hv = _card(v, "Property showroom")
 	for i in HOMES.size():
@@ -661,7 +661,7 @@ func _invest(v: Control):
 		var tv = UI.vb(-4)
 		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tv.add_child(UI.lbl(SPONSORS[i][0], 20, UI.TEXT, "semi"))
-		tv.add_child(UI.lbl_fill("%s · €%.1f a share%s" % [SPONSORS[i][1], price, " · you hold %d" % q if q > 0 else ""], 15, UI.MUTED))
+		tv.add_child(UI.lbl_fill("%s · %s%.1f a share%s" % [SPONSORS[i][1], G.settings.get("cur", "€"), price * G.CUR_RATE.get(G.settings.get("cur", "€"), 1.0), " · you hold %d" % q if q > 0 else ""], 15, UI.MUTED))
 		r.add_child(tv)
 		var idx = i
 		var bb = UI.chip("BUY 1K", UI.accent, UI.on_color(UI.accent), 15)
@@ -677,14 +677,14 @@ func _invest(v: Control):
 			r.add_child(sb)
 		sh.add_child(r)
 	var e = _card(v, "Work off the pitch")
-	e.add_child(UI.btn("Agent: %s (€2K a week)" % ("hired" if lf.agent else "none"), func():
+	e.add_child(UI.btn("Agent: %s (%s a week)" % ["hired" if lf.agent else "none", G.money(2000)], func():
 		lf.agent = not lf.agent
 		refresh(), "primary" if lf.agent else "secondary", "briefcase", 48))
 	e.add_child(UI.lbl("An agent makes the board more likely to agree a pay rise.", 16, UI.DIM))
 	e.add_child(UI.btn("TV and newspaper work: %s" % ("on" if lf.media else "off"), func():
 		lf.media = not lf.media
 		refresh(), "primary" if lf.media else "secondary", "megaphone", 48))
-	e.add_child(UI.lbl("Pays €8K a week and builds reputation, but the board likes it less each week.", 16, UI.DIM))
+	e.add_child(UI.lbl("Pays %s a week and builds reputation, but the board likes it less each week." % G.money(8000), 16, UI.DIM))
 
 
 func _owner(v: Control):
