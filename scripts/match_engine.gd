@@ -52,6 +52,7 @@ func setup(f: Dictionary, lu_h: Dictionary, lu_a: Dictionary, det: bool):
 	total = 90 + rng.randi_range(2, 6)
 	recalc(0)
 	recalc(1)
+	recalc(0)   # again, so side 0 knows who side 1 is marking
 
 
 func _side(lu: Dictionary, home: bool) -> Dictionary:
@@ -69,7 +70,18 @@ func _side(lu: Dictionary, home: bool) -> Dictionary:
 		_pm(pid, false)
 	if d.capt >= 0 and d.capt in d.xi and pl[d.capt].at[13] >= 75:
 		d.boost *= 1.008
+	d["tc"] = G.TC.side_setup(lu, d)
 	return d
+
+
+func _retac(i: int):
+	# instructions changed during the match: rebuild the tactical modifiers, keep what has already happened
+	var t = sd[i]
+	var old = t.tc
+	t.tc = G.TC.side_setup({"user": old.user, "pins": t.club.pins if old.user and t.club.has("pins") else old.pins, "tm_pid": old.tm_pid}, t)
+	t.tc.links0 = old.links0
+	t.tc.link_goals = old.link_goals
+	t.tc["first"] = false
 
 
 func _pm(pid: int, starter: bool):
@@ -86,7 +98,10 @@ func set_shape(i: int, slots: Array, rids: Array, instr = null):
 		t.roles.append(sl[0])
 	if instr != null:
 		t.instr = instr.duplicate()
+	_retac(i)
 	recalc(i)
+	if sd.size() == 2:
+		recalc(1 - i)
 
 
 func shout(i: int, kind: String) -> bool:
@@ -120,8 +135,14 @@ func recalc(i: int):
 	var t0 = 0.0
 	var t1 = 0.0
 	var ins = t.instr
-	var wide_f = [0.9, 1.0, 1.08][ins.width]
-	var cen_f = [1.06, 1.0, 0.96][ins.width]
+	var tc = t.tc
+	var md = tc.m
+	var opp = sd[1 - i] if sd.size() == 2 else null
+	if tc.get("dirty", true):
+		G.TC.refresh_side(t, opp)
+		tc["dirty"] = false
+	var wide_f = [0.9, 1.0, 1.08][ins.width] * md.wide
+	var cen_f = [1.06, 1.0, 0.96][ins.width] * md.cen
 	for k in 11:
 		var pid = t.xi[k]
 		if pid < 0:
@@ -136,7 +157,8 @@ func recalc(i: int):
 		if q.rid != t.rids[k]:
 			q.rid = t.rids[k]
 			q.sf = 0.955 + 0.07 * G.RL.suit(p, q.rid)
-		var f = G.fit(p, role) * (0.86 + 0.14 * q.cond / 100.0) * (0.975 + 0.0005 * p.mor) * q.sf
+		var pmod = G.TC.pl_mods(t, k, p, q, minute, opp)
+		var f = G.fit(p, role) * (0.86 + 0.14 * q.cond / 100.0) * (0.975 + 0.0005 * p.mor) * q.sf * pmod[0]
 		var e = p.ovr * f
 		if k == 0:
 			t.gk = e
@@ -144,9 +166,9 @@ func recalc(i: int):
 			w1.append(0.004)
 			t1 += 0.004
 			continue
-		var aw = base[0] * rd.m[0] * (wide_f if G.RL.WIDE.has(role) else cen_f)
-		var mw = base[1] * rd.m[1]
-		var dw = base[2] * rd.m[2]
+		var aw = base[0] * rd.m[0] * (wide_f if G.RL.WIDE.has(role) else cen_f) * pmod[1]
+		var mw = base[1] * rd.m[1] * pmod[2]
+		var dw = base[2] * rd.m[2] * pmod[3]
 		wa += aw
 		wm += mw
 		wd += dw
@@ -154,13 +176,13 @@ func recalc(i: int):
 		a += aw * (0.65 * e + 0.35 * f * (st[1] + st[3] + st[0]) / 3.0)
 		m += mw * (0.65 * e + 0.35 * f * (st[2] + st[3]) / 2.0)
 		d += dw * (0.65 * e + 0.35 * f * (st[4] + st[5]) / 2.0)
-		var x0 = (base[0] * 0.75 + 0.14) * q.p0 * rd.sh
-		var x1 = (0.7 * base[0] + 0.5 * base[1] + 0.03) * q.p1 * rd["as"]
+		var x0 = (base[0] * 0.75 + 0.14) * q.p0 * rd.sh * pmod[4]
+		var x1 = (0.7 * base[0] + 0.5 * base[1] + 0.03) * q.p1 * rd["as"] * pmod[5]
 		w0.append(x0)
 		w1.append(x1)
 		t0 += x0
 		t1 += x1
-	var h = (1.03 if t.home else 1.0) * t.boost
+	var h = (1.03 if t.home else 1.0) * t.boost * tc.sx.cap
 	var sa = 1.0
 	var sdf = 1.0
 	if t.shout == "push":
@@ -175,9 +197,9 @@ func recalc(i: int):
 	var line_m = [0.97, 1.0, 1.035][ins.line]
 	var line_d = [1.035, 1.0, 0.97][ins.line]
 	var pass_m = [1.03, 1.0, 0.97][ins["pass"]]
-	t.att = max(20.0, a / max(0.01, wa) * pow(wa / REF[0], 0.35) * MENT[t.ment][0] * h * sa) if wa > 0.0 else 20.0
-	t.mid = max(20.0, m / max(0.01, wm) * pow(wm / REF[1], 0.35) * PRESS_MID[t.press] * h * line_m * pass_m) if wm > 0.0 else 20.0
-	t.def = max(20.0, d / max(0.01, wd) * pow(wd / REF[2], 0.35) * MENT[t.ment][1] * h * sdf * line_d * (0.99 if ins.counter else 1.0)) if wd > 0.0 else 20.0
+	t.att = max(20.0, a / max(0.01, wa) * pow(wa / REF[0], 0.35) * MENT[t.ment][0] * h * sa * md.att * G.TC.link_att(tc)) if wa > 0.0 else 20.0
+	t.mid = max(20.0, m / max(0.01, wm) * pow(wm / REF[1], 0.35) * PRESS_MID[t.press] * h * line_m * pass_m * md.mid * tc.sx.mid) if wm > 0.0 else 20.0
+	t.def = max(20.0, d / max(0.01, wd) * pow(wd / REF[2], 0.35) * MENT[t.ment][1] * h * sdf * line_d * (0.99 if ins.counter else 1.0) * md.def * tc.sx.def) if wd > 0.0 else 20.0
 	t.midp = pow(t.mid, 2.6)
 	t.w0 = w0
 	t.w1 = w1
@@ -186,9 +208,11 @@ func recalc(i: int):
 	if sd.size() == 2:
 		for j in 2:
 			var x = sd[j]
-			var ps = 0.282 * pow(x.att / sd[1 - j].def, 2.1) * TEMPO_SHOT[x.tempo] * [0.95, 1.0, 1.05][x.instr["pass"]]
+			var ps = 0.268 * pow(x.att / sd[1 - j].def, 2.1) * TEMPO_SHOT[x.tempo] * [0.95, 1.0, 1.05][x.instr["pass"]] * x.tc.m.ps
 			if x.instr.counter:
 				ps *= 1.07 if x.mid < sd[1 - j].mid else 0.97
+			if x.tc.m.cb > 0.0 and x.mid < sd[1 - j].mid:
+				ps *= 1.0 + x.tc.m.cb
 			x.ps = clamp(ps, 0.05, 0.6)
 
 
@@ -230,7 +254,7 @@ func step() -> Array:
 	if minute % tick == 0:
 		for i in 2:
 			var t = sd[i]
-			var dr = 0.27 * tick * PRESS_DRAIN[t.press] * TEMPO_DRAIN[t.tempo]
+			var dr = 0.27 * tick * PRESS_DRAIN[t.press] * TEMPO_DRAIN[t.tempo] * t.tc.m.drain
 			for k in 11:
 				var pid = t.xi[k]
 				if pid >= 0:
@@ -253,6 +277,8 @@ func step() -> Array:
 				recalc(j)
 			elif x.shout == "waste" and x.goals > sd[1 - j].goals:
 				ps *= 0.78
+		if x.shout != "waste" and x.goals > sd[1 - j].goals and (x.tc.waste == 2 or (x.tc.waste == 1 and minute >= 75)):
+			ps *= 0.82
 	if rng.randf() < 0.0028:
 		_shot(ai, out, true)
 	elif r < ps:
@@ -306,6 +332,25 @@ func _pick(t: Dictionary, mode: int, exclude := -1) -> int:
 	return -1
 
 
+func _crosser(t: Dictionary) -> int:
+	# the wide player most likely to deliver a cross; -1 if the side has no width
+	var b = -1
+	var bw = -1.0
+	for k in range(1, 11):
+		var c = t.xi[k]
+		if c < 0 or not G.RL.WIDE.has(t.roles[k]):
+			continue
+		var w = pow(pl[c].at[3] / 60.0, 3.0) * rng.randf()
+		if t.tc.pins[k] in ["ht", "afb"]:
+			w *= 1.5
+		if G.TC.has(pl[c], "pc"):
+			w *= 1.3
+		if w > bw:
+			bw = w
+			b = c
+	return b
+
+
 func _best_at(t: Dictionary, idx: int, pref: int) -> int:
 	if pref >= 0 and pref in t.xi:
 		return pref
@@ -329,9 +374,19 @@ func _shot(ai: int, out: Array, pen: bool):
 	var asst = -1
 	var loc = Vector2(0.89, 0.5)
 	var gkr = max(30.0, df.gk)
+	var header = false
+	var md = at.tc.m
+	var b_big = 0.15 + max(0.04, 0.11 + md.big + df.tc.m.opp_big)
+	var b_cross = b_big + md.cross + at.tc.sx.cross
+	var b_box = max(b_cross + 0.05, 1.0 - (0.40 + md.long))
+	var crosser = -1
 	if pen:
 		sh = _best_at(at, 17, at.pk)
 		q = clamp(0.74 + (pl[sh].at[17] - 70) * 0.004, 0.6, 0.9)
+		if G.TC.has(pl[sh], "pen"):
+			q += 0.06
+		if df.xi[0] >= 0 and G.TC.has(pl[df.xi[0]], "psv"):
+			q -= 0.06
 		if detailed:
 			out.append(ev("info", ai, "PENALTY to %s! %s steps up..." % [at.club.name, nm(sh)]))
 	else:
@@ -339,7 +394,7 @@ func _shot(ai: int, out: Array, pen: bool):
 		if r < 0.05:
 			kind = "fk"
 			sh = _best_at(at, 16, at.fk)
-			q = 0.065 * pow(pl[sh].at[16] / 70.0, 2.2) * 72.0 / gkr
+			q = 0.065 * pow(pl[sh].at[16] / 70.0, 2.2) * 72.0 / gkr * G.TC.shot_mult(pl[sh], "fk", false)
 			loc = Vector2(rng.randf_range(0.72, 0.8), rng.randf_range(0.3, 0.7))
 		elif r < 0.15:
 			kind = "corner"
@@ -352,17 +407,41 @@ func _shot(ai: int, out: Array, pen: bool):
 					if w > bw:
 						bw = w
 						sh = c
-			q = 0.095 * pow(pl[sh].at[2] / 72.0, 1.5) * pow((pl[asst].at[3] if asst >= 0 else 65) / 70.0, 0.8) * 72.0 / gkr
+			q = 0.095 * pow(pl[sh].at[2] / 72.0, 1.5) * pow((pl[asst].at[3] if asst >= 0 else 65) / 70.0, 0.8) * 72.0 / gkr * G.TC.shot_mult(pl[sh], "corner", true)
+			header = true
 			at.corners += 1
 			loc = Vector2(rng.randf_range(0.9, 0.95), rng.randf_range(0.42, 0.58))
 		else:
+			if r >= b_big and r < b_cross:
+				crosser = _crosser(at)
+			if crosser >= 0:
+				# a cross from wide: who gets on the end of it depends on the kind of cross asked for
+				kind = "cross"
+				asst = crosser
+				var ct = at.tc.cross_type
+				var idx = 0 if ct == 1 else (12 if ct == 3 else 2)
+				header = idx == 2
+				var bw = -1.0
+				for k in range(1, 11):
+					var c = at.xi[k]
+					if c >= 0 and c != asst:
+						var rw = 1.0 if at.roles[k] == "ST" else (0.75 if at.roles[k] in ["CAM", "LW", "RW", "LM", "RM"] else (0.5 if at.roles[k] == "CM" else 0.12))
+						var w = pow(pl[c].at[idx] / 60.0, 2.0) * rw * rng.randf()
+						if w > bw:
+							bw = w
+							sh = c
+				q = 0.085 * pow(pl[sh].at[idx] / 72.0, 1.5) * pow(pl[asst].at[3] / 70.0, 0.8) * 72.0 / gkr * G.TC.shot_mult(pl[sh], "cross", header)
+				if G.TC.has(pl[asst], "pc"):
+					q *= 1.15
+				loc = Vector2(rng.randf_range(0.88, 0.94), rng.randf_range(0.4, 0.6))
+		if kind == "pen" and not pen and r >= 0.15:
 			var p = pl[sh]
 			var skill = p.at[0]
-			if r < 0.26:
+			if r < b_big:
 				q = 0.38
 				kind = "big"
 				loc = Vector2(rng.randf_range(0.88, 0.93), rng.randf_range(0.42, 0.58))
-			elif r < 0.6:
+			elif r < b_box:
 				q = 0.11
 				kind = "box"
 				loc = Vector2(rng.randf_range(0.82, 0.9), rng.randf_range(0.32, 0.68))
@@ -372,7 +451,7 @@ func _shot(ai: int, out: Array, pen: bool):
 				skill = p.at[1]
 				loc = Vector2(rng.randf_range(0.7, 0.78), rng.randf_range(0.28, 0.72))
 			var se = (0.5 * skill + 0.5 * p.ovr) * (0.86 + 0.14 * pm[sh].cond / 100.0)
-			q *= pow(se / gkr, 1.3)
+			q *= pow(se / gkr, 1.3) * G.TC.shot_mult(p, kind, false)
 		q = min(0.9, q)
 	at.shots += 1
 	at.xg += q
@@ -390,10 +469,17 @@ func _shot(ai: int, out: Array, pen: bool):
 		at.sot += 1
 		pm[sh].g += 1
 		at.scorers.append({"pid": sh, "m": minute, "pen": pen})
-		if kind in ["big", "box", "long"] and rng.randf() < 0.75:
-			asst = _pick(at, 1, sh)
+		if kind in ["big", "box", "long"]:
+			var partner = G.TC.link_partner(at.tc, sh)
+			if partner >= 0 and partner in at.xi and rng.randf() < 0.4:
+				asst = partner
+			elif rng.randf() < 0.75:
+				asst = _pick(at, 1, sh)
 		if asst >= 0:
 			pm[asst].a += 1
+		var lk = G.TC.link_for(at.tc, sh, asst)
+		if lk != null:
+			at.tc.link_goals += 1
 		ball_state = "GOAL"
 		last_pass = asst
 		if detailed:
@@ -402,12 +488,32 @@ func _shot(ai: int, out: Array, pen: bool):
 				"pen": tx = "GOAL! %s sends the keeper the wrong way from the spot!" % nm(sh)
 				"fk": tx = "GOAL! What a free kick from %s — up and over the wall for %s!" % [nm(sh), at.club.name]
 				"corner": tx = "GOAL! %s rises highest from the corner and powers it home for %s!" % [nm(sh), at.club.name]
+				"cross":
+					if header:
+						tx = "GOAL! %s gets up to meet the cross and heads %s in front!" % [nm(sh), at.club.name] if at.goals > df.goals else "GOAL! %s gets up to meet the cross and heads it in for %s!" % [nm(sh), at.club.name]
+					else:
+						tx = "GOAL! The ball is whipped in and %s turns it home for %s!" % [nm(sh), at.club.name]
 				"long": tx = T_GOAL_LONG[rng.randi() % T_GOAL_LONG.size()] % [nm(sh), at.club.name]
 				_: tx = T_GOAL[rng.randi() % T_GOAL.size()] % [nm(sh), at.club.name]
+			var sks = pl[sh].get("sk", [])
+			if kind == "long" and "lr" in sks:
+				tx += " That is the Long Ranger in him."
+			elif kind == "fk" and "fk" in sks:
+				tx += " A specialist's free kick."
+			elif kind == "cross" and not header and "acr" in sks:
+				tx += " An acrobatic finish!"
+			elif header and "hd" in sks:
+				tx += " Nobody beats him in the air."
+			elif kind in ["big", "box"] and "fts" in sks and rng.randf() < 0.5:
+				tx += " First time, no hesitation."
 			if asst >= 0:
 				tx += " Assist: %s." % nm(asst)
+			if lk != null:
+				tx += " That is the %s link-up at work!" % G.TC.LINKS[lk.id].n
 			var e = ev("goal", ai, tx, sh)
 			e["a"] = asst
+			if lk != null:
+				e["link"] = lk.id
 			out.append(e)
 		else:
 			events.append({"m": minute, "t": "goal", "s": ai, "x": "", "p": sh})
@@ -427,6 +533,8 @@ func _shot(ai: int, out: Array, pen: bool):
 				tx = "%s curls the free kick on target — %s tips it away." % [nm(sh), nm(gk) if gk >= 0 else "the keeper"]
 			elif kind == "corner":
 				tx = "%s meets the corner with a header — saved by %s." % [nm(sh), nm(gk) if gk >= 0 else "the keeper"]
+			elif kind == "cross":
+				tx = "%s gets on the end of the cross — %s keeps it out." % [nm(sh), nm(gk) if gk >= 0 else "the keeper"]
 			else:
 				tx = _save_text(sh, gk)
 			out.append(ev("save", ai, tx, sh))
@@ -444,6 +552,8 @@ func _shot(ai: int, out: Array, pen: bool):
 				tx = "%s's free kick clears the wall — and the bar." % nm(sh)
 			elif kind == "corner":
 				tx = "%s gets up well at the corner but heads over." % nm(sh)
+			elif kind == "cross":
+				tx = "The cross comes in and %s cannot keep it down." % nm(sh)
 			elif kind == "big":
 				tx = T_BIG[rng.randi() % T_BIG.size()] % nm(sh)
 			else:
@@ -462,7 +572,7 @@ func _save_text(sh: int, gk: int) -> String:
 func _foul(i: int, out: Array):
 	var t = sd[i]
 	t.fouls += 1
-	var r = rng.randf()
+	var r = rng.randf() / t.tc.m.foul
 	if t.shout == "calm":
 		r *= 2.0
 	if r >= 0.16:
@@ -490,6 +600,7 @@ func _send_off(i: int, pid: int, out: Array, text: String):
 	q.tout = minute
 	t.rc += 1
 	t.xi[t.xi.find(pid)] = -1
+	t.tc["dirty"] = true
 	recalc(i)
 	if detailed:
 		out.append(ev("red", i, text, pid))
@@ -502,12 +613,17 @@ func _injury(out: Array):
 	var pid = t.xi[k]
 	if pid < 0 or (k == 0 and rng.randf() < 0.7):
 		return
+	var res = G.TC.inj_res(pl[pid])
+	if res == 3 and rng.randf() < 0.4:
+		return
 	var r = rng.randf()
 	var days = rng.randi_range(3, 10)
 	if r > 0.9:
 		days = rng.randi_range(36, 120)
 	elif r > 0.6:
 		days = rng.randi_range(11, 35)
+	if res == 1:
+		days = int(days * 1.3)
 	pm[pid].inj = days
 	var cands = _sub_candidates(i, k)
 	if t.subs < 5 and cands.size() > 0:
@@ -518,6 +634,7 @@ func _injury(out: Array):
 		pm[pid].on = false
 		pm[pid].tout = minute
 		t.xi[k] = -1
+		t.tc["dirty"] = true
 		recalc(i)
 		if detailed:
 			out.append(ev("injury", i, "%s is injured and %s have no substitutes left — down to ten." % [nm(pid), t.club.name], pid))
@@ -547,6 +664,7 @@ func do_sub(i: int, k: int, in_pid: int, out = null):
 	pm[in_pid].on = true
 	pm[in_pid].tin = minute
 	t.subs += 1
+	t.tc["dirty"] = true
 	recalc(i)
 	if detailed:
 		var e = ev("sub", i, "Substitution for %s: %s replaces %s." % [t.club.name, nm(in_pid), nm(o) if o >= 0 else "—"], in_pid)
@@ -559,6 +677,7 @@ func swap_slots(i: int, k1: int, k2: int):
 	var x = t.xi[k1]
 	t.xi[k1] = t.xi[k2]
 	t.xi[k2] = x
+	t.tc["dirty"] = true
 	recalc(i)
 
 

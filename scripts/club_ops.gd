@@ -146,10 +146,12 @@ static func daily():
 		u.study = 0
 		u.badge = min(4, u.badge + 1)
 		u.points += 3
+		G.TC.on_badge()
 		u.rep = min(100.0, u.rep + 5.0)
 		G.msg("Coaching badge earned", "Congratulations — you now hold the %s licence. You have 3 new attribute points to spend in the board room." % BADGES[u.badge], "board", null, true)
 	if G.cur.weekday == 1:
 		weekly()
+		G.TC.weekly()
 
 
 static func life() -> Dictionary:

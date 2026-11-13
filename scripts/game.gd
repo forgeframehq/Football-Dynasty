@@ -9,6 +9,7 @@ const CP = preload("res://scripts/comps.gd")
 const OPS = preload("res://scripts/club_ops.gd")
 const PS = preload("res://scripts/persona.gd")
 const DL = preload("res://scripts/deals.gd")
+const TC = preload("res://scripts/tac.gd")
 
 const SAVE_V = 2
 var slot := 0
@@ -322,6 +323,13 @@ func new_game(profile, club_id: int):
 	s.user.conf = clamp(60.0 - max(0.0, (mc.rep - 25.0) - s.user.rep) * 0.9, 30.0, 60.0)
 	s.user.obj = LG.objective(mc)
 	init_user_tactics(mc)
+	if profile.has("pstyle"):
+		# chosen on the new-career screens: the manager's best playstyle and first link-up
+		s.user["prof"] = TC.start_prof(int(profile.pstyle), int(profile.badge))
+		s.user["links"] = [profile.link] if profile.get("link", "") != "" else []
+		s.user["tac_set"] = true
+		mc["instr"] = TC.INSTR_DEF.duplicate()
+		TC.set_style(mc, int(profile.pstyle))
 	LG.generate_fixtures()
 	ensure_state()
 	active = true
@@ -411,6 +419,7 @@ func ensure_state():
 		if not FORMATIONS.has(c.formation):
 			c.formation = "4-3-3"
 		init_user_tactics(c)
+	TC.ensure()
 	s.v = SAVE_V
 
 
@@ -569,7 +578,8 @@ func number_squad(c: Dictionary):
 
 
 func make_preset(c: Dictionary) -> Dictionary:
-	return {"formation": c.formation, "slots": c.slots.duplicate(true), "roles": c.roles.duplicate(), "instr": c.instr.duplicate(), "ment": c.ment, "press": c.press, "tempo": c.tempo}
+	return {"formation": c.formation, "slots": c.slots.duplicate(true), "roles": c.roles.duplicate(), "instr": c.instr.duplicate(), "ment": c.ment, "press": c.press, "tempo": c.tempo,
+		"pins": c.pins.duplicate(), "pstyle": c.pstyle}
 
 
 func apply_preset(c: Dictionary, pr: Dictionary):
@@ -580,9 +590,16 @@ func apply_preset(c: Dictionary, pr: Dictionary):
 	c.ment = pr.ment
 	c.press = pr.press
 	c.tempo = pr.tempo
+	for k in TC.INSTR_DEF:
+		if not c.instr.has(k):
+			c.instr[k] = TC.INSTR_DEF[k]
+	c.pins = pr.pins.duplicate() if pr.has("pins") else ["", "", "", "", "", "", "", "", "", "", ""]
+	if pr.has("pstyle"):
+		TC.set_style(c, int(pr.pstyle), false)
 	for i in 11:
 		if c.xi[i] >= 0:
 			c.roles[i] = RL.valid(c.roles[i], c.slots[i][0])
+	TC.pins_valid(c)
 
 
 func auto_roles(c: Dictionary):
@@ -739,8 +756,9 @@ func lineup(cid: int, opp: int) -> Dictionary:
 		fix_lineup()
 		for i in 11:
 			c.roles[i] = RL.valid(c.roles[i], c.slots[i][0])
+		TC.pins_valid(c)
 		return {"club": cid, "xi": c.xi, "bench": c.bench, "formation": c.formation, "ment": c.ment, "press": c.press, "tempo": c.tempo, "user": true, "boost": 1.0 + (s.user.attr.tac - 10) * 0.0015,
-			"slots": c.slots, "rids": c.roles, "instr": c.instr, "pk": c.pk, "fk": c.fk, "ck": c.ck, "capt": c.capt}
+			"slots": c.slots, "rids": c.roles, "instr": c.instr, "pk": c.pk, "fk": c.fk, "ck": c.ck, "capt": c.capt, "pins": c.pins, "tm_pid": c.tm_pid}
 	var r = lu_cache.get(cid, null)
 	if r != null:
 		for pid in r.xi:
@@ -767,8 +785,9 @@ func lineup(cid: int, opp: int) -> Dictionary:
 		lu_cache[cid] = r
 	var d = c.rep - s.clubs[opp].rep
 	var ment = 3 if d >= 4 else (1 if d <= -6 else 2)
-	return {"club": cid, "xi": r.xi, "bench": r.bench, "formation": c.formation, "ment": ment, "press": c.press, "tempo": c.tempo, "user": false,
-		"slots": FORMATIONS[c.formation], "rids": r.rids, "instr": AI_INSTR, "pk": -1, "fk": -1, "ck": -1, "capt": -1}
+	var sty = TC.STYLES[TC.style_of(c)].set
+	return {"club": cid, "xi": r.xi, "bench": r.bench, "formation": c.formation, "ment": ment, "press": sty.press, "tempo": sty.tempo, "user": false,
+		"slots": FORMATIONS[c.formation], "rids": r.rids, "instr": TC.ai_instr(c), "pk": -1, "fk": -1, "ck": -1, "capt": -1}
 
 
 func team_ratings(cid: int) -> Dictionary:
@@ -876,6 +895,8 @@ func apply_match(sim):
 			if sim.pm[pid].tin >= 0:
 				s.players[pid].cond = int(sim.pm[pid].cond)
 				s.recov[pid] = true
+		if involved:
+			TC.after_match(sim, 0 if f.h == ucid else 1)
 		return
 	for i in 2:
 		var t = sim.sd[i]
@@ -957,6 +978,7 @@ func apply_match(sim):
 		var t = sim.sd[ui]
 		var o = sim.sd[1 - ui]
 		var u = s.user
+		TC.after_match(sim, ui)
 		u.p += 1
 		var pts = 1
 		if t.goals > o.goals:

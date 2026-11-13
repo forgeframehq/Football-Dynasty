@@ -115,6 +115,8 @@ static func contract_offer(p: Dictionary, wage: int, years: int) -> Dictionary:
 static func move(p: Dictionary, to_id: int, fee: int, wage: int, years: int):
 	var s = G.s
 	var from_id = p.club
+	p["prevc"] = from_id
+	p.erase("lsk")
 	var from_name = "Free agent"
 	if from_id >= 0:
 		var fc = s.clubs[from_id]
