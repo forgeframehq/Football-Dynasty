@@ -285,6 +285,17 @@ func run(m):
 				main.stack[-1].zoom = 1.0
 				main.stack[-1].refresh()
 				await snap("city_sel")
+	if want.call("scout"):
+		for i in 8:
+			if G.user_fixture_today() != null:
+				break
+			G.advance()
+		G.TC.set_style(G.uc(), 0)
+		main.root("match", {"fx": G.user_fixture_today()})
+		await snap("scout_possession")
+		G.TC.set_style(G.uc(), 2)
+		main.root("match", {"fx": G.user_fixture_today()})
+		await snap("scout_longcounter")
 	if want.call("match"):
 		for i in 8:
 			if G.user_fixture_today() != null:

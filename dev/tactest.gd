@@ -113,8 +113,15 @@ static func run(_node: Node):
 	show("park the bus", series(equal, n))
 	reset.call()
 	for k in 11:
-		c.roles[k] = G.RL.BY_POS[c.slots[k][0]][-1]
-	show("everyone in the last-listed role for his position", series(equal, n))
+		var worst_r = c.roles[k]
+		var ws = 9.0
+		for rid in G.RL.BY_POS[c.slots[k][0]]:
+			var sv = G.RL.suit(s.players[c.xi[k]], rid)
+			if sv < ws:
+				ws = sv
+				worst_r = rid
+		c.roles[k] = worst_r
+	show("every player in the role that suits him least", series(equal, n))
 	reset.call()
 	var x = c.xi.duplicate()
 	for k in range(1, 6):
@@ -133,6 +140,39 @@ static func run(_node: Node):
 	s.user["links"] = all_links.slice(0, 2)
 	show("two link-up plays active %s" % str(all_links.slice(0, 2)), series(equal, n))
 	reset.call()
+	print("\n--- 2b. Style against style at equal strength (you good at each, 75): rows you, columns them")
+	var oc = s.clubs[equal]
+	var native = oc.get("pstyle", null)
+	var grid = "%-20s" % ""
+	for st in 5:
+		grid += "%8s" % G.TC.STYLES[st].s
+	print(grid)
+	var best = [-1.0, 0, 0]
+	var worst = [9.0, 0, 0]
+	for mine in 5:
+		var line = "%-20s" % G.TC.STYLES[mine].n
+		for theirs in 5:
+			reset.call()
+			G.TC.set_style(c, mine)
+			s.user.prof[mine] = 75.0
+			oc["pstyle"] = theirs
+			var r = series(equal, int(n / 2))
+			line += "%8.2f" % r[3]
+			if r[3] > best[0]:
+				best = [r[3], mine, theirs]
+			if r[3] < worst[0]:
+				worst = [r[3], mine, theirs]
+		print(line)
+	print("best plan %.2f pts/game, worst %.2f: over 38 games that is %.0f points" % [best[0], worst[0], (best[0] - worst[0]) * 38])
+	if native == null:
+		oc.erase("pstyle")
+	else:
+		oc["pstyle"] = native
+	reset.call()
+	print("\n--- 2c. Notes the scout report would show for your default set-up against the equal side")
+	var mu = G.TC.matchup(G.TC.side_view(G.lineup(me, equal)), G.TC.side_view(G.lineup(equal, me)))
+	for nt in mu.notes:
+		print("   %+.3f  %s" % [nt[0], nt[1]])
 	print("\n--- 3. Underdog: best and worst plan against the STRONGEST side")
 	show("default set-up", series(strong, n))
 	for st in 5:
@@ -146,3 +186,43 @@ static func run(_node: Node):
 	reset.call()
 	c.ment = 4
 	show("all-out attack", series(strong, n))
+	reset.call()
+	var sc = s.clubs[strong]
+	var sn = sc.get("pstyle", null)
+	print("\n--- 3b. Underdog, each style against each style the strongest side might use")
+	var gb = [-1.0, 0, 0]
+	for theirs in 5:
+		var line = "they play %-18s" % G.TC.STYLES[theirs].n
+		for mine in 5:
+			reset.call()
+			G.TC.set_style(c, mine)
+			s.user.prof[mine] = 80.0
+			sc["pstyle"] = theirs
+			var r = series(strong, int(n / 2))
+			line += "  %s %4.1f%%" % [G.TC.STYLES[mine].s, r[0]]
+		print(line)
+	if sn == null:
+		sc.erase("pstyle")
+	else:
+		sc["pstyle"] = sn
+	reset.call()
+	print("\n--- 4. Cup tie: best second-tier side at home to top-tier sides")
+	var low = -1
+	var lb = 0.0
+	for cid in s.clubs.size():
+		var l2 = s.leagues[s.clubs[cid].lg]
+		if l2.country == s.leagues[lg].country and l2.tier == 2 and xi_ovr(cid) > lb:
+			lb = xi_ovr(cid)
+			low = cid
+	if low >= 0:
+		for top in [ids[0], ids[ids.size() / 2], ids[-1]]:
+			var w = 0
+			var dr = 0
+			for i in n:
+				var sim = G.new_sim({"h": low, "a": top, "ko": true, "d": s.day, "comp": "cup"}, false)
+				sim.sd[0].auto = true
+				sim.sd[1].auto = true
+				sim.run_to_end()
+				if sim.winner() == 0:
+					w += 1
+			print("%s (XI %.1f) at home to %s (XI %.1f): goes through %.1f%%" % [s.clubs[low].name, lb, s.clubs[top].name, xi_ovr(top), 100.0 * w / n])

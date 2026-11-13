@@ -225,7 +225,7 @@ static func ai_link(c: Dictionary) -> String:
 
 
 static func ai_prof(c: Dictionary) -> float:
-	return clamp(48.0 + (c.rep - 50.0) * 1.0, 45.0, 90.0)
+	return clamp(55.0 + (c.rep - 50.0) * 0.5, 50.0, 78.0)
 
 
 static func ensure_fam(p: Dictionary):
@@ -616,6 +616,9 @@ static func after_match(sim, ui: int):
 	s.user.link_goals = int(s.user.get("link_goals", 0)) + int(tc.link_goals)
 	var st = int(tc.style)
 	s.user.prof[st] = min(99.0, float(s.user.prof[st]) + 0.25)
+	s.user["mp"] = int(s.user.get("mp", 0)) + 1
+	s.user["style_streak"] = int(s.user.get("style_streak", 0)) + 1 if int(s.user.get("style_last", -1)) == st else 1
+	s.user["style_last"] = st
 	for pid in sim.pm:
 		var q = sim.pm[pid]
 		if q.tin < 0 or not s.players.has(pid):
@@ -670,8 +673,8 @@ static func side_setup(lu: Dictionary, d: Dictionary) -> Dictionary:
 	for k in INSTR_DEF:
 		if not ins.has(k):
 			ins[k] = INSTR_DEF[k]
-	var style = style_of(c)
-	var prof = float(G.s.user.prof[style]) if user else ai_prof(c)
+	var style = int(lu.get("pstyle", style_of(c)))
+	var prof = float(G.s.user.prof[style]) if user else ai_prof(c) - (12.0 if style != style_of(c) else 0.0)
 	var fam = 80.0
 	if user:
 		var tot = 0.0
@@ -755,7 +758,7 @@ static func side_setup(lu: Dictionary, d: Dictionary) -> Dictionary:
 			m.mid *= 0.975
 			m.att *= 1.025
 	# proficiency and familiarity: a few percent either way
-	var q = clamp((prof - 50.0) / 50.0 * 0.02 + (fam - 60.0) / 100.0 * 0.025, -0.035, 0.03)
+	var q = clamp((prof - 50.0) / 50.0 * 0.035 + (fam - 60.0) / 100.0 * 0.04, -0.06, 0.055)
 	m.att *= 1.0 + q
 	m.mid *= 1.0 + q
 	m.def *= 1.0 + q
@@ -897,10 +900,170 @@ static func pl_mods(t: Dictionary, k: int, p: Dictionary, q: Dictionary, minute:
 	return [e, aw, mw, dw, x0, x1]
 
 
+# ------------------------------------------------------------------ match-ups
+# How one side's plan fares against the other's. Every rule looks at both sets of instructions and, where it
+# matters, at the players who have to carry them out. MU scales the whole system (tuned with dev/tactest.gd).
+
+const MU = 0.68
+# the style an AI manager switches to when he sets up to stop a given style
+const COUNTER_STYLE = [2, 2, 3, 0, 0]
+
+
+static func side_view(lu: Dictionary) -> Dictionary:
+	# a line-up as the match-up rules want it (the engine's own side dictionaries already have this shape)
+	var roles = []
+	for sl in lu.slots:
+		roles.append(sl[0])
+	return {"xi": lu.xi, "roles": roles, "instr": lu.instr, "press": lu.press, "tempo": lu.tempo, "ment": lu.ment}
+
+
+static func traits(t: Dictionary) -> Dictionary:
+	# what the eleven on the pitch are like, by unit
+	var pl = G.s.players
+	var acc = {"pa": [0.0, 0], "pd": [0.0, 0], "pass": [0.0, 0], "press": [0.0, 0], "aa": [0.0, 0], "ad": [0.0, 0]}
+	for k in range(1, 11):
+		var pid = t.xi[k]
+		if pid < 0:
+			continue
+		var p = pl[pid]
+		var role = t.roles[k]
+		var ln = G.LINE[role]
+		if ln == 3 or role in ["CAM", "LM", "RM"]:
+			acc.pa[0] += p.st[0]
+			acc.pa[1] += 1
+		if ln == 1:
+			acc.pd[0] += p.st[0]
+			acc.pd[1] += 1
+			acc.ad[0] += p.at[2] if role == "CB" else p.at[2] * 0.5 + 30.0
+			acc.ad[1] += 1
+		if ln <= 2:
+			acc["pass"][0] += p.st[2]
+			acc["pass"][1] += 1
+		if ln >= 2:
+			acc.press[0] += (p.st[5] + p.st[4] * 0.5 + p.st[0] * 0.5) / 2.0
+			acc.press[1] += 1
+		if role == "ST":
+			acc.aa[0] += p.at[2]
+			acc.aa[1] += 1
+	var out = {}
+	for key in acc:
+		out[key] = acc[key][0] / acc[key][1] if acc[key][1] > 0 else 65.0
+	return out
+
+
+static func matchup(a: Dictionary, b: Dictionary) -> Dictionary:
+	# -> multipliers for side a against side b, and the reasons. In a note, {A} is a's "Your/Their" and {b} is b's "their/your".
+	var ia = a.instr
+	var ib = b.instr
+	var ta = traits(a)
+	var tb = traits(b)
+	var m = {"att": 0.0, "mid": 0.0, "def": 0.0, "ps": 0.0}
+	var notes = []
+	var add = func(key: String, v: float, text: String):
+		m[key] += v * MU
+		if abs(v) >= 0.012 and text != "":
+			notes.append([v, text])
+	var pace = clamp((tb.pa - ta.pd) / 10.0, -1.0, 1.0)          # their runners against our back line
+	var a_line = int(ia.get("line", 1))
+	var b_line = int(ib.get("line", 1))
+	var a_pass = int(ia.get("pass", 1))
+	var b_pass = int(ib.get("pass", 1))
+	var a_counter = bool(ia.get("counter", false))
+	var b_counter = bool(ib.get("counter", false))
+	# 1. a high line against a side that breaks or goes long
+	if a_line == 2:
+		if b_counter:
+			add.call("def", -(0.035 + 0.045 * clamp(pace + 0.4, 0.0, 1.0)), "{A} high line leaves space behind for {b} counter-attacks")
+		elif b_pass == 2:
+			add.call("def", -(0.02 + 0.025 * clamp(pace + 0.4, 0.0, 1.0)), "{A} high line can be turned by {b} long passing")
+		elif pace > 0.25:
+			add.call("def", -0.03 * pace, "{A} high line is up against quicker forwards")
+		elif pace < -0.25:
+			add.call("mid", 0.02 * -pace, "{A} high line squeezes forwards who cannot run in behind")
+	# 2. a deep line
+	if a_line == 0:
+		if b_pass == 0:
+			add.call("def", 0.038, "{A} deep block gives {b} short passing nowhere to go")
+		var air = clamp((tb.aa - ta.ad) / 10.0, -1.0, 1.0)
+		if int(ib.get("final", 0)) == 3 or int(ib.get("build", 0)) == 2:
+			add.call("def", -(0.02 + 0.035 * max(0.0, air)) if air > -0.2 else 0.02, "{A} deep block invites {b} crosses into the box" if air > -0.2 else "{A} centre-backs win everything {b} put into the box")
+		if int(ib.get("final", 0)) == 2:
+			add.call("def", -0.02, "{A} deep block gives {b} shooters time from distance")
+	# 3. pressing high against their way of playing out
+	if int(a.press) == 2:
+		if b_pass == 2:
+			add.call("mid", -0.03, "{A} press is bypassed by {b} long passing")
+			add.call("def", -0.015, "")
+		else:
+			var q = clamp((ta.press - tb["pass"]) / 8.0 + 0.35, -1.0, 1.0)
+			var w = 1.0 if b_pass == 0 else 0.55
+			if q >= 0.0:
+				add.call("mid", (0.02 + 0.045 * q) * w, "{A} press wins the ball from defenders who are not comfortable on it")
+			else:
+				add.call("mid", 0.035 * q * w, "{A} press is played through by better passers")
+	# 4. breaking at speed
+	if a_counter:
+		if b_line == 2 or int(b.ment) >= 3:
+			var mypace = clamp((ta.pa - tb.pd) / 10.0, -1.0, 1.0)
+			add.call("ps", 0.06 + 0.06 * max(0.0, mypace), "{A} counter-attacks have space to run into")
+		elif b_line == 0:
+			add.call("ps", -0.08, "{A} counter-attacks find no space behind a deep defence")
+	# 5. where the attacks go against how the defence is set
+	var a_wide = int(ia.get("build", 0)) == 2 or int(ia.get("width", 1)) == 2
+	var a_centre = int(ia.get("build", 0)) == 1 or int(ia.get("width", 1)) == 0
+	var b_compact = int(ib.get("compact", 1))
+	if a_wide and b_compact == 0:
+		add.call("att", 0.045, "{A} wide play stretches a narrow defence")
+	elif a_wide and b_compact == 2:
+		add.call("att", -0.025, "{A} wide play runs into a defence that is already spread out")
+	elif a_centre and b_compact == 0:
+		add.call("att", -0.045, "{A} play through the middle runs into a packed centre")
+	elif a_centre and b_compact == 2:
+		add.call("att", 0.035, "{A} play through the middle finds gaps in a stretched defence")
+	# 6. keeping the ball against a side that neither presses high nor sits deep
+	if a_pass == 0 and int(a.tempo) <= 1 and int(b.press) <= 1 and b_line >= 1:
+		add.call("mid", 0.045, "{A} possession game makes them chase the ball")
+	# 7. going long
+	if a_pass == 2:
+		if b_pass == 0 and int(b.tempo) <= 1:
+			add.call("mid", -0.035, "{A} long balls give possession straight back to a side that keeps it")
+		if b_line == 0:
+			var air2 = clamp((ta.aa - tb.ad) / 10.0, -1.0, 1.0)
+			add.call("att", 0.04 * air2, "{A} target man %s in the air against a deep defence" % ("wins" if air2 > 0 else "loses"))
+	notes.sort_custom(func(x, y): return abs(x[0]) > abs(y[0]))
+	return {"att": 1.0 + m.att, "mid": 1.0 + m.mid, "def": 1.0 + m.def, "ps": 1.0 + m.ps, "notes": notes, "net": m.att + m.mid + m.def + m.ps * 0.5}
+
+
+static func ai_plan(c: Dictionary, opp: Dictionary) -> int:
+	# the playstyle an AI manager uses in this match. Against the user he may set up to stop the style the user
+	# has been relying on: more likely the longer the user has stuck with it, and the better the manager.
+	var native = style_of(c)
+	var u = G.s.user
+	if opp.id != u.club:
+		return native
+	var streak = int(u.get("style_streak", 0))
+	if streak < 3:
+		return native
+	var chance = clamp(0.1 + 0.07 * (streak - 2) + (c.rep - 60.0) * 0.004, 0.0, 0.65)
+	var roll = float((G.s.season * 131 + c.id * 977 + int(u.get("mp", 0)) * 37) % 1000) / 1000.0
+	if roll < chance:
+		return COUNTER_STYLE[style_of(opp)]
+	return native
+
+
+static func plan_instr(style: int) -> Dictionary:
+	var d = INSTR_DEF.duplicate()
+	var st = STYLES[style].set
+	for k in st:
+		if not (k in ["ment", "press", "tempo"]):
+			d[k] = st[k]
+	return d
+
+
 static func link_att(tc: Dictionary) -> float:
 	var f = 1.0
 	for l in tc.links:
-		f *= 1.0 + [0.004, 0.007, 0.010][l.lvl] * l.m
+		f *= 1.0 + [0.008, 0.013, 0.019][l.lvl] * l.m
 	return f
 
 

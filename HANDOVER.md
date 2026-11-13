@@ -1,7 +1,8 @@
-# Football Dynasty 26 — Handover (13 Nov 2026, v0.7.1 on `main`)
+# Football Dynasty 26 — Handover (13 Nov 2026, v0.7.1 on `main`, v0.8.0 on `dev`)
 
 ## Where things stand
-- `main`, `dev` and the published APK are all v0.7.1 (built 13 Nov at Sudhi's request). Work on `dev`; push to `main` only when he asks for an APK.
+- `main` and the published APK are v0.7.1. `dev` is v0.8.0 (match engine rework), not yet built into an APK. Work on `dev`; push to `main` only when Sudhi asks for an APK.
+- Locked in with Sudhi but not built: real 3D Club City from the Kenney kits with one of his stadium models (CC0), a 3D manager's home (dollhouse and walk-in views) tied to Lifestyle, a car ladder using the Kenney Car Kit only, a simple-view fallback. Packs he uploaded are not in the repo yet.
 - v0.7.0 adds the tactics system, the transfer system, the Football Dynasty 26 branding (icon, wordmark, purple and gold scheme) and the intro film. See ROADMAP.md for the ticked list.
 - Personal football manager for Android (not for publishing): FIFA/PES career feel with Football Manager Mobile depth.
 - Godot 4.7.2, GDScript, GL Compatibility, all UI built in code. Landscape, base viewport 1100×620, immersive and edge-to-edge.
@@ -22,7 +23,7 @@ Standing rules:
 - Godot is not preinstalled: download `Godot_v4.7.2-stable_linux.x86_64.zip` from the godotengine/godot GitHub releases.
 - Build check: `gh run list -R forgeframehq/Football-Dynasty --limit 1`; APK: `gh api repos/forgeframehq/Football-Dynasty/releases/tags/latest -q '.assets[]'`.
 - Commits: author `Claude <noreply@anthropic.com>`; end messages with the Co-Authored-By and Claude-Session lines the session supplies.
-- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.7.1, code 10).
+- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.8.0, code 11).
 
 ## Code map
 - Autoloads: `DB` (data), `UI` (`scripts/ui.gd`), `G` (`scripts/game.gd`). Save is `G.s`, binary, integer keys survive.
@@ -90,3 +91,14 @@ Standing rules:
 - `kit` screen (scripts/screens/kit.gd, widget scripts/widgets/shirt.gd): live shirt, six patterns (`c.kitp`), colours, and this season's sponsor offers with a preview on the shirt and a confirm before signing. Replaces the Sponsors hub page in the menus; Club Identity is now Club Records.
 - `G.OPS.sponsor_now()` is the only valid way to read the sponsor (it checks the season). `G.OPS.sponsor_call()` sends the important "Sponsor offers are in" message at new game, new job and season rollover; Home's To Do shows it until one is signed. There are no sponsor targets in the code.
 - `UI.confirm(..., danger, no)` takes a back-out callback; used for the permanent best-playstyle and link-up choices (tac_sheets.gd).
+
+## v0.8.0 (dev): match engine — match-ups, stars, upsets
+- `G.TC.matchup(a, b)` (tac.gd): seven rules compare both sides' instructions and unit traits (`traits()`: pace, passing, pressing, aerial) and return multipliers for att/mid/def/chance rate plus notes. `MU` scales the lot (0.68). Called in `ME.recalc()` every tick, so in-match changes count. Notes use `{A}` / `{b}` placeholders (never `%`: they pass through format strings).
+- Pre-match opposition report (match.gd) shows the verdict and the top three reasons, and says when the AI has changed style to stop you.
+- AI adapts: `TC.ai_plan(c, opp)`. Against the user only, after 3+ matches in the same playstyle, an AI manager may switch to `COUNTER_STYLE` (chance grows with the streak and his club's rep; he is 12 points less proficient in it). Deterministic per match (`s.user.mp`), so the report and the match agree. `lineup()` returns `pstyle`; `side_setup` honours it.
+- Stars: in `recalc`, a player well above his own XI's average gets more of the shooting/assist share, a shot-quality bonus (`pm[pid].star`) and lifts team attack; tight-marking him (`tm` pin) removes most of it. A standout defender lifts defence.
+- `ME._on_the_day()`: each side gets a small random swing; a favourite (rep +7 or higher division) may take the game lightly (less often with high morale); a lower-division side at home in a knockout tie gets a lift. `t.under` marks the underdog; game state in `recalc` makes a leading underdog dig in and a trailing favourite take risks.
+- Role suitability now 0.90-1.03 (was 0.955-1.025); proficiency/familiarity swing -6% to +5.5%; link-up team boost doubled.
+- Strength curve flattened slightly (chance exponent 1.95, possession 2.4) and `PS_K` retuned: about 2.75-2.85 goals a game.
+- `dev/tactest.gd` (`-- --tactest n=400`) measures all of this: strength, each choice at equal strength, the 5x5 style grid, the underdog grid and cup ties. Results swing by about +/-0.07 points a game at n=400; do not tune on single cells.
+- Measured after the change: best-to-worst style choice against a given opponent style is worth roughly 0.3-0.4 points a game at equal strength; mastered-and-settled against poor-and-unsettled 1.53 v 1.00; worst roles 1.08; underdog win chance against the top side 7-26% depending on plan (was about 14% whatever you did); best second-tier side at home to the best top-tier side goes through 26%.

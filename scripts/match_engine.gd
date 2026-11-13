@@ -10,6 +10,7 @@ const PRESS_DRAIN = [0.9, 1.0, 1.2]
 const TEMPO_SHOT = [0.94, 1.0, 1.06]
 const TEMPO_DRAIN = [0.95, 1.0, 1.1]
 const REF = [3.9, 4.2, 4.9]
+const PS_K = 0.25    # chances per minute of possession at equal strength; tuned for about 2.8 goals a game
 const SHOUTS = {"push": "Push forward", "calm": "Calm down", "waste": "Waste time", "demand": "Demand more"}
 
 const T_GOAL = ["GOAL! %s finds the net for %s!", "GOAL! %s makes no mistake — %s score!", "GOAL! A clinical finish from %s. %s celebrate!", "GOAL! %s buries it! The %s fans erupt!"]
@@ -50,9 +51,39 @@ func setup(f: Dictionary, lu_h: Dictionary, lu_a: Dictionary, det: bool):
 	pl = G.s.players
 	sd = [_side(lu_h, true), _side(lu_a, false)]
 	total = 90 + rng.randi_range(2, 6)
+	_on_the_day()
 	recalc(0)
 	recalc(1)
 	recalc(0)   # again, so side 0 knows who side 1 is marking
+
+
+func _on_the_day():
+	# no side plays to its exact level every week. A small swing for everyone; a favourite can take a weaker
+	# opponent lightly; a lower-division side at home in a cup tie raises its game.
+	for i in 2:
+		var t = sd[i]
+		var o = sd[1 - i]
+		var day = clamp(rng.randfn(0.0, 0.02), -0.045, 0.045)
+		var gap = t.club.rep - o.club.rep
+		var lower = G.s.leagues[o.club.lg].tier > G.s.leagues[t.club.lg].tier
+		if gap >= 7.0 or lower:
+			var mor = 0.0
+			var n = 0
+			for pid in t.xi:
+				if pid >= 0:
+					mor += pl[pid].mor
+					n += 1
+			mor /= max(1, n)
+			var chance = (0.22 + (0.10 if fx.get("ko", false) and lower else 0.0)) * (0.55 if mor >= 80.0 else (1.25 if mor < 55.0 else 1.0))
+			if rng.randf() < chance:
+				day -= 0.05
+				t["flat"] = true
+		if fx.get("ko", false) and t.home and G.s.leagues[t.club.lg].tier > G.s.leagues[o.club.lg].tier:
+			day += 0.025
+			t["lift"] = true
+		t.boost *= 1.0 + day
+		t["day"] = day
+		t["under"] = gap <= -4.0
 
 
 func _side(lu: Dictionary, home: bool) -> Dictionary:
@@ -141,6 +172,11 @@ func recalc(i: int):
 	if tc.get("dirty", true):
 		G.TC.refresh_side(t, opp)
 		tc["dirty"] = false
+	var mu = G.TC.matchup(t, opp) if opp != null else {"att": 1.0, "mid": 1.0, "def": 1.0, "ps": 1.0, "notes": []}
+	t["mu"] = mu
+	var es = []
+	var esum = 0.0
+	var en = 0
 	var wide_f = [0.9, 1.0, 1.08][ins.width] * md.wide
 	var cen_f = [1.06, 1.0, 0.96][ins.width] * md.cen
 	for k in 11:
@@ -156,10 +192,13 @@ func recalc(i: int):
 		var q = pm[pid]
 		if q.rid != t.rids[k]:
 			q.rid = t.rids[k]
-			q.sf = 0.955 + 0.07 * G.RL.suit(p, q.rid)
+			q.sf = 0.90 + 0.13 * G.RL.suit(p, q.rid)
 		var pmod = G.TC.pl_mods(t, k, p, q, minute, opp)
 		var f = G.fit(p, role) * (0.86 + 0.14 * q.cond / 100.0) * (0.975 + 0.0005 * p.mor) * q.sf * pmod[0]
 		var e = p.ovr * f
+		es.append(e)
+		esum += e
+		en += 1
 		if k == 0:
 			t.gk = e
 			w0.append(0.0)
@@ -182,6 +221,40 @@ func recalc(i: int):
 		w1.append(x1)
 		t0 += x0
 		t1 += x1
+	# standout players: a man well above his own team-mates gets on the ball more and makes more of it,
+	# the more so the weaker the defence in front of him. Tight-marking him takes most of it away.
+	var star_att = 0.0
+	var star_def = 0.0
+	if en > 0:
+		var avg = esum / en
+		var odef = opp.def if opp != null else avg
+		var oatt = opp.att if opp != null else avg
+		var j = 0
+		for k in 11:
+			if t.xi[k] < 0:
+				continue
+			var e2 = es[j]
+			j += 1
+			if k == 0:
+				continue
+			var q2 = pm[t.xi[k]]
+			var rel = clamp((e2 - avg - 2.0) / 6.0, 0.0, 1.0)
+			var base2 = ROLE_W[t.roles[k]]
+			var st2 = 0.0
+			if rel > 0.0 and base2[0] >= 0.3:
+				st2 = rel * clamp((e2 - odef + 6.0) / 10.0, 0.2, 1.0)
+				if opp != null and opp.has("tc") and opp.tc.tm_target == t.xi[k]:
+					st2 *= 0.35
+				t0 -= w0[k]
+				t1 -= w1[k]
+				w0[k] *= 1.0 + 0.55 * st2
+				w1[k] *= 1.0 + 0.4 * st2
+				t0 += w0[k]
+				t1 += w1[k]
+				star_att = max(star_att, st2)
+			elif rel > 0.0 and base2[2] >= 0.6:
+				star_def = max(star_def, rel * clamp((e2 - oatt + 6.0) / 10.0, 0.2, 1.0))
+			q2["star"] = st2
 	var h = (1.03 if t.home else 1.0) * t.boost * tc.sx.cap
 	var sa = 1.0
 	var sdf = 1.0
@@ -197,10 +270,21 @@ func recalc(i: int):
 	var line_m = [0.97, 1.0, 1.035][ins.line]
 	var line_d = [1.035, 1.0, 0.97][ins.line]
 	var pass_m = [1.03, 1.0, 0.97][ins["pass"]]
-	t.att = max(20.0, a / max(0.01, wa) * pow(wa / REF[0], 0.35) * MENT[t.ment][0] * h * sa * md.att * G.TC.link_att(tc)) if wa > 0.0 else 20.0
-	t.mid = max(20.0, m / max(0.01, wm) * pow(wm / REF[1], 0.35) * PRESS_MID[t.press] * h * line_m * pass_m * md.mid * tc.sx.mid) if wm > 0.0 else 20.0
-	t.def = max(20.0, d / max(0.01, wd) * pow(wd / REF[2], 0.35) * MENT[t.ment][1] * h * sdf * line_d * (0.99 if ins.counter else 1.0) * md.def * tc.sx.def) if wd > 0.0 else 20.0
-	t.midp = pow(t.mid, 2.6)
+	# the state of the game: an underdog in front digs in, a favourite behind throws men forward
+	var gs_ps = 1.0
+	if opp != null and minute >= 20:
+		var gd = t.goals - opp.goals
+		if gd > 0 and t.get("under", false):
+			sdf *= 1.04
+			gs_ps = 0.9
+		elif gd < 0 and opp.get("under", false) and minute >= 45:
+			sa *= 1.035
+			sdf *= 0.965
+	t["gs_ps"] = gs_ps
+	t.att = max(20.0, a / max(0.01, wa) * pow(wa / REF[0], 0.35) * MENT[t.ment][0] * h * sa * md.att * G.TC.link_att(tc) * mu.att * (1.0 + 0.035 * star_att)) if wa > 0.0 else 20.0
+	t.mid = max(20.0, m / max(0.01, wm) * pow(wm / REF[1], 0.35) * PRESS_MID[t.press] * h * line_m * pass_m * md.mid * tc.sx.mid * mu.mid) if wm > 0.0 else 20.0
+	t.def = max(20.0, d / max(0.01, wd) * pow(wd / REF[2], 0.35) * MENT[t.ment][1] * h * sdf * line_d * (0.99 if ins.counter else 1.0) * md.def * tc.sx.def * mu.def * (1.0 + 0.025 * star_def)) if wd > 0.0 else 20.0
+	t.midp = pow(t.mid, 2.4)
 	t.w0 = w0
 	t.w1 = w1
 	t.t0 = t0
@@ -208,9 +292,9 @@ func recalc(i: int):
 	if sd.size() == 2:
 		for j in 2:
 			var x = sd[j]
-			var ps = 0.268 * pow(x.att / sd[1 - j].def, 2.1) * TEMPO_SHOT[x.tempo] * [0.95, 1.0, 1.05][x.instr["pass"]] * x.tc.m.ps
+			var ps = PS_K * pow(x.att / sd[1 - j].def, 1.95) * TEMPO_SHOT[x.tempo] * [0.95, 1.0, 1.05][x.instr["pass"]] * x.tc.m.ps * x.get("mu", {"ps": 1.0}).ps * x.get("gs_ps", 1.0)
 			if x.instr.counter:
-				ps *= 1.07 if x.mid < sd[1 - j].mid else 0.97
+				ps *= 1.03 if x.mid < sd[1 - j].mid else 0.99
 			if x.tc.m.cb > 0.0 and x.mid < sd[1 - j].mid:
 				ps *= 1.0 + x.tc.m.cb
 			x.ps = clamp(ps, 0.05, 0.6)
@@ -452,6 +536,7 @@ func _shot(ai: int, out: Array, pen: bool):
 				loc = Vector2(rng.randf_range(0.7, 0.78), rng.randf_range(0.28, 0.72))
 			var se = (0.5 * skill + 0.5 * p.ovr) * (0.86 + 0.14 * pm[sh].cond / 100.0)
 			q *= pow(se / gkr, 1.3) * G.TC.shot_mult(p, kind, false)
+		q *= 1.0 + 0.22 * float(pm[sh].get("star", 0.0))
 		q = min(0.9, q)
 	at.shots += 1
 	at.xg += q

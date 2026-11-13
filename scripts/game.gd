@@ -801,9 +801,10 @@ func lineup(cid: int, opp: int) -> Dictionary:
 		lu_cache[cid] = r
 	var d = c.rep - s.clubs[opp].rep
 	var ment = 3 if d >= 4 else (1 if d <= -6 else 2)
-	var sty = TC.STYLES[TC.style_of(c)].set
+	var plan = TC.ai_plan(c, s.clubs[opp])
+	var sty = TC.STYLES[plan].set
 	return {"club": cid, "xi": r.xi, "bench": r.bench, "formation": c.formation, "ment": ment, "press": sty.press, "tempo": sty.tempo, "user": false,
-		"slots": FORMATIONS[c.formation], "rids": r.rids, "instr": TC.ai_instr(c), "pk": -1, "fk": -1, "ck": -1, "capt": -1}
+		"slots": FORMATIONS[c.formation], "rids": r.rids, "instr": TC.plan_instr(plan), "pk": -1, "fk": -1, "ck": -1, "capt": -1, "pstyle": plan}
 
 
 func team_ratings(cid: int) -> Dictionary:

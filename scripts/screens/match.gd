@@ -123,26 +123,48 @@ func _build_pre():
 	var rv = UI.vb(8)
 	rv.add_child(UI.caps("Opposition report · %s" % opp.name, 20, UI.accent))
 	# how they play: their manager's style and the link-up to watch for
-	var ost = G.TC.STYLES[G.TC.style_of(opp)]
 	var olu = G.lineup(opp.id, G.s.user.club)
+	var ost = G.TC.STYLES[int(olu.get("pstyle", G.TC.style_of(opp)))]
 	var opos = []
 	for sl in olu.slots:
 		opos.append(sl[0])
 	var olk = G.TC.ai_link(opp)
 	var opr = G.TC.link_pair(olk, olu.xi, opos)
-	rv.add_child(UI.wrap("Playstyle: %s." % ost.n, 20, UI.TEXT))
-	if not opr.is_empty():
-		rv.add_child(UI.wrap("Watch for their %s link-up: %s to %s." % [G.TC.LINKS[olk].n, G.pname(s.players[opr[0]]), G.pname(s.players[opr[1]])], 20, UI.AMBER))
+	if int(olu.get("pstyle", G.TC.style_of(opp))) != G.TC.style_of(opp):
+		rv.add_child(UI.wrap("Playstyle: %s today, not their usual %s. They have set up to stop you." % [ost.n, G.TC.STYLES[G.TC.style_of(opp)].n], 20, UI.AMBER))
 	else:
-		rv.add_child(UI.wrap("Their %s link-up is off: nobody in the XI fits it today." % G.TC.LINKS[olk].n, 20, UI.MUTED))
+		rv.add_child(UI.wrap("Playstyle: %s." % ost.n, 20, UI.TEXT))
+	# how the two plans meet: the biggest reasons either way, best first
+	var mine = G.TC.matchup(G.TC.side_view(G.lineup(G.s.user.club, opp.id)), G.TC.side_view(olu))
+	var theirs = G.TC.matchup(G.TC.side_view(olu), G.TC.side_view(G.lineup(G.s.user.club, opp.id)))
+	var pts = []
+	for nt in mine.notes:
+		pts.append([nt[0], nt[1].replace("{A}", "Your").replace("{b}", "their")])
+	for nt in theirs.notes:
+		pts.append([-nt[0], nt[1].replace("{A}", "Their").replace("{b}", "your")])
+	pts.sort_custom(func(x, y): return abs(x[0]) > abs(y[0]))
+	var net = mine.net - theirs.net
+	var verdict = "even" if abs(net) < 0.03 else ("in your favour" if net > 0 else "against you")
+	rv.add_child(UI.caps("Match-up: %s%s" % ["strongly " if abs(net) >= 0.1 else "", verdict], 17, UI.MUTED if abs(net) < 0.03 else (UI.GREEN if net > 0 else UI.RED)))
+	for k in min(3, pts.size()):
+		var ph = UI.hb(8)
+		ph.add_child(UI.icon("trending-up" if pts[k][0] > 0 else "trending-down", 18, UI.GREEN if pts[k][0] > 0 else UI.RED))
+		ph.add_child(UI.wrap(pts[k][1] + ".", 18, UI.TEXT))
+		rv.add_child(ph)
+	if pts.is_empty():
+		rv.add_child(UI.wrap("Neither plan has an edge on the other: it comes down to the players.", 18, UI.MUTED))
+	if not opr.is_empty():
+		rv.add_child(UI.wrap("Watch for their %s link-up: %s to %s." % [G.TC.LINKS[olk].n, G.pname(s.players[opr[0]]), G.pname(s.players[opr[1]])], 18, UI.AMBER))
+	else:
+		rv.add_child(UI.wrap("Their %s link-up is off: nobody in the XI fits it today." % G.TC.LINKS[olk].n, 18, UI.MUTED))
 	var lines = [["att", "going forward"], ["mid", "in midfield"], ["def", "at the back"]]
 	lines.sort_custom(func(x, y): return ro[x[0]] > ro[y[0]])
-	rv.add_child(UI.wrap("They line up in a %s and are strongest %s (%d), weakest %s (%d)." % [opp.formation, lines[0][1], ro[lines[0][0]], lines[2][1], ro[lines[2][0]]], 22, UI.MUTED))
+	rv.add_child(UI.wrap("They line up in a %s and are strongest %s (%d), weakest %s (%d)." % [opp.formation, lines[0][1], ro[lines[0][0]], lines[2][1], ro[lines[2][0]]], 18, UI.MUTED))
 	var stars = []
 	for pid in opp.players:
 		stars.append(G.s.players[pid])
 	stars.sort_custom(func(x, y): return x.ovr + x.form > y.ovr + y.form)
-	for k in min(3, stars.size()):
+	for k in min(3 if pts.size() < 3 else 2, stars.size()):
 		var sp = stars[k]
 		var r = UI.hb(10)
 		r.add_child(UI.pos(sp.pos, 18))
