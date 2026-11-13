@@ -48,13 +48,10 @@ func build():
 		chips.add_child(ch)
 	body.add_child(UI.topbar("Tactics", false, chips))
 	UI.main.t_sub = "%s · %s · %s" % [TABS[tab], c.formation, style_name(c)]
-	body.add_child(UI.margin(UI.seg(TABS, tab, func(i):
-		tab = i
-		sel = null
-		refresh(), 19), 20, 0, 20, 8))
-	var h = panes(14, 20)
+	# the pitch takes the whole height on the left; tabs and buttons sit above the list on the right
+	var h = panes(12, 20)
 	var left = UI.vb(8)
-	left.custom_minimum_size = Vector2(clamp((UI.main.size.x - 92) * 0.45, 500, 700), 0)
+	left.custom_minimum_size = Vector2(clamp((UI.main.size.x - UI.main.rail_w()) * 0.44, 470, 620), 0)
 	pitch = PITCH.new()
 	pitch.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	pitch.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -94,20 +91,28 @@ func build():
 		tokens.append(t)
 	pitch.resized.connect(_place)
 	_place.call_deferred()
+	h.add_child(left)
+	var right = UI.vb(8)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(right)
+	right.add_child(UI.seg(TABS, tab, func(i):
+		tab = i
+		sel = null
+		refresh(), 16))
 	if tab == 0:
-		var acts = UI.hb(8)
-		for it in [["%s" % c.formation, "layout-grid", _pick_formation], [style_name(c), "zap", _pick_style], ["Best XI", "sparkles", func():
+		var acts = UI.hb(6)
+		for it in [["%s" % c.formation, _pick_formation], [style_name(c), _pick_style], ["Best XI", func():
 				G.auto_pick(c)
 				G.auto_roles(c)
 				sel = null
-				refresh()], ["Presets", "save", _presets]]:
-			var bt = UI.btn(it[0], it[2], "secondary", it[1], 46)
+				refresh()], ["Presets", _presets]]:
+			var bt = UI.btn(it[0], it[1], "secondary", "", 42)
 			bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			acts.add_child(bt)
-		left.add_child(acts)
-	h.add_child(left)
+		right.add_child(acts)
 	var rp = pane(0, 6)
-	h.add_child(rp[0])
+	rp[0].size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right.add_child(rp[0])
 	var v = rp[1]
 	sc = rp[0].get_child(0)
 	match tab:
@@ -193,8 +198,8 @@ func _captain(v: Control, c: Dictionary):
 
 
 func _squad_list(v: Control, c: Dictionary):
-	var hint = "Tap a player for his details. Drag a name onto the pitch to swap. Tap a role to change it." if sel == null else "Now tap the player to swap with."
-	v.add_child(UI.lbl(hint, 16, UI.DIM if sel == null else UI.accent))
+	if sel != null:
+		v.add_child(UI.lbl_fill("Now tap the player to swap with.", 16, UI.accent))
 	_head(v, "Starting XI", "Role")
 	for i in 11:
 		if c.xi[i] >= 0:
@@ -324,6 +329,8 @@ func _place():
 		var yy = 0.03 if sl[0] == "GK" else 0.1 + sl[2] * 0.83
 		var p = pitch.pt(yy, sl[1])
 		t.position = p - Vector2(t.size.x / 2.0, 30)
+		# keep the whole marker, name included, inside the pitch
+		t.position.y = clamp(t.position.y, 2.0, pitch.size.y - t.size.y - 6.0)
 
 
 func _token_input(e: InputEvent, t: Control, i: int):

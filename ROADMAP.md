@@ -119,3 +119,4 @@ Options
 ## Fixes (v0.6.1, from phone feedback 12 Nov)
 - [x] "Leave the game?" and every other confirm pop-up showed no buttons (bare `wrap()` in a lambda called the built-in maths function)
 - [x] Camera cut-out: the rail background now runs to the screen edge and the icon column is narrower, so the strip beside the notch is no longer dead space
+- [x] Tactics (v0.6.2): pitch takes the full height on every tab (tabs and buttons moved above the list), goalkeeper's name no longer cut off, right side no longer runs off the screen on notched phones

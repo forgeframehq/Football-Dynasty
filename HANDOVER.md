@@ -1,7 +1,7 @@
-# Football Dynasty — Handover (12 Nov 2026, after v0.6.1)
+# Football Dynasty — Handover (12 Nov 2026, after v0.6.2)
 
 ## Where things stand
-- v0.6.1 on `main` (dense pass for the main screens plus two phone fixes); the APK is published on release tag `latest`.
+- v0.6.2 on `main` (dense pass for the main screens, phone fixes, taller tactics pitch); the APK is published on release tag `latest`.
 - Personal football manager for Android (not for publishing): FIFA/PES career feel with Football Manager Mobile depth.
 - Godot 4.7.2, GDScript, GL Compatibility, all UI built in code. Landscape, base viewport 1100×620, immersive and edge-to-edge.
 - Repo `forgeframehq/Football-Dynasty` (public). Real player, club and league names (17,849 players, 49 leagues).
@@ -21,7 +21,7 @@ Standing rules:
 - Godot is not preinstalled: download `Godot_v4.7.2-stable_linux.x86_64.zip` from the godotengine/godot GitHub releases.
 - Build check: `gh run list -R forgeframehq/Football-Dynasty --limit 1`; APK: `gh api repos/forgeframehq/Football-Dynasty/releases/tags/latest -q '.assets[]'`.
 - Commits: author `Claude <noreply@anthropic.com>`; end messages with the Co-Authored-By and Claude-Session lines the session supplies.
-- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.6.1, code 7).
+- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.6.2, code 8).
 
 ## Code map
 - Autoloads: `DB` (data), `UI` (`scripts/ui.gd`), `G` (`scripts/game.gd`). Save is `G.s`, binary, integer keys survive.
@@ -55,6 +55,8 @@ Standing rules:
 - Dataset source: `github.com/bca2519-afk/easpprts_application` (`players.csv`).
 
 ## Pitfalls
+- A plain `UI.lbl` with a long sentence sets a huge minimum width and pushes the whole screen off the right edge on notched phones (this was the tactics hint line). Use `UI.lbl_fill` or `UI.wrap` for anything longer than a few words, and check screens with `notch=70`.
+- Tactics agreed with Sudhi so far (12 Nov, build only after he says go): manager-owned link-up plays as in eFootball (pick one at career start, more per coaching badge, two slots that fitting players activate, bronze/silver/gold with minutes together), team playstyles with manager proficiency, extra Defence/Attack options, generated player skills. Tactics page is extended, not rebuilt.
 - Inside a lambda in `ui.gd`, a bare `wrap(...)` calls Godot's built-in maths `wrap()`, not the label helper. Write `self.wrap(...)`. This is what broke every `UI.confirm` pop-up up to v0.6.0.
 - `G.advance()` runs to the next stop (match day, important message), not one day.
 - Left cut-out: `main.gd` keeps `notch_l`; with the rail showing, the safe margin is 0 and the rail is `rail_w()` wide with its icons pushed right of the cut-out. Screens without the rail still get the full left margin.
