@@ -71,6 +71,10 @@ func _ready():
 	if "--prof" in ua:
 		load("res://dev/prof.gd").run(self)
 		return
+	if "--tactest" in ua:
+		load("res://dev/tactest.gd").run(self)
+		get_tree().quit()
+		return
 	if "--mktest" in ua:
 		load("res://dev/mktest.gd").run(self)
 		get_tree().quit()
