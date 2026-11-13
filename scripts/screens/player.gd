@@ -2,7 +2,7 @@ extends "res://scripts/screens/screen.gd"
 # Player profile with attributes, contract, season stats and actions.
 
 
-const PAGES = ["Profile", "Personal", "Positions", "Contract", "Stats", "Manage"]
+const PAGES = ["Profile", "Personal", "Roles & Skills", "Contract", "Stats", "Manage"]
 const POS_XY = {"GK": [.5, .06], "CB": [.5, .2], "LB": [.14, .26], "RB": [.86, .26], "CDM": [.5, .37], "CM": [.5, .5], "LM": [.12, .52], "RM": [.88, .52],
 	"CAM": [.5, .65], "LW": [.15, .78], "RW": [.85, .78], "ST": [.5, .89]}
 
@@ -156,7 +156,8 @@ func _page(p: Dictionary, own: bool, free: bool):
 		var r2 = UI.hb(6)
 		r2.add_child(_info("Condition", "%d%%" % int(p.cond), UI.cond_color(p.cond)))
 		r2.add_child(_info("Morale", str(int(p.mor)), UI.cond_color(p.mor + 10)))
-		r2.add_child(_info("Form", "%.1f" % p.form if played else "-", (UI.GREEN if p.form >= 7.0 else UI.TEXT) if played else UI.DIM))
+		var av = G.TC.arrow(p)
+		r2.add_child(_info(G.TC.arrow_text(av) if av != 0 else "Form", "%.1f" % p.form if played else "-", G.TC.arrow_col(av) if av != 0 else ((UI.GREEN if p.form >= 7.0 else UI.TEXT) if played else UI.DIM)))
 		r2.add_child(_info("Av. rating", "%.2f" % G.avg_rating(p) if played else "-", UI.TEXT if played else UI.DIM))
 		r2.add_child(_info("Apps · goals", "%d · %d" % [p.ss.ap, p.ss.g]))
 		iv.add_child(r2)
@@ -179,6 +180,21 @@ func _page(p: Dictionary, own: bool, free: bool):
 		strip.add_child(UI.sp())
 		strip.add_child(UI.lbl("%s%s · %s foot · %d★ skills · %d★ weak foot" % [p.pos, (" / " + " / ".join(p.alt)) if p.alt.size() > 0 else "", "Left" if p.foot == "L" else "Right", p.sm, p.wf], 16, UI.MUTED))
 		col.add_child(strip)
+		var sks = G.TC.skill_names(p)
+		if sks.size() > 0 or own:
+			var sr = UI.hb(5)
+			sr.add_child(UI.caps("Skills", 13, UI.DIM))
+			for nm2 in sks:
+				sr.add_child(UI.chip(nm2, Color(UI.accent, 0.14), UI.TEXT, 13))
+			if sks.is_empty():
+				sr.add_child(UI.lbl("None yet", 14, UI.DIM))
+			if p.get("lsk", null) != null:
+				sr.add_child(UI.chip("LEARNING %s · %d WK" % [G.TC.SKILLS[p.lsk[0]].n.to_upper(), int(p.lsk[1])], Color(UI.AMBER, 0.14), UI.AMBER, 12))
+			sr.add_child(UI.sp())
+			if own:
+				var fam = int(p.get("fam", 50))
+				sr.add_child(UI.caps("Knows your style %d%%" % fam, 13, UI.cond_color(fam + 10)))
+			col.add_child(sr)
 		# every attribute on screen at once: three columns that share whatever height is left
 		var grid = UI.hb(8)
 		grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -204,6 +220,9 @@ func _page(p: Dictionary, own: bool, free: bool):
 		v.add_child(UI.kv("Nationality", p.nat))
 		v.add_child(UI.kv("Preferred foot", "Left" if p.foot == "L" else "Right"))
 		v.add_child(UI.kv("Skill moves · weak foot", "%d★ · %d★" % [p.sm, p.wf]))
+		var ir = G.TC.inj_res(p)
+		v.add_child(UI.kv("Injury resistance", ["Fragile", "Normal", "Robust"][ir - 1] if known else "Unknown until scouted", [UI.RED, UI.TEXT, UI.GREEN][ir - 1] if known else UI.DIM))
+		v.add_child(UI.kv("Form type", "Streaky" if G.TC.form_type(p) == 1 else "Steady"))
 		v.add_child(UI.kv("Squad status", status))
 		v.add_child(UI.kv("Career", "%d apps · %d goals" % G.PS.career(p)))
 		v.add_child(UI.kv("Shirt number", str(p.get("num", "-"))))
@@ -261,13 +280,50 @@ func _page(p: Dictionary, own: bool, free: bool):
 			var rd = G.RL.ROLES[r[1]]
 			var rh = UI.hb(10)
 			rh.add_child(UI.lbl_fill(rd.n, 21, UI.TEXT, "semi"))
+			if G.TC.role_fits(r[1], G.TC.style_of(uc)):
+				rh.add_child(UI.chip("FITS YOUR STYLE", Color(UI.GREEN, 0.14), UI.GREEN, 12))
 			rh.add_child(UI.stars(40 + G.RL.stars(p, r[1]) * 12, 15))
 			v.add_child(rh)
 			v.add_child(UI.lbl_fill(rd.d, 15, UI.MUTED))
+		var b = pane(0, 4)
+		h.add_child(b[0])
+		v = b[1]
+		v.add_child(UI.caps("Skills · %d of %d" % [p.get("sk", []).size(), G.TC.MAX_SKILLS], 17, UI.accent))
+		for id in p.get("sk", []):
+			if G.TC.SKILLS.has(id):
+				v.add_child(UI.lbl(G.TC.SKILLS[id].n, 20, UI.TEXT, "semi"))
+				v.add_child(UI.wrap(G.TC.SKILLS[id].d, 15, UI.MUTED))
+		if p.get("sk", []).is_empty():
+			v.add_child(UI.lbl("No special skills.", 17, UI.DIM))
+		if own:
+			var l = p.get("lsk", null)
+			if l != null:
+				v.add_child(UI.kv("Learning", "%s · %d weeks" % [G.TC.SKILLS[l[0]].n, int(l[1])], UI.AMBER, 17))
+			elif G.TC.learnable(p).size() > 0:
+				v.add_child(UI.btn("Teach him a skill", func(): _learn(p), "secondary", "graduation-cap", 44))
+			var fam = int(p.get("fam", 50))
+			v.add_child(UI.divider())
+			v.add_child(UI.kv("Knows your playstyle", "%d%%" % fam, UI.cond_color(fam + 10), 17))
+			if fam < 100:
+				v.add_child(UI.lbl_fill("About %d more matches to settle fully." % G.TC.settle_matches(p), 14, UI.DIM))
+		else:
+			v.add_child(UI.divider())
+			v.add_child(UI.wrap(G.TC.fit_text(p), 16, UI.MUTED))
+		var mine = []
+		for lid in s.user.links:
+			if G.TC.LINKS.has(lid):
+				for sl in [G.TC.LINKS[lid].a, G.TC.LINKS[lid].b]:
+					var can = p.pos in sl.pos
+					for ap in p.alt:
+						can = can or ap in sl.pos
+					if can and G.TC.fits_slot(sl, p):
+						mine.append("%s (%s)" % [G.TC.LINKS[lid].n, sl.t.to_lower()])
+		if mine.size() > 0:
+			v.add_child(UI.wrap("Fits your link-up: " + ", ".join(mine), 16, UI.GREEN))
 		var pm = PosMap.new()
 		pm.p = p
 		pm.xy = POS_XY
-		pm.custom_minimum_size = Vector2(330, 0)
+		pm.custom_minimum_size = Vector2(250, 0)
 		pm.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		pm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		h.add_child(pm)
@@ -351,6 +407,9 @@ func build():
 		body.add_child(UI.topbar("Player"))
 		return
 	var p = s.players[args.pid]
+	if args.has("page"):
+		page = int(args.page)
+		args.erase("page")
 	var uc = G.uc()
 	var own = p.club == uc.id
 	var free = p.club < 0
@@ -540,6 +599,31 @@ func _indiv(p: Dictionary):
 				refresh())
 			v.add_child(r)
 	UI.sheet("Individual training", build_sheet)
+
+
+func _learn(p: Dictionary):
+	var build_sheet = func(v):
+		v.add_child(UI.wrap("He works on one new skill at a time on the training ground. Skills close to what he can already do come quicker. A player can hold %d." % G.TC.MAX_SKILLS, 20, UI.MUTED))
+		for it in G.TC.learnable(p):
+			var sk = G.TC.SKILLS[it[0]]
+			var r = UI.panel(UI.CARD, 14, 16, 10, UI.LINE)
+			var h = UI.hb(10)
+			var tv = UI.vb(0)
+			tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tv.add_child(UI.lbl(sk.n, 24, UI.TEXT, "disp"))
+			tv.add_child(UI.wrap(sk.d, 17, UI.MUTED))
+			h.add_child(tv)
+			h.add_child(UI.caps("%d weeks" % it[1], 17, UI.accent))
+			r.add_child(h)
+			var id = it[0]
+			var wk = it[1]
+			UI.tap(r, func():
+				p["lsk"] = [id, wk]
+				UI.close_sheet()
+				UI.toast("%s starts work on %s" % [G.pname(p), G.TC.SKILLS[id].n], UI.GREEN)
+				refresh())
+			v.add_child(r)
+	UI.sheet("Teach a skill", build_sheet)
 
 
 func _retrain(p: Dictionary):

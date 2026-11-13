@@ -122,6 +122,19 @@ func _build_pre():
 	var rep_card = UI.card()
 	var rv = UI.vb(8)
 	rv.add_child(UI.caps("Opposition report · %s" % opp.name, 20, UI.accent))
+	# how they play: their manager's style and the link-up to watch for
+	var ost = G.TC.STYLES[G.TC.style_of(opp)]
+	var olu = G.lineup(opp.id, G.s.user.club)
+	var opos = []
+	for sl in olu.slots:
+		opos.append(sl[0])
+	var olk = G.TC.ai_link(opp)
+	var opr = G.TC.link_pair(olk, olu.xi, opos)
+	rv.add_child(UI.wrap("Playstyle: %s." % ost.n, 20, UI.TEXT))
+	if not opr.is_empty():
+		rv.add_child(UI.wrap("Watch for their %s link-up: %s to %s." % [G.TC.LINKS[olk].n, G.pname(s.players[opr[0]]), G.pname(s.players[opr[1]])], 20, UI.AMBER))
+	else:
+		rv.add_child(UI.wrap("Their %s link-up is off: nobody in the XI fits it today." % G.TC.LINKS[olk].n, 20, UI.MUTED))
 	var lines = [["att", "going forward"], ["mid", "in midfield"], ["def", "at the back"]]
 	lines.sort_custom(func(x, y): return ro[x[0]] > ro[y[0]])
 	rv.add_child(UI.wrap("They line up in a %s and are strongest %s (%d), weakest %s (%d)." % [opp.formation, lines[0][1], ro[lines[0][0]], lines[2][1], ro[lines[2][0]]], 22, UI.MUTED))

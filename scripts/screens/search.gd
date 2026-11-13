@@ -3,12 +3,15 @@ extends "res://scripts/screens/screen.gd"
 
 const PER = 9
 const GROUPS = ["All", "GK", "DEF", "MID", "ATT"]
-const VIEWS = ["General", "Contract", "Attributes"]
+const VIEWS = ["General", "Contract", "Attributes", "Skills"]
 
 var pg := 0
 var grp := 0
 var view := 0
 var afford := false
+var skill := ""        # only players with this skill
+var fitstyle := false  # only players with a role for the user's playstyle
+var linkfit := false   # only players who fit a slot in one of the user's link-up plays
 var q := ""
 var key := "val"
 var desc := true
@@ -19,6 +22,7 @@ func _collect():
 	var s = G.s
 	var c = G.uc()
 	rows = []
+	var st = G.TC.style_of(c)
 	var ql = q.strip_edges().to_lower()
 	for p in s.players.values():
 		if p.club == c.id:
@@ -28,6 +32,12 @@ func _collect():
 		if grp > 0 and G.LINE.get(p.pos, 2) != grp - 1:
 			continue
 		if afford and G.value(p) > c.budget:
+			continue
+		if skill != "" and not (skill in p.get("sk", [])):
+			continue
+		if fitstyle and G.TC.best_fit_role(p, p.pos, st) == "":
+			continue
+		if linkfit and not _fits_link(p):
 			continue
 		if ql != "" and not G.pfull(p).to_lower().contains(ql) and not (p.club >= 0 and s.clubs[p.club].name.to_lower().contains(ql)):
 			continue
@@ -47,6 +57,43 @@ func _collect():
 			"phy": return float(p.st[5])
 		return float(G.value(p))
 	rows.sort_custom(func(a, b): return f.call(a) > f.call(b) if desc else f.call(a) < f.call(b))
+
+
+func _fits_link(p: Dictionary) -> bool:
+	for lid in G.s.user.links:
+		if not G.TC.LINKS.has(lid):
+			continue
+		for sl in [G.TC.LINKS[lid].a, G.TC.LINKS[lid].b]:
+			if p.pos in sl.pos and G.TC.fits_slot(sl, p):
+				return true
+	return false
+
+
+func _pick_skill():
+	var build_sheet = func(v):
+		var none = UI.panel(UI.CARD, 12, 16, 8, UI.accent if skill == "" else UI.LINE)
+		none.add_child(UI.lbl("Any skill", 22, UI.TEXT, "semi"))
+		UI.tap(none, func():
+			skill = ""
+			pg = 0
+			UI.close_sheet()
+			refresh())
+		v.add_child(none)
+		for id in G.TC.SKILLS:
+			var sk = G.TC.SKILLS[id]
+			var r = UI.panel(UI.CARD, 12, 16, 6, UI.accent if skill == id else UI.LINE)
+			var h = UI.hb(10)
+			h.add_child(UI.lbl(sk.n, 21, UI.TEXT, "semi"))
+			h.add_child(UI.lbl_fill(sk.d, 15, UI.MUTED))
+			r.add_child(h)
+			var sid = id
+			UI.tap(r, func():
+				skill = sid
+				pg = 0
+				UI.close_sheet()
+				refresh())
+			v.add_child(r)
+	UI.sheet("Filter by skill", build_sheet)
 
 
 func build():
@@ -102,6 +149,22 @@ func build():
 		pg = 0
 		refresh(), true)
 	fh.add_child(ac)
+	var skc = UI.chip(G.TC.SKILLS[skill].n.to_upper() if skill != "" else "SKILL", Color(UI.accent, 0.2) if skill != "" else Color(1, 1, 1, 0.06), UI.accent if skill != "" else UI.MUTED, 17)
+	UI.tap(skc, func(): _pick_skill(), true)
+	fh.add_child(skc)
+	var fsc = UI.chip("FITS STYLE", Color(UI.GREEN, 0.2) if fitstyle else Color(1, 1, 1, 0.06), UI.GREEN if fitstyle else UI.MUTED, 17)
+	UI.tap(fsc, func():
+		fitstyle = not fitstyle
+		pg = 0
+		refresh(), true)
+	fh.add_child(fsc)
+	if s.user.links.size() > 0:
+		var lkc = UI.chip("FITS LINK-UP", Color(UI.GREEN, 0.2) if linkfit else Color(1, 1, 1, 0.06), UI.GREEN if linkfit else UI.MUTED, 17)
+		UI.tap(lkc, func():
+			linkfit = not linkfit
+			pg = 0
+			refresh(), true)
+		fh.add_child(lkc)
 	var le = UI.input(q, "Name or club…", func(t): q = t)
 	le.custom_minimum_size = Vector2(0, 40)
 	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -121,6 +184,8 @@ func build():
 		cols += [["val", "Value", 96]]
 	elif view == 1:
 		cols += [["wage", "Wage", 90], ["cend", "Until", 70], ["val", "Value", 96]]
+	elif view == 3:
+		cols = [["name", "Name", 260], ["", "Pos", 60], ["age", "Age", 50], ["ovr", "Rtg", 54], ["", "Skills", 0], ["val", "Value", 96]]
 	else:
 		cols = [["name", "Name", 0], ["", "Pos", 70], ["ovr", "Rtg", 54], ["pac", "Pac", 50], ["sho", "Sho", 50], ["pas", "Pas", 50], ["dri", "Dri", 50], ["def", "Def", 50], ["phy", "Phy", 50], ["val", "Value", 96]]
 	var head = UI.panel(Color(UI.accent, 0.5), 6, 14, 3)
@@ -130,6 +195,7 @@ func build():
 		var l = UI.lbl(cd[1] + (" ▾" if on and desc else (" ▴" if on else "")), 19, UI.GOLD if on else UI.TEXT, "semi")
 		if cd[2] > 0:
 			l.custom_minimum_size = Vector2(cd[2], 0)
+			l.clip_text = true
 		else:
 			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if cd[0] != "":
@@ -182,11 +248,14 @@ func build():
 					node = UI.lbl(G.money(p.wage), 20, UI.MUTED, "disp")
 				"Until":
 					node = UI.lbl(str(p.cend) if p.club >= 0 else "-", 20, UI.AMBER if p.cend <= s.season + 1 else UI.MUTED, "disp")
+				"Skills":
+					node = UI.lbl_fill(", ".join(G.TC.skill_names(p)) if p.get("sk", []).size() > 0 else "-", 16, UI.MUTED)
 				_:
 					var i = ["Pac", "Sho", "Pas", "Dri", "Def", "Phy"].find(cd[1])
 					node = UI.lbl(str(int(p.st[i])), 21, UI.ovr_color(int(p.st[i])), "disp")
 			if w > 0:
 				node.custom_minimum_size = Vector2(w, 0)
+				node.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 			node.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			h.add_child(node)
 		r.add_child(h)

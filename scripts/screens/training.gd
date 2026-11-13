@@ -136,4 +136,11 @@ func build():
 				refresh(), true)
 			v.add_child(r)
 	var sid = sel
+	var l = p.get("lsk", null)
+	if l != null:
+		v.add_child(UI.kv("Learning", "%s · %d wk" % [G.TC.SKILLS[l[0]].n, int(l[1])], UI.AMBER, 15))
+	else:
+		var opts = G.TC.learnable(p)
+		if opts.size() > 0:
+			v.add_child(UI.btn("Teach a skill · %d" % opts.size(), func(): UI.main.open("player", {"pid": sid, "page": 2}), "ghost", "graduation-cap", 40))
 	v.add_child(UI.btn("Player profile", func(): UI.main.open("player", {"pid": sid}), "secondary", "user", 44))
