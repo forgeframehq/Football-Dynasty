@@ -4,6 +4,8 @@ extends Control
 var mode := 0      # 0 none, 1 shape, 2 defence, 3 attack
 var c: Dictionary = {}
 var pitch: Control
+var show_links := false
+var lines: Array = []   # [from, to, colour] for the link-ups that are switched on
 
 
 func _ready():
@@ -17,6 +19,10 @@ func _chev(at: Vector2, dirv: Vector2, col: Color, s := 10.0, w := 4.0):
 
 
 func _draw():
+	if show_links:
+		for l in lines:
+			draw_line(l[0], l[1], Color(l[2], 0.22), 16.0, true)
+			draw_line(l[0], l[1], Color(l[2], 0.95), 4.0, true)
 	if mode == 0 or c.is_empty() or pitch == null:
 		return
 	var ins = c.instr

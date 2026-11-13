@@ -511,6 +511,21 @@ static func active_links(c: Dictionary, xi: Array, roles: Array, user: bool) -> 
 	return out
 
 
+static func slot_pos(c: Dictionary) -> Array:
+	var out = []
+	for sl in G.slots_of(c):
+		out.append(sl[0])
+	return out
+
+
+static func user_links(c: Dictionary) -> Array:
+	return active_links(c, c.xi, slot_pos(c), true)
+
+
+static func user_pair(id: String, c: Dictionary) -> Array:
+	return link_pair(id, c.xi, slot_pos(c))
+
+
 static func slot_fits(sl: Dictionary, c: Dictionary) -> Array:
 	# squad players who could fill a link-up slot (right quality and can play one of its positions)
 	var out = []
@@ -910,7 +925,11 @@ static func fit_text(p: Dictionary) -> String:
 
 
 static func arrow_icon(v: int) -> String:
-	return ["arrow-down", "arrow-down-right", "arrow-right", "arrow-up-right", "arrow-up"][clampi(v, -2, 2) + 2]
+	return ["arrow-down", "trending-down", "arrow-right", "trending-up", "arrow-up"][clampi(v, -2, 2) + 2]
+
+
+static func arrow_text(v: int) -> String:
+	return ["Badly out of form", "Off the pace", "Normal", "In good form", "On fire"][clampi(v, -2, 2) + 2]
 
 
 static func arrow_col(v: int) -> Color:

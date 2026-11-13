@@ -29,6 +29,15 @@ func build():
 	r2.add_child(_fixtures(c))
 	r2.add_child(_club(c))
 	r2.add_child(_news())
+	if not G.s.user.get("tac_set", false):
+		_ask_tactics.call_deferred()
+
+
+func _ask_tactics():
+	# asked once per career: the manager's best playstyle and first link-up play
+	if not is_inside_tree() or UI.main.sheet_node != null or G.s.user.get("tac_set", false):
+		return
+	preload("res://scripts/screens/tac_sheets.gd").first_setup(func(): refresh())
 
 
 func _card(title: String, right := "", cb = null, hot := false) -> Array:

@@ -417,12 +417,12 @@ func cond_color(v: float) -> Color:
 	return RED
 
 
-func seg(options: Array, sel: int, cb: Callable, size := 22) -> PanelContainer:
-	var p = panel(Color(1, 1, 1, 0.05), 16, 5, 5)
+func seg(options: Array, sel: int, cb: Callable, size := 22, vpad := 9) -> PanelContainer:
+	var p = panel(Color(1, 1, 1, 0.05), 16 if vpad >= 9 else 10, 5 if vpad >= 9 else 3, 5 if vpad >= 9 else 3)
 	var h = hb(4)
 	for i in options.size():
 		var on = i == sel
-		var it = panel(accent if on else Color(0, 0, 0, 0), 12, 8, 9)
+		var it = panel(accent if on else Color(0, 0, 0, 0), 12 if vpad >= 9 else 8, 8 if vpad >= 9 else 4, vpad)
 		it.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var l = lbl(str(options[i]).to_upper(), size, on_color(accent) if on else MUTED, "disp")
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

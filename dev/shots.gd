@@ -58,6 +58,15 @@ func run(m):
 			G.apply_match(sim0)
 		G.advance()
 	var c = G.uc()
+	if want.call("tacsetup") and not only.is_empty():
+		main.root("home")
+		await snap("setup_style", 0.8)
+		main.close_sheet()
+		G.TC.set_style(c, 1)
+		preload("res://scripts/screens/tac_sheets.gd").pick_link(-1, func(): pass)
+		await snap("setup_link", 0.8)
+		main.close_sheet()
+	G.s.user["tac_set"] = true
 	var simple = ["home", "inbox", "squad", "tactics", "training", "fixtures", "finances", "campus", "board", "trophies", "jobs", "table", "comps", "stats", "transfers", "scouting", "club"]
 	if want.call("trophies"):
 		G.s.user.trophies = ["Premier League 2026/27", "FA Cup 2026/27", "UEFA Champions League 2027/28", "EFL Cup 2027/28"]
@@ -178,7 +187,12 @@ func run(m):
 			main.stack[-1].refresh()
 			await snap("life_%d" % i)
 	if want.call("tactics2"):
+		if G.s.user.links.is_empty():
+			for id in G.TC.LINK_ORDER:
+				if not G.TC.user_pair(id, c).is_empty() and G.s.user.links.size() < 2:
+					G.s.user.links.append(id)
 		main.root("tactics")
+		await snap("tactics_0")
 		var t = main.stack[-1]
 		for i in [1, 2, 3, 4, 5]:
 			t.tab = i

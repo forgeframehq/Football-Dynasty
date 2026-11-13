@@ -4,16 +4,8 @@ extends "res://scripts/screens/screen.gd"
 const PITCH = preload("res://scripts/widgets/pitch.gd")
 const TOKEN = preload("res://scripts/widgets/ptoken.gd")
 const OVERLAY = preload("res://scripts/widgets/tac_overlay.gd")
-const TABS = ["Formation", "Shape", "Defence", "Attack", "Set Pieces", "Captain"]
-# name, mentality, pressing, tempo, width, line, passing, counter, description
-const STYLES = [
-	["Gegenpress", 3, 2, 2, 1, 2, 1, false, "Win it back high and attack at once."],
-	["Possession", 2, 1, 0, 1, 2, 0, false, "Short passes, patience, control."],
-	["Counter", 1, 0, 2, 1, 0, 2, true, "Sit deep, then break at speed."],
-	["Park the Bus", 0, 0, 0, 0, 0, 2, true, "Everyone behind the ball."],
-	["Wing Play", 3, 1, 1, 2, 1, 1, false, "Stretch the pitch and cross."],
-	["Route One", 2, 1, 2, 1, 1, 2, false, "Get it forward early."],
-]
+const TABS = ["Formation", "Playstyle", "Defence", "Attack", "Link-ups", "Set Pieces"]
+const MENT_SHORT = ["Bus", "Defend", "Balance", "Attack", "All out"]
 
 var tab := 0
 var sel = null   # {"k": "xi"/"sub"/"res", "i": index or pid}
@@ -22,13 +14,11 @@ var drag = null  # token drag
 var ldrag = null # list drag
 var ghost: Control = null
 var tokens: Array = []
+var overlay: Control = null
 
 
 func style_name(c: Dictionary) -> String:
-	for st in STYLES:
-		if c.ment == st[1] and c.press == st[2] and c.tempo == st[3] and c.instr.width == st[4] and c.instr.line == st[5] and c.instr["pass"] == st[6] and c.instr.counter == st[7]:
-			return st[0]
-	return "Custom"
+	return G.TC.STYLES[G.TC.style_of(c)].n
 
 
 func build():
@@ -58,6 +48,8 @@ func build():
 	left.add_child(pitch)
 	var ov = OVERLAY.new()
 	ov.mode = [0, 1, 2, 3, 0, 0][tab]
+	ov.show_links = tab in [0, 4]
+	overlay = ov
 	ov.c = c
 	ov.pitch = pitch
 	pitch.add_child(ov)
@@ -101,7 +93,9 @@ func build():
 		refresh(), 16))
 	if tab == 0:
 		var acts = UI.hb(6)
-		for it in [["%s" % c.formation, _pick_formation], [style_name(c), _pick_style], ["Best XI", func():
+		for it in [["%s" % c.formation, _pick_formation], [G.TC.STYLES[G.TC.style_of(c)].s + " style", func():
+				tab = 1
+				refresh()], ["Best XI", func():
 				G.auto_pick(c)
 				G.auto_roles(c)
 				sel = null
@@ -117,20 +111,20 @@ func build():
 	sc = rp[0].get_child(0)
 	match tab:
 		0: _squad_list(v, c)
-		1:
-			_instr(v, "Mentality", G.MENTALITY, c, "ment", "How many players commit forward. Attacking shapes create more and concede more.")
-			_instr(v, "Width", ["Narrow", "Normal", "Wide"], c.instr, "width", "Narrow packs the middle of the pitch; wide stretches play out to the flanks.")
+		1: _playstyle(v, c)
 		2:
-			_instr(v, "Defensive line", ["Deep", "Balanced", "High"], c.instr, "line", "A high line squeezes the pitch but leaves space in behind for quick forwards.")
-			_instr(v, "Closing down", ["Sit back", "Own half", "All over"], c, "press", "Pressing all over wins the ball early and costs your players stamina.")
+			for o in G.TC.DEF_OPTS:
+				_opt(v, c, o)
+			_pins(v, c, "def")
 		3:
-			_instr(v, "Passing", ["Short", "Mixed", "Direct"], c.instr, "pass", "Short passing keeps the ball; direct passing gets it forward quickly.")
-			_instr(v, "Tempo", G.TEMPO, c, "tempo", "A fast tempo creates more chances and gives the ball away more often.")
-			_instr(v, "Counter-attack", ["No", "Yes"], c.instr, "counter", "Break forward at speed when the opposition has more of the ball.")
-		4:
+			for o in G.TC.ATT_OPTS:
+				_opt(v, c, o)
+			_pins(v, c, "att")
+		4: _links(v, c)
+		5:
 			for row in [["Penalties", "pk", 17], ["Free kicks", "fk", 16], ["Corners", "ck", 3]]:
 				_taker(v, c, row[0], row[1], row[2])
-		5: _captain(v, c)
+			_captain(v, c)
 
 
 func _head(v: Control, text: String, right := ""):
@@ -142,16 +136,6 @@ func _head(v: Control, text: String, right := ""):
 		hh.add_child(UI.caps(right, 17, UI.accent))
 	hp.add_child(hh)
 	v.add_child(hp)
-
-
-func _instr(v: Control, title: String, options: Array, d: Dictionary, key: String, hint: String):
-	var cur = int(d[key])
-	_head(v, title, str(options[cur]))
-	v.add_child(UI.seg(options, cur, func(i):
-		d[key] = (i == 1) if typeof(d[key]) == TYPE_BOOL else i
-		refresh(), 19))
-	v.add_child(UI.wrap(hint, 18, UI.MUTED))
-	v.add_child(UI.sp(0, 6))
 
 
 func _taker(v: Control, c: Dictionary, title: String, key: String, at: int):
@@ -173,28 +157,51 @@ func _taker(v: Control, c: Dictionary, title: String, key: String, at: int):
 
 
 func _captain(v: Control, c: Dictionary):
-	_head(v, "Captain", "Lifts morale when he plays")
-	var list = []
-	for pid in c.xi + c.bench:
-		if pid >= 0:
-			list.append(G.s.players[pid])
-	list.sort_custom(func(a, b): return G.age(a) * 2 + a.ovr > G.age(b) * 2 + b.ovr)
-	for p in list:
-		var on = c.capt == p.id
-		var r = UI.panel(Color(UI.accent, 0.16) if on else UI.CARD2, 10, 12, 6, UI.accent if on else UI.LINE)
-		var h = UI.hb(10)
-		h.add_child(UI.pos(p.pos, 18))
-		h.add_child(UI.lbl_fill(G.pname(p), 22, UI.TEXT, "semi"))
-		h.add_child(UI.lbl("%d yrs" % G.age(p), 18, UI.MUTED))
-		h.add_child(UI.ovr(p.ovr, 20))
-		if on:
-			h.add_child(UI.chip("C", UI.GOLD, Color("0a0e17"), 16))
-		r.add_child(h)
-		var pid = p.id
-		UI.tap(r, func():
-			c.capt = pid
-			refresh())
-		v.add_child(r)
+	var pid = c.capt
+	var ok = pid >= 0 and G.s.players.has(pid) and pid in c.players
+	_head(v, "Captain", "Composure")
+	var r = UI.panel(UI.CARD2, 12, 14, 10, UI.LINE)
+	var h = UI.hb(10)
+	if ok:
+		h.add_child(UI.pos(G.s.players[pid].pos, 18))
+	h.add_child(UI.lbl_fill(G.pname(G.s.players[pid]) if ok else "Nobody chosen", 23, UI.TEXT, "semi"))
+	if ok and G.TC.has(G.s.players[pid], "cap"):
+		h.add_child(UI.chip("CAPTAINCY", Color(UI.GOLD, 0.16), UI.GOLD, 14))
+	if ok:
+		h.add_child(UI.ovr(G.s.players[pid].at[13], 20))
+	h.add_child(UI.chip("CHANGE", Color(1, 1, 1, 0.08), UI.TEXT, 16))
+	r.add_child(h)
+	UI.tap(r, func(): _pick_captain())
+	v.add_child(r)
+
+
+func _pick_captain():
+	var c = G.uc()
+	var build_sheet = func(v):
+		v.add_child(UI.wrap("A captain with composure lifts the whole team a little. One with the Captaincy skill lifts it more.", 20, UI.MUTED))
+		var list = []
+		for pid in c.xi + c.bench:
+			if pid >= 0:
+				list.append(G.s.players[pid])
+		list.sort_custom(func(a, b): return (30 if G.TC.has(a, "cap") else 0) + a.at[13] > (30 if G.TC.has(b, "cap") else 0) + b.at[13])
+		for p in list:
+			var on = c.capt == p.id
+			var r = UI.panel(Color(UI.accent, 0.16) if on else UI.CARD, 14, 16, 8, UI.accent if on else UI.LINE)
+			var h = UI.hb(10)
+			h.add_child(UI.pos(p.pos, 18))
+			h.add_child(UI.lbl_fill(G.pname(p), 23, UI.TEXT, "semi"))
+			if G.TC.has(p, "cap"):
+				h.add_child(UI.chip("CAPTAINCY", Color(UI.GOLD, 0.16), UI.GOLD, 14))
+			h.add_child(UI.lbl("%d yrs" % G.age(p), 18, UI.MUTED))
+			h.add_child(UI.ovr(p.at[13], 20))
+			r.add_child(h)
+			var pid = p.id
+			UI.tap(r, func():
+				c.capt = pid
+				UI.close_sheet()
+				refresh())
+			v.add_child(r)
+	UI.sheet("Captain", build_sheet)
 
 
 func _squad_list(v: Control, c: Dictionary):
@@ -243,6 +250,8 @@ func _row(p: Dictionary, kind: String, slot: int, c: Dictionary) -> Control:
 	var state = "injured" if p.inj > 0 else ("suspended" if p.susp > 0 else "%d%% fit" % int(p.cond))
 	nv.add_child(UI.lbl_fill("%s · %s" % [alt, state], 15, UI.RED if not G.available(p) else UI.MUTED))
 	h.add_child(nv)
+	var av = G.TC.arrow(p)
+	h.add_child(UI.icon(G.TC.arrow_icon(av), 20, G.TC.arrow_col(av)))
 	h.add_child(UI.ovr(p.ovr, 19))
 	if kind == "xi":
 		var rid = c.roles[slot]
@@ -291,36 +300,6 @@ func _row_input(e: InputEvent, kind: String, key: int, nm: String):
 			ghost.global_position = e.global_position - Vector2(50, 46)
 
 
-func _pick_style():
-	var c = G.uc()
-	var build_sheet = func(v):
-		v.add_child(UI.wrap("A style sets every team instruction in one tap. You can still change each one afterwards.", 20, UI.MUTED))
-		for st in STYLES:
-			var on = style_name(c) == st[0]
-			var r = UI.panel(Color(UI.accent, 0.14) if on else UI.CARD, 14, 16, 10, UI.accent if on else UI.LINE)
-			var h = UI.hb(10)
-			var tv = UI.vb(-2)
-			tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			tv.add_child(UI.lbl(st[0], 26, UI.TEXT, "disp"))
-			tv.add_child(UI.lbl(st[8], 18, UI.MUTED))
-			h.add_child(tv)
-			h.add_child(UI.caps("%s · %s" % [G.MENTALITY[st[1]], G.PRESSING[st[2]]], 16, UI.DIM))
-			r.add_child(h)
-			var x = st
-			UI.tap(r, func():
-				c.ment = x[1]
-				c.press = x[2]
-				c.tempo = x[3]
-				c.instr.width = x[4]
-				c.instr.line = x[5]
-				c.instr["pass"] = x[6]
-				c.instr.counter = x[7]
-				UI.close_sheet()
-				refresh())
-			v.add_child(r)
-	UI.sheet("Playing style", build_sheet)
-
-
 func _place():
 	if pitch == null or not is_instance_valid(pitch):
 		return
@@ -331,6 +310,7 @@ func _place():
 		t.position = p - Vector2(t.size.x / 2.0, 30)
 		# keep the whole marker, name included, inside the pitch
 		t.position.y = clamp(t.position.y, 2.0, pitch.size.y - t.size.y - 6.0)
+	_link_lines()
 
 
 func _token_input(e: InputEvent, t: Control, i: int):
@@ -635,3 +615,317 @@ func _presets():
 			card.add_child(cv)
 			v.add_child(card)
 	UI.sheet("Tactical presets", build_sheet)
+
+
+# ---------------------------------------------------------------- playstyle, options, individual instructions, link-ups
+
+func _link_lines():
+	if overlay == null or not is_instance_valid(overlay):
+		return
+	var c = G.uc()
+	var lines = []
+	for l in G.TC.user_links(c):
+		var a = null
+		var b = null
+		for t in tokens:
+			if t.p != null and t.p.id == l.a:
+				a = t
+			elif t.p != null and t.p.id == l.b:
+				b = t
+		if a != null and b != null:
+			lines.append([a.position + Vector2(a.size.x / 2.0, 30), b.position + Vector2(b.size.x / 2.0, 30), Color(G.TC.LEVEL_COL[l.lvl])])
+	overlay.lines = lines
+	overlay.queue_redraw()
+
+
+func _opt(v: Control, c: Dictionary, o: Array):
+	# one instruction on one line: what it is, what it costs, and the choices
+	var d = c if o[4] == "c" else c.instr
+	var key = o[0]
+	var is_bool = typeof(d[key]) == TYPE_BOOL
+	var cur = (1 if d[key] else 0) if is_bool else int(d[key])
+	var r = UI.hb(10)
+	var tv = UI.vb(-4)
+	tv.custom_minimum_size = Vector2(232, 0)
+	tv.add_child(UI.lbl(o[1], 17, UI.TEXT, "semi"))
+	var dl = UI.lbl(o[3], 12, UI.DIM)
+	dl.clip_text = true
+	tv.add_child(dl)
+	r.add_child(tv)
+	var sg = UI.seg(o[2], cur, func(i):
+		d[key] = (i == 1) if is_bool else i
+		refresh(), 14, 5)
+	sg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sg.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	r.add_child(sg)
+	v.add_child(r)
+
+
+func _playstyle(v: Control, c: Dictionary):
+	var u = G.s.user
+	var st = G.TC.style_of(c)
+	var fit = G.TC.style_fit(c)
+	var fam = int(G.TC.avg_fam(c))
+	var top = UI.hb(8)
+	for it in [["Style fit", str(fit), UI.cond_color(fit + 10)], ["Squad familiarity", "%d%%" % fam, UI.cond_color(fam + 10)], ["Your proficiency", str(int(u.prof[st])), UI.ovr_color(int(u.prof[st]))]]:
+		var tl = UI.panel(Color(1, 1, 1, 0.04), 10, 10, 4)
+		tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var th = UI.hb(6)
+		th.add_child(UI.lbl_fill(it[0], 14, UI.MUTED))
+		th.add_child(UI.lbl(it[1], 22, it[2], "disp"))
+		tl.add_child(th)
+		top.add_child(tl)
+	v.add_child(top)
+	for i in G.TC.STYLES.size():
+		var sd = G.TC.STYLES[i]
+		var on = i == st
+		var r = UI.panel(Color(UI.accent, 0.16) if on else Color(1, 1, 1, 0.03), 10, 12, 5, UI.accent if on else Color(0, 0, 0, 0))
+		var h = UI.hb(10)
+		var tv = UI.vb(-4)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl(sd.n, 19, UI.TEXT, "semi"))
+		var dl = UI.lbl_fill(sd.d, 13, UI.MUTED if on else UI.DIM)
+		tv.add_child(dl)
+		h.add_child(tv)
+		var bar = UI.bar(float(u.prof[i]) / 99.0, UI.ovr_color(int(u.prof[i])), 7)
+		bar.custom_minimum_size = Vector2(70, 7)
+		bar.size_flags_horizontal = Control.SIZE_SHRINK_END
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(bar)
+		var pl = UI.lbl(str(int(u.prof[i])), 21, UI.ovr_color(int(u.prof[i])), "disp")
+		pl.custom_minimum_size = Vector2(30, 0)
+		pl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		h.add_child(pl)
+		r.add_child(h)
+		var idx = i
+		UI.tap(r, func():
+			if idx == G.TC.style_of(c):
+				return
+			UI.confirm("Switch to %s?" % G.TC.STYLES[idx].n, "Your instructions will move to this style's defaults and the squad will need a few weeks of matches to learn it. Familiarity drops until they do.", "Switch style", func():
+				G.TC.set_style(c, idx)
+				refresh()), true)
+		v.add_child(r)
+	_opt(v, c, ["ment", "Mentality", MENT_SHORT, "How many players commit forward", "c"])
+	_opt(v, c, ["width", "Width", ["Narrow", "Normal", "Wide"], "Narrow packs the middle, wide stretches play", "i"])
+	# roles that do not suit the style, and a one-tap fix where the player can do a role that does
+	var off = []
+	var fixable = 0
+	for i in range(1, 11):
+		if c.xi[i] >= 0 and not G.TC.role_fits(c.roles[i], st):
+			var p = G.s.players[c.xi[i]]
+			var alt = G.TC.best_fit_role(p, c.slots[i][0], st)
+			off.append("%s (%s%s)" % [G.pname(p), str(c.roles[i]).to_upper(), (" → " + alt.to_upper()) if alt != "" else ""])
+			fixable += 1 if alt != "" else 0
+	var fh = UI.hb(8)
+	var ft = UI.lbl_fill(("Roles outside the style: " + ", ".join(off)) if off.size() > 0 else "Every outfield role suits this style.", 14, UI.MUTED if off.size() > 0 else UI.GREEN)
+	fh.add_child(ft)
+	if fixable > 0:
+		fh.add_child(UI.btn("Fit %d role%s" % [fixable, "" if fixable == 1 else "s"], func():
+			for i in range(1, 11):
+				if c.xi[i] >= 0 and not G.TC.role_fits(c.roles[i], st):
+					var alt = G.TC.best_fit_role(G.s.players[c.xi[i]], c.slots[i][0], st)
+					if alt != "":
+						c.roles[i] = alt
+			refresh(), "secondary", "", 36))
+	v.add_child(fh)
+
+
+func _pins(v: Control, c: Dictionary, kind: String):
+	G.TC.pins_valid(c)
+	var used = G.TC.pin_count(c, kind)
+	var hh = UI.hb(8)
+	hh.add_child(UI.caps("Individual instructions · %d of 2" % used, 14, UI.accent))
+	hh.add_child(UI.sp())
+	v.add_child(UI.divider())
+	v.add_child(hh)
+	var row = UI.hb(6)
+	for i in 11:
+		var pn = c.pins[i]
+		if pn == "" or G.TC.PINS[pn].k != kind:
+			continue
+		var p = G.s.players[c.xi[i]]
+		var r = UI.panel(Color(UI.accent, 0.14), 8, 10, 5, Color(UI.accent, 0.5))
+		r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var h = UI.hb(6)
+		var tv = UI.vb(-4)
+		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tv.add_child(UI.lbl_fill(G.pname(p), 16, UI.TEXT, "semi"))
+		var sub = G.TC.PINS[pn].n
+		if pn == "tm":
+			sub += " · " + (G.pname(G.s.players[c.tm_pid]) if c.tm_pid >= 0 and G.s.players.has(c.tm_pid) else "their best forward")
+		tv.add_child(UI.lbl_fill(sub, 12, UI.accent))
+		h.add_child(tv)
+		var x = UI.panel(Color(1, 1, 1, 0.08), 8, 6, 4)
+		x.add_child(UI.icon("x", 16, UI.MUTED))
+		var idx = i
+		UI.tap(x, func():
+			c.pins[idx] = ""
+			refresh(), true)
+		h.add_child(x)
+		r.add_child(h)
+		if pn == "tm":
+			UI.tap(r, func(): _pick_target())
+		row.add_child(r)
+	if used < 2:
+		var add = UI.btn("Add instruction", func(): _pick_pin(kind), "ghost", "plus", 40)
+		add.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(add)
+	v.add_child(row)
+
+
+func _pick_pin(kind: String):
+	var c = G.uc()
+	var build_sheet = func(v):
+		v.add_child(UI.wrap("Give one player a job of his own. Tap a name to assign it.", 20, UI.MUTED))
+		for id in G.TC.PINS:
+			var pd = G.TC.PINS[id]
+			if pd.k != kind:
+				continue
+			var card = UI.panel(UI.CARD, 14, 16, 10, UI.LINE)
+			var cv = UI.vb(6)
+			cv.add_child(UI.lbl(pd.n, 24, UI.TEXT, "disp"))
+			cv.add_child(UI.wrap(pd.d, 17, UI.MUTED))
+			var fl = UI.hb(6)
+			var any = false
+			for i in 11:
+				if c.xi[i] >= 0 and c.slots[i][0] in pd.pos and c.pins[i] == "":
+					any = true
+					var p = G.s.players[c.xi[i]]
+					var ch = UI.chip("%s  %s" % [c.slots[i][0], G.pname(p)], Color(UI.accent, 0.18), UI.TEXT, 17)
+					var idx = i
+					var pin = id
+					UI.tap(ch, func():
+						c.pins[idx] = pin
+						UI.close_sheet()
+						refresh(), true)
+					fl.add_child(ch)
+			if not any:
+				fl.add_child(UI.lbl("Nobody in the XI plays %s." % " or ".join(pd.pos), 16, UI.DIM))
+			cv.add_child(fl)
+			card.add_child(cv)
+			v.add_child(card)
+	UI.sheet("Attacking instruction" if kind == "att" else "Defensive instruction", build_sheet)
+
+
+func _pick_target():
+	# who the tight marker follows: automatic, or a named player from the next opponents
+	var c = G.uc()
+	var f = G.next_user_fixture()
+	var build_sheet = func(v):
+		var auto = UI.panel(UI.CARD, 14, 16, 10, UI.accent if c.tm_pid < 0 else UI.LINE)
+		auto.add_child(UI.lbl("Automatic: their best forward on the day", 22, UI.TEXT, "semi"))
+		UI.tap(auto, func():
+			c.tm_pid = -1
+			UI.close_sheet()
+			refresh())
+		v.add_child(auto)
+		if f == null:
+			return
+		var oc = G.s.clubs[f.a if f.h == c.id else f.h]
+		v.add_child(UI.caps("Next opponents · %s" % oc.name, 17, UI.MUTED))
+		var list = []
+		for pid in oc.players:
+			var p = G.s.players[pid]
+			if p.pos in ["ST", "LW", "RW", "CAM", "LM", "RM"] and G.available(p):
+				list.append(p)
+		list.sort_custom(func(a, b): return a.ovr > b.ovr)
+		for k in min(8, list.size()):
+			var p = list[k]
+			var r = UI.panel(UI.CARD, 14, 16, 8, UI.accent if c.tm_pid == p.id else UI.LINE)
+			var h = UI.hb(10)
+			h.add_child(UI.pos(p.pos, 18))
+			h.add_child(UI.lbl_fill(G.pname(p), 22, UI.TEXT, "semi"))
+			h.add_child(UI.lbl(", ".join(G.TC.skill_names(p).slice(0, 2)), 14, UI.DIM))
+			h.add_child(UI.ovr(p.ovr, 20))
+			r.add_child(h)
+			var pid = p.id
+			UI.tap(r, func():
+				c.tm_pid = pid
+				UI.close_sheet()
+				refresh())
+			v.add_child(r)
+	UI.sheet("Who to mark", build_sheet)
+
+
+func _slot_line(v: Control, sl: Dictionary, pid: int, c: Dictionary):
+	var h = UI.hb(8)
+	var tg = UI.caps(sl.t, 13, UI.DIM)
+	tg.custom_minimum_size = Vector2(74, 0)
+	h.add_child(tg)
+	if pid >= 0:
+		var p = G.s.players[pid]
+		h.add_child(UI.pos(c.slots[c.xi.find(pid)][0], 14))
+		h.add_child(UI.lbl_fill(G.pname(p), 18, UI.TEXT, "semi"))
+	else:
+		var fits = G.TC.slot_fits(sl, c)
+		var names = []
+		for k in min(3, fits.size()):
+			names.append(G.pname(fits[k]))
+		var txt = ("Could play it: " + ", ".join(names)) if names.size() > 0 else ("Nobody fits: needs " + G.TC.slot_need(sl))
+		h.add_child(UI.lbl_fill("%s · %s" % ["/".join(sl.pos), txt], 14, UI.AMBER if names.size() > 0 else UI.RED))
+	v.add_child(h)
+
+
+func _links(v: Control, c: Dictionary):
+	var u = G.s.user
+	var slots = G.TC.link_slots()
+	var act = {}
+	for l in G.TC.user_links(c):
+		act[l.id] = l
+	var hh = UI.hb(8)
+	hh.add_child(UI.caps("Your link-up plays · %d of %d" % [u.links.size(), slots], 15, UI.accent))
+	hh.add_child(UI.sp())
+	hh.add_child(UI.caps("%d goals from link-ups" % int(u.get("link_goals", 0)), 13, UI.DIM))
+	v.add_child(hh)
+	var st = G.TC.style_of(c)
+	for id in u.links:
+		if not G.TC.LINKS.has(id):
+			continue
+		var L = G.TC.LINKS[id]
+		var l = act.get(id, null)
+		var card = UI.panel(Color(UI.accent, 0.1) if l != null else Color(1, 1, 1, 0.03), 10, 12, 6, Color(G.TC.LEVEL_COL[l.lvl]) if l != null else Color(1, 1, 1, 0.08))
+		var cv = UI.vb(2)
+		var th = UI.hb(8)
+		th.add_child(UI.lbl(L.n, 20, UI.TEXT, "disp"))
+		if st in L.style:
+			th.add_child(UI.chip("SUITS YOUR STYLE", Color(UI.GREEN, 0.14), UI.GREEN, 12))
+		th.add_child(UI.sp())
+		if l != null:
+			var games = G.TC.pair_games(id, l.a, l.b)
+			var nxt = "" if l.lvl >= 2 else " · %d to %s" % [G.TC.LEVEL_AT[l.lvl + 1] - games, G.TC.LEVELS[l.lvl + 1]]
+			th.add_child(UI.caps("%d together%s" % [games, nxt], 12, UI.DIM))
+			th.add_child(UI.chip(G.TC.LEVELS[l.lvl].to_upper(), Color(G.TC.LEVEL_COL[l.lvl]), Color("0a0e17"), 13))
+		else:
+			th.add_child(UI.chip("OFF", Color(1, 1, 1, 0.08), UI.MUTED, 13))
+		cv.add_child(th)
+		_slot_line(cv, L.a, l.a if l != null else -1, c)
+		_slot_line(cv, L.b, l.b if l != null else -1, c)
+		card.add_child(cv)
+		var lid = id
+		UI.tap(card, func(): _link_sheet(lid))
+		v.add_child(card)
+	if u.links.size() < slots:
+		v.add_child(UI.btn("Choose a link-up play", func(): _pick_link(-1), "primary", "plus", 44))
+	elif slots < 5:
+		v.add_child(UI.lbl_fill("Your next coaching badge unlocks another link-up play.", 14, UI.DIM))
+
+
+func _link_sheet(id: String):
+	var L = G.TC.LINKS[id]
+	var build_sheet = func(v):
+		v.add_child(UI.wrap(L.d, 20, UI.MUTED))
+		for sl in [L.a, L.b]:
+			v.add_child(UI.kv("%s · %s" % [sl.t, " / ".join(sl.pos)], G.TC.slot_need(sl), UI.TEXT, 17))
+		var names = []
+		for i in L.style:
+			names.append(G.TC.STYLES[i].n)
+		v.add_child(UI.kv("Strongest in", ", ".join(names), UI.accent, 17))
+		v.add_child(UI.wrap("The pair goes Bronze, Silver, Gold as they start matches together (10 and 25). Levels belong to the pair, so they are kept if you swap this play out and bring it back.", 16, UI.DIM))
+		v.add_child(UI.btn("Replace with another link-up", func():
+			UI.close_sheet()
+			_pick_link(G.s.user.links.find(id)), "secondary", "repeat", 52))
+	UI.sheet(L.n, build_sheet)
+
+
+func _pick_link(replace: int):
+	preload("res://scripts/screens/tac_sheets.gd").pick_link(replace, func(): refresh())
