@@ -183,7 +183,7 @@ func _look(row: Control):
 		_put("club_accent", i == 1)
 		UI.main.reskin(), 19, 5))
 	v.add_child(UI.sp(0, 2))
-	_head(v, "Currency symbol")
+	_head(v, "Currency  ·  €1 = £0.85 = $1.15")
 	var curs = ["€", "£", "$"]
 	v.add_child(UI.seg(curs, max(0, curs.find(G.settings.get("cur", "€"))), func(i):
 		_put("cur", curs[i])

@@ -14,6 +14,7 @@ const MK = preload("res://scripts/market.gd")
 
 const SAVE_V = 2
 var slot := 0
+const CUR_RATE = {"€": 1.0, "£": 0.85, "$": 1.15}
 var settings: Dictionary = {"sound": true}
 
 
@@ -205,8 +206,10 @@ func nice(v: float) -> int:
 
 
 func money(v) -> String:
-	var n = float(v)
-	var sg = ("-" if n < 0 else "") + str(settings.get("cur", "€"))
+	# the game keeps every amount in euros; other currencies are converted for display at fixed rates
+	var cur = str(settings.get("cur", "€"))
+	var n = float(v) * float(CUR_RATE.get(cur, 1.0))
+	var sg = ("-" if n < 0 else "") + cur
 	n = abs(n)
 	if n >= 1e9:
 		return "%s%.2fB" % [sg, n / 1e9]
