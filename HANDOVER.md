@@ -46,7 +46,7 @@ Standing rules:
 9. Modes: holiday mode, save backup, custom dashboard, create-a-club, quick match, tutorial, legends, international football.
 
 ## Assets awaited
-- Suno music tracks from Sudhi → `assets/music/track_1.mp3` … `track_12.mp3`.
+- Music: seven Suno songs are in (see the settings section at the end). More can be added to `UI.SONGS`.
 - Open-spaces city pack (park, car parks, fan plaza, construction site, farm field, trees).
 - Scouting office level 1 re-export (PNG truncated).
 - Optional: two replacement trophies (league title, top continental; `trophy_01` and `trophy_04` unused), bolder logos for PulseDyn, Apex Motors, TurboForge, TerraSpark, continent pictures.
@@ -62,7 +62,7 @@ Standing rules:
 - Engine balance: baseline is about 2.8 goals a game and top scorers in the 40s over a season (`--selftest 1`, CALIB line). Anything that adds chances or weights strikers moves it fast; re-run after engine changes.
 - `dev/mktest.gd` (`-- --mktest`) exercises every transfer feature and the tactics data headlessly. `dev/shots.sh` keys added: tacsetup, tactics2 (six tabs), deal (two-day flow), market (brief, loan sheet, deadline day); `--intro` plays the intro in a shots run.
 - Config name is now "Football Dynasty 26", so the desktop user-data folder changed; the Android package id is unchanged, so phone saves carry over. Loading a v0.6.2 save was tested headlessly for two seasons.
-- The accent colour is fixed (`UI.BRAND`); `set_accent_from` is a stub.
+- The accent colour comes from the chosen skin (`UI.apply_accent()`), or the club's colour if that setting is on.
 - A plain `UI.lbl` with a long sentence sets a huge minimum width and pushes the whole screen off the right edge on notched phones (this was the tactics hint line). Use `UI.lbl_fill` or `UI.wrap` for anything longer than a few words, and check screens with `notch=70`.
 - Tactics agreed with Sudhi so far (12 Nov, build only after he says go): manager-owned link-up plays as in eFootball (pick one at career start, more per coaching badge, two slots that fitting players activate, bronze/silver/gold with minutes together), team playstyles with manager proficiency, extra Defence/Attack options, generated player skills. Tactics page is extended, not rebuilt.
 - Inside a lambda in `ui.gd`, a bare `wrap(...)` calls Godot's built-in maths `wrap()`, not the label helper. Write `self.wrap(...)`. This is what broke every `UI.confirm` pop-up up to v0.6.0.
