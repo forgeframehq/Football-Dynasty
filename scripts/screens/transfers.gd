@@ -1,7 +1,7 @@
 extends "res://scripts/screens/screen.gd"
 # Transfer market desk: your talks, bids for your players, shortlist and the latest deals, all on one screen.
 
-const STAGE = {"new": "Not approached", "enq_wait": "Awaiting reply", "club": "Your move: bid", "bid_wait": "Bid with club", "talks": "Your move: terms", "done": "Signed", "dead": "Collapsed"}
+const STAGE = {"new": "Not approached", "enq_wait": "Your move: fee talks", "club": "Your move: fee talks", "bid_wait": "Your move: fee talks", "deleg": "Assistant is talking", "meet": "Fee agreed: he comes in tomorrow", "talks": "Your move: player terms", "done": "Signed", "dead": "Talks off"}
 
 
 func build():

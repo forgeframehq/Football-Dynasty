@@ -528,7 +528,7 @@ func _bar(p: Dictionary):
 		var dl = G.DL.find(p.id)
 		var lab = "Approach club"
 		if dl != null and dl.mode == "buy" and dl.stage != "dead" and dl.stage != "done":
-			lab = {"new": "Approach club", "enq_wait": "Awaiting reply", "bid_wait": "Bid pending", "club": "Make bid", "talks": "Agree terms"}[dl.stage]
+			lab = {"new": "Approach club", "club": "Fee talks", "deleg": "Assistant talking", "meet": "Meets tomorrow", "talks": "Agree terms"}.get(dl.stage, "Approach club")
 		acts.append([lab, "handshake", "primary", func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"})])
 	acts.append(["Compare", "users", "secondary", func(): _compare(p)])
 	acts.append(["Similar", "search", "secondary", func(): UI.main.open("lists", {"kind": "similar", "pid": p.id, "grp": "search"})])

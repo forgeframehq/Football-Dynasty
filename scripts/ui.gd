@@ -625,7 +625,7 @@ func input(text: String, placeholder: String, cb: Callable) -> LineEdit:
 	return le
 
 
-func slider(minv: float, maxv: float, value: float, step: float, cb: Callable) -> HSlider:
+func slider(minv: float, maxv: float, value: float, step: float, cb: Callable, small := false) -> HSlider:
 	var sl = HSlider.new()
 	sl.min_value = minv
 	sl.max_value = maxv
@@ -648,8 +648,17 @@ func slider(minv: float, maxv: float, value: float, step: float, cb: Callable) -
 				var a = clamp(26.0 - d, 0.0, 1.0)
 				img.set_pixel(x, y, Color(1, 1, 1, a))
 		icon_cache["_grab"] = ImageTexture.create_from_image(img)
-	sl.add_theme_icon_override("grabber", icon_cache["_grab"])
-	sl.add_theme_icon_override("grabber_highlight", icon_cache["_grab"])
+	if small and not icon_cache.has("_grab_s"):
+		# a smaller handle for dense forms, where plus and minus buttons do the fine work
+		var im2 = Image.create(38, 38, false, Image.FORMAT_RGBA8)
+		for y in 38:
+			for x in 38:
+				var d2 = Vector2(x - 18.5, y - 18.5).length()
+				im2.set_pixel(x, y, Color(1, 1, 1, clamp(17.5 - d2, 0.0, 1.0)))
+		icon_cache["_grab_s"] = ImageTexture.create_from_image(im2)
+	var gk = "_grab_s" if small else "_grab"
+	sl.add_theme_icon_override("grabber", icon_cache[gk])
+	sl.add_theme_icon_override("grabber_highlight", icon_cache[gk])
 	sl.value_changed.connect(cb)
 	return sl
 

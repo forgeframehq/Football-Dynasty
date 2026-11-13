@@ -1,13 +1,16 @@
 extends RefCounted
-# Transfers as a process: enquiry, a fee negotiated with the club over days (answered by
-# message), then personal terms with the player and his agent, then completion.
-# Also instalments, appearance add-ons, sell-on clauses, squad-role promises, rival bids
-# and counter-offers when other clubs bid for the user's players.
+# Transfers as a two-day process. Day 1: enquiry and a face-to-face fee negotiation with the
+# selling club (patience bar, final offer, player swaps, or delegate it to the assistant).
+# Day 2: the player and his agent come in; you see what he wants and agree terms.
+# Also instalments, appearance add-ons, sell-on clauses, squad-role promises, performance
+# bonuses, pre-contracts, rival bids and counter-offers when clubs bid for the user's players.
 
 const ROLES = ["Star player", "First team", "Rotation", "Backup", "Prospect"]
 const INST = ["All up front", "Half now, half in 12 months", "Three payments over 2 years"]
 const NOW = [1.0, 0.5, 0.34]
 const ADDON_APPS = 20
+const BONUS = ["None", "Appearances", "Goals", "Both"]
+const BONUS_DEF = ["None", "Appearances", "Clean sheets", "Both"]
 
 
 static func all() -> Dictionary:
@@ -43,9 +46,24 @@ static func start(p: Dictionary, mode: String) -> Dictionary:
 		else:
 			return d
 	d = {"pid": p.id, "mode": mode, "stage": "new" if mode == "buy" else "talks", "club": p.club, "started": G.s.day, "ask": -1, "fee": 0, "inst": 0,
-		"addon": 0, "sellon": 0, "wait": 0, "pat": 3, "ppat": 4, "rival": -1, "exp": 0, "block": 0, "log": [], "terms": {}, "counter": {}}
+		"addon": 0, "sellon": 0, "wait": 0, "pat": 100.0, "ppat": 100.0, "rival": -1, "exp": 0, "block": 0, "log": [], "terms": {}, "counter": {}, "swap": -1, "meet": 0, "v": 2}
+	if mode == "pre":
+		d.stage = "talks"
 	all()[p.id] = d
 	return d
+
+
+static func upgrade(d: Dictionary):
+	# deals saved before the two-day flow used small counters for patience and waited a day for every reply
+	if int(d.get("v", 1)) >= 2:
+		return
+	d["v"] = 2
+	d.pat = clamp(float(d.pat) * 33.0, 0.0, 100.0)
+	d.ppat = clamp(float(d.ppat) * 25.0, 0.0, 100.0)
+	d["swap"] = -1
+	d["meet"] = 0
+	if d.stage == "enq_wait" or d.stage == "bid_wait":
+		d.stage = "club"
 
 
 static func kill(d: Dictionary, days := 14):
@@ -78,31 +96,164 @@ static func untouchable(p: Dictionary) -> bool:
 	return G.TR.squad_rank(p) < 3 and c.rep >= G.uc().rep - 1 and p.cend - G.s.season > 1
 
 
-static func enquire(d: Dictionary):
-	var p = G.s.players[d.pid]
-	d.stage = "enq_wait"
-	d.wait = G.s.day + 1
-	say(d, "you", "Asked %s whether %s is available and at what price." % [G.s.clubs[p.club].name, G.pname(p)])
+static func swap_value(d: Dictionary, q: Dictionary) -> float:
+	# what the selling club thinks one of your players is worth to them as part of the deal
+	var c = G.s.clubs[d.club]
+	if q.ovr < c.rep - 9:
+		return 0.0
+	var same = 0
+	for pid in c.players:
+		var o = G.s.players[pid]
+		if G.LINE[o.pos] == G.LINE[q.pos] and o.ovr >= q.ovr:
+			same += 1
+	var need = 1.05 if same < 2 else (0.85 if same < 4 else 0.65)
+	return G.value(q) * need
 
 
-static func submit_bid(d: Dictionary, fee: int, inst: int, addon: int, sellon: int) -> Dictionary:
+static func swap_ok(d: Dictionary, q: Dictionary) -> String:
+	var c = G.s.clubs[d.club]
+	if q.get("loan", -1) >= 0:
+		return "He is here on loan."
+	if q.ovr < c.rep - 9:
+		return "%s do not think he is good enough for them." % c.short
+	if q.ovr > c.rep + 9:
+		return "%s would not agree to join %s." % [G.pname(q), c.short]
+	return ""
+
+
+static func total_value(d: Dictionary, fee: int, inst: int, addon: int, sellon: int, swap: int) -> float:
 	var p = G.s.players[d.pid]
+	var v = package(p, fee, inst, addon, sellon)
+	if swap >= 0 and G.s.players.has(swap):
+		v += swap_value(d, G.s.players[swap])
+	return v
+
+
+static func stance(p: Dictionary) -> String:
+	return "listed" if p.listed else ("no" if untouchable(p) else "price")
+
+
+static func enquire(d: Dictionary) -> String:
+	# day one starts here: their manager tells you where they stand, there and then
+	var p = G.s.players[d.pid]
+	var c = G.s.clubs[p.club]
+	var w = G.TR.willing(p)
+	d.stage = "club"
+	say(d, "you", "Asked %s whether %s is available and at what price." % [c.name, G.pname(p)])
+	var t = ""
+	if untouchable(p):
+		d.ask = G.nice(ask(p, d) * 1.25)
+		t = "He is not for sale. He is one of our most important players. Only something exceptional, around %s, would make us think again." % G.money(d.ask)
+	elif p.listed:
+		d.ask = ask(p, d)
+		t = "He is available. We would let him go for around %s and we are open to a sensible structure." % G.money(d.ask)
+	else:
+		d.ask = ask(p, d)
+		t = "We are not looking to sell, but every player has a price. We value him at %s." % G.money(d.ask)
+	if p.get("rc", 0) > 0:
+		t += " His contract has a release clause of %s, payable in full." % G.money(p.rc)
+	if not w.ok:
+		t += " I should tell you the player himself may not be keen."
+	say(d, "club", t)
+	return t
+
+
+static func submit_bid(d: Dictionary, fee: int, inst: int, addon: int, sellon: int, swap := -1, final := false) -> Dictionary:
+	# an offer across the table: accepted, countered or turned down on the spot
+	var p = G.s.players[d.pid]
+	var c = G.s.clubs[p.club]
 	var uc = G.uc()
 	if not G.window_open():
-		return {"ok": false, "text": "The transfer window is closed."}
+		return {"ok": false, "res": "error", "text": "The transfer window is closed."}
 	var w = G.TR.willing(p)
 	if not w.ok and uc.players.size() >= G.TR.MAX_SQUAD:
-		return {"ok": false, "text": w.why}
+		return {"ok": false, "res": "error", "text": w.why}
 	if pay_now(fee, inst) > uc.budget:
-		return {"ok": false, "text": "The first payment of %s is more than your %s budget." % [G.money(pay_now(fee, inst)), G.money(uc.budget)]}
+		return {"ok": false, "res": "error", "text": "The first payment of %s is more than your %s budget." % [G.money(pay_now(fee, inst)), G.money(uc.budget)]}
+	if swap >= 0:
+		var why = swap_ok(d, G.s.players[swap])
+		if why != "":
+			return {"ok": false, "res": "error", "text": why}
 	d.fee = fee
 	d.inst = inst
 	d.addon = addon
 	d.sellon = sellon
-	d.stage = "bid_wait"
+	d.swap = swap
+	var swap_txt = (" plus %s" % G.pname(G.s.players[swap])) if swap >= 0 else ""
+	say(d, "you", "%s %s%s%s." % ["Final offer:" if final else "Offered", G.money(fee), swap_txt, extras(d)])
+	var a = float(ask(p, d))
+	if untouchable(p):
+		a *= 1.25
+	d.ask = G.nice(a)
+	var pv = total_value(d, fee, inst, addon, sellon, swap)
+	var rc = p.get("rc", 0)
+	if rc > 0 and fee >= rc and inst == 0:
+		_agree(d, "That meets the release clause. We cannot refuse.")
+		return {"ok": true, "res": "accept", "text": "Your %s offer meets the release clause in %s's contract. %s cannot refuse." % [G.money(fee), G.pname(p), c.name]}
+	var ratio = pv / max(1.0, a)
+	if ratio >= (0.92 if final else 0.95):
+		_agree(d, "We have a deal at %s%s%s." % [G.money(fee), swap_txt, extras(d)])
+		return {"ok": true, "res": "accept", "text": "“We have a deal.” %s accept %s%s%s for %s." % [c.name, G.money(fee), swap_txt, extras(d), G.pname(p)]}
+	if final:
+		kill(d, 21)
+		say(d, "club", "Refused the final offer and ended the talks.")
+		return {"ok": true, "res": "dead", "text": "“Then we have nothing more to discuss.” %s refuse your final offer and will not talk about %s again before %s." % [c.name, G.pname(p), G.fmt_date(d.block)]}
+	d.pat = float(d.pat) - clamp((0.95 - ratio) * 170.0, 8.0, 55.0)
+	if d.pat <= 0.0:
+		kill(d, 21)
+		say(d, "club", "Walked away from the table.")
+		return {"ok": true, "res": "dead", "text": "“You are wasting my time.” Their manager gets up and leaves. %s will not discuss %s again before %s." % [c.name, G.pname(p), G.fmt_date(d.block)]}
+	if ratio >= 0.72:
+		var want = G.nice(a * (0.97 + 0.04 * d.pat / 100.0))
+		d.counter = {"fee": want, "inst": 0, "addon": 0, "sellon": 0}
+		var alt = ""
+		if sellon == 0 and want > 2000000:
+			alt = " Or %s with fifteen per cent of any future sale." % G.money(G.nice(want * 0.93))
+		var line = "“We are getting closer.”" if ratio >= 0.88 else "“That is not enough for a player like him.”"
+		say(d, "club", "Turned it down. Would accept %s." % G.money(want))
+		return {"ok": true, "res": "counter", "text": "%s He would do it at %s up front.%s" % [line, G.money(want), alt]}
+	d.counter = {}
+	say(d, "club", "Dismissed it as far too low.")
+	return {"ok": true, "res": "reject", "text": "“Is that a serious offer?” It is well short of their %s valuation, and his patience is going." % G.money(d.ask)}
+
+
+static func delegate(d: Dictionary, max_fee: int) -> Dictionary:
+	# hand the fee talks to the assistant with a ceiling; he reports back tomorrow
+	var uc = G.uc()
+	if not G.window_open():
+		return {"ok": false, "text": "The transfer window is closed."}
+	if max_fee > uc.budget:
+		return {"ok": false, "text": "Your limit of %s is more than the %s budget." % [G.money(max_fee), G.money(uc.budget)]}
+	d.stage = "deleg"
+	d["dmax"] = max_fee
 	d.wait = G.s.day + 1
-	say(d, "you", "Bid %s%s." % [G.money(fee), extras(d)])
-	return {"ok": true, "text": "Bid sent. %s will reply by message." % G.s.clubs[p.club].name}
+	say(d, "you", "Sent the assistant to negotiate, up to %s." % G.money(max_fee))
+	return {"ok": true, "text": "Your assistant will meet them today and report back tomorrow."}
+
+
+static func _delegate_result(d: Dictionary):
+	var p = G.s.players[d.pid]
+	var c = G.s.clubs[p.club]
+	var a = float(ask(p, d))
+	if untouchable(p):
+		a *= 1.25
+	d.ask = G.nice(a)
+	var mx = float(d.dmax)
+	# he is a steadier negotiator than a bold one: he lands close to their price, never a steal
+	var settle = G.nice(a * G.rng.randf_range(0.96, 1.01))
+	if settle <= mx:
+		d.fee = settle
+		d.inst = 0
+		d.addon = 0
+		d.sellon = 0
+		d.swap = -1
+		_agree(d, "Agreed with your assistant at %s." % G.money(settle), "Your assistant has agreed a fee of %s with %s for %s, inside the %s limit you gave him." % [G.money(settle), c.name, G.pfull(p), G.money(int(mx))])
+		return
+	d.stage = "club"
+	d.pat = max(15.0, float(d.pat) - 20.0)
+	d.counter = {"fee": G.nice(a * 0.98), "inst": 0, "addon": 0, "sellon": 0}
+	say(d, "club", "Would not go below %s with the assistant." % G.money(int(d.counter.fee)))
+	G.msg("%s: no agreement yet" % G.pname(p), "Your assistant could not agree a fee with %s inside your %s limit. They want about %s for %s.\n\nThe talks are still open if you want to sit down with them yourself." % [c.name, G.money(int(mx)), G.money(int(d.counter.fee)), G.pfull(p)], "deal", p.id, true)
 
 
 static func extras(d: Dictionary) -> String:
@@ -113,75 +264,25 @@ static func extras(d: Dictionary) -> String:
 	return t
 
 
-static func _reply_enquiry(d: Dictionary):
+static func _agree(d: Dictionary, line: String, msg_text := ""):
+	# fee settled: the player and his agent come in tomorrow
 	var p = G.s.players[d.pid]
-	var c = G.s.clubs[p.club]
-	var w = G.TR.willing(p)
-	d.stage = "club"
-	var t = ""
-	if untouchable(p):
-		d.ask = G.nice(ask(p, d) * 1.25)
-		t = "%s is not for sale. He is one of our most important players and we have no wish to lose him.\n\nOnly an exceptional offer — in the region of %s — would make us think again." % [G.pname(p), G.money(d.ask)]
-	elif p.listed:
-		d.ask = ask(p, d)
-		t = "%s is available. We would let him go for around %s and are open to a sensible structure." % [G.pname(p), G.money(d.ask)]
-	else:
-		d.ask = ask(p, d)
-		t = "We are not actively looking to sell %s, but every player has a price. We value him at %s." % [G.pname(p), G.money(d.ask)]
-	if p.get("rc", 0) > 0:
-		t += "\n\nHis contract contains a release clause of %s, payable in full." % G.money(p.rc)
-	if not w.ok:
-		t += "\n\nOur understanding is that the player himself may not be keen: %s" % w.why
-	say(d, "club", t.split("\n")[0])
-	G.msg("%s: reply from %s" % [G.pname(p), c.name], t, "deal", p.id, true)
+	var c = G.s.clubs[d.club]
+	d.stage = "meet"
+	d.meet = G.s.day + 1
+	d.exp = G.s.day + 10
+	d.ppat = 100.0
+	say(d, "club", line)
+	var swap_txt = (" plus %s" % G.pname(G.s.players[d.swap])) if d.swap >= 0 and G.s.players.has(d.swap) else ""
+	var body = msg_text if msg_text != "" else "%s have accepted %s%s%s for %s." % [c.name, G.money(d.fee), swap_txt, extras(d), G.pfull(p)]
+	G.msg("%s: fee agreed" % G.pname(p), body + "\n\n%s and his agent will come in to discuss personal terms on %s. The agreement with %s stands for 10 days." % [G.pname(p), G.fmt_date(d.meet), c.short], "deal", p.id)
 
 
-static func _reply_bid(d: Dictionary):
-	var p = G.s.players[d.pid]
-	var c = G.s.clubs[p.club]
-	var a = float(ask(p, d))
-	if untouchable(p):
-		a *= 1.25
-	var pv = package(p, d.fee, d.inst, d.addon, d.sellon)
-	var rc = p.get("rc", 0)
-	var title = "%s: %s reply" % [G.pname(p), c.name]
-	if rc > 0 and d.fee >= rc and d.inst == 0:
-		_agree(d, "Your %s bid meets the release clause in %s's contract. %s cannot refuse, and you may now speak to the player." % [G.money(d.fee), G.pname(p), c.name])
-		return
-	if pv >= a * 0.95:
-		_agree(d, "%s accept your offer of %s%s for %s.\n\nYou have permission to discuss personal terms with the player and his agent. The agreement stands for 10 days." % [c.name, G.money(d.fee), extras(d), G.pfull(p)])
-		return
-	d.pat -= 1
-	d.ask = G.nice(a)
-	if d.pat <= 0:
-		kill(d)
-		say(d, "club", "Talks ended.")
-		G.msg(title, "%s have rejected your latest offer and ended the talks. They will not discuss %s again before %s." % [c.name, G.pname(p), G.fmt_date(d.block)], "deal", p.id, true)
-		return
-	d.stage = "club"
-	if pv >= a * 0.72:
-		# a counter-offer, softened a little each round
-		var want = G.nice(a * (0.99 + 0.03 * d.pat / 3.0))
-		d.counter = {"fee": want, "inst": 0, "addon": 0, "sellon": 0}
-		var alt = ""
-		if d.sellon == 0 and want > 2000000:
-			var w2 = G.nice(want * 0.93)
-			alt = " Alternatively we would take %s with a 15%% sell-on clause." % G.money(w2)
-		say(d, "club", "Rejected. Would accept %s." % G.money(want))
-		G.msg(title, "%s have turned down your offer of %s%s.\n\nThey would do business at %s paid up front.%s\n\nThey are prepared to hear %d more offer%s." % [c.name, G.money(d.fee), extras(d), G.money(want), alt, d.pat, "" if d.pat == 1 else "s"], "deal", p.id, true)
-	else:
-		d.counter = {}
-		say(d, "club", "Rejected as far too low.")
-		G.msg(title, "%s have dismissed your offer of %s as well short of their valuation of %s.\n\nThey are prepared to hear %d more offer%s." % [c.name, G.money(d.fee), G.money(d.ask), d.pat, "" if d.pat == 1 else "s"], "deal", p.id, true)
-
-
-static func _agree(d: Dictionary, text: String):
+static func _meeting(d: Dictionary):
 	var p = G.s.players[d.pid]
 	d.stage = "talks"
-	d.exp = G.s.day + 10
-	d.ppat = 4
-	say(d, "club", "Fee agreed: %s%s." % [G.money(d.fee), extras(d)])
-	G.msg("%s: fee agreed" % G.pname(p), text, "deal", p.id, true)
+	say(d, "agent", "Arrived for talks.")
+	G.msg("%s is here to talk terms" % G.pname(p), "%s and his agent are at the club today to discuss a contract. Open the talks to see what he wants and make your offer.\n\nThe fee agreed with %s stands until %s." % [G.pfull(p), G.s.clubs[d.club].name, G.fmt_date(d.exp)], "deal", p.id, true)
 
 
 # ---------------------------------------------------------------- player side
@@ -233,17 +334,95 @@ static func demand(d: Dictionary, t: Dictionary) -> Dictionary:
 		dem *= 1.04
 	if t.rc > 0:
 		dem *= 0.94 if t.rc < G.value(p) * 1.6 else 0.98
-	var sm = {"free": 20.0, "buy": 8.0, "renew": 4.0}[d.mode]
+	# what he wants beyond money: each unmet wish makes him dearer, the essential ones stop the deal
+	var pr = priorities(d)
+	for w in pr:
+		match w.k:
+			"europe":
+				dem *= 1.06
+			"clause":
+				if int(t.rc) == 0:
+					dem *= 1.05
+			"games":
+				if int(t.role) >= 3:
+					if blocked == "":
+						blocked = "%s wants to play. He will not sign as a %s." % [G.pname(p), ROLES[t.role].to_lower()]
+			"short":
+				if int(t.years) > 3:
+					dem *= 1.05
+			"long":
+				if int(t.years) < int(w.v):
+					dem *= 1.05
+	var sm = {"free": 20.0, "buy": 8.0, "renew": 4.0, "pre": 14.0}[d.mode]
 	var base = float(G.TR.wage_demand(p))
-	var agent = base * {"free": 10.0, "buy": 5.0, "renew": 3.0}[d.mode]
+	var agent = base * {"free": 10.0, "buy": 5.0, "renew": 3.0, "pre": 8.0}[d.mode]
 	if d.mode == "buy":
 		agent = max(agent, d.fee * 0.05)
-	return {"wage": G.nice(dem), "sign": G.nice(base * sm), "agent": G.nice(agent), "role": er, "blocked": blocked, "notes": notes}
+	return {"wage": G.nice(dem), "sign": G.nice(base * sm), "agent": G.nice(agent), "role": er, "blocked": blocked, "notes": notes, "want": pr}
+
+
+static func in_europe(c: Dictionary) -> bool:
+	for cp in G.s.get("comps", []):
+		if cp.get("kind", "") != "euro":
+			continue
+		for g in cp.get("groups", []):
+			if c.id in g:
+				return true
+		if c.id in cp.get("alive", []):
+			return true
+	return false
+
+
+static func priorities(d: Dictionary) -> Array:
+	# the things this player cares about in a move: [{k, text, ess}] (ess = he will not sign without it)
+	var p = G.s.players[d.pid]
+	var uc = G.uc()
+	var per = G.PS.personality(p)
+	var a = G.age(p)
+	var out = []
+	if d.mode != "renew" and p.ovr >= 78 and p.ovr >= uc.rep - 2 and not in_europe(uc):
+		out.append({"k": "europe", "text": "Wants European football: you cannot offer it this season, so he asks for more", "ess": false})
+	if a <= 22 and p.pot >= p.ovr + 3 and p.ovr >= uc.rep - 12:
+		out.append({"k": "games", "text": "Wants to play: will not sign as a Backup or Prospect", "ess": true})
+	if (per == "Ambitious" or (p.club >= 0 and uc.rep < p.ovr - 1)) and d.mode != "renew":
+		out.append({"k": "clause", "text": "Wants a release clause in case a bigger club comes", "ess": false})
+	if per == "Ambitious" and a <= 25:
+		out.append({"k": "short", "text": "Prefers three years or fewer, to keep his options open", "ess": false})
+	elif a >= 30 or per == "Loyal":
+		out.append({"k": "long", "v": 2 if a >= 30 else 4, "text": "Wants security: at least %d years" % (2 if a >= 30 else 4), "ess": false})
+	if per == "Mercenary":
+		out.append({"k": "cash", "text": "Prefers guaranteed money to bonuses", "ess": false})
+	return out
+
+
+static func knows_wants(d: Dictionary) -> bool:
+	var p = G.s.players[d.pid]
+	return d.mode == "renew" or p.club == G.s.user.club or G.OPS.knows(p)
+
+
+static func bonus_amounts(p: Dictionary, wage: int, kind: int) -> Dictionary:
+	# performance bonuses are sized from the weekly wage so they scale with the player
+	var back = G.LINE[p.pos] <= 1
+	var b = {"ab": 0, "gb": 0, "cs": 0}
+	if kind == 1 or kind == 3:
+		b.ab = G.nice(wage * 0.15)
+	if kind == 2 or kind == 3:
+		if back:
+			b.cs = G.nice(wage * 0.25)
+		else:
+			b.gb = G.nice(wage * 0.4)
+	return b
+
+
+static func bonus_week(p: Dictionary, b: Dictionary) -> float:
+	# what the bonuses are worth to him per week, on a normal season
+	var goals = {"ST": 14.0, "LW": 8.0, "RW": 8.0, "CAM": 7.0, "LM": 5.0, "RM": 5.0, "CM": 4.0}.get(p.pos, 1.5) * p.ovr / 80.0
+	return (b.ab * 30.0 + b.gb * goals + b.cs * 11.0) / 52.0
 
 
 static func default_terms(d: Dictionary) -> Dictionary:
 	var p = G.s.players[d.pid]
-	var t = {"wage": 0, "years": 3, "role": expected_role(p), "sign": 0, "agent": 0, "rc": 0}
+	var t = {"wage": 0, "years": 3, "role": expected_role(p), "sign": 0, "agent": 0, "rc": 0, "bon": 0}
 	if d.mode == "renew":
 		t.years = clampi(p.cend - G.s.season + 2, 1, 5)
 	if G.age(p) >= 32:
@@ -279,14 +458,16 @@ static func offer_terms(d: Dictionary, t: Dictionary) -> Dictionary:
 		return {"res": "reject", "text": "%s is unhappy and refuses to discuss a new deal right now." % G.pname(p)}
 	if d.mode == "buy" and not G.window_open():
 		return {"res": "error", "text": "The window is closed. The move cannot be registered until it reopens."}
+	if d.mode == "buy" and d.swap >= 0 and (not G.s.players.has(d.swap) or G.s.players[d.swap].club != uc.id):
+		d.swap = -1
 	say(d, "you", "Offered %s/wk for %d yr%s as %s." % [G.money(t.wage), t.years, "" if t.years == 1 else "s", ROLES[t.role].to_lower()])
 	var dm = demand(d, t)
 	if dm.blocked != "":
-		d.ppat -= 1
+		d.ppat -= 20.0
 		say(d, "agent", dm.blocked)
 		return _talk_end(d, {"res": "reject", "text": dm.blocked})
 	if t.agent < dm.agent * 0.5:
-		d.ppat -= 1
+		d.ppat -= 15.0
 		var tx = "The agent will not let this through without a proper fee. He wants about %s for himself." % G.money(dm.agent)
 		say(d, "agent", tx)
 		return _talk_end(d, {"res": "counter", "text": tx, "wage": t.wage, "sign": t.sign, "agent": dm.agent})
@@ -294,11 +475,12 @@ static func offer_terms(d: Dictionary, t: Dictionary) -> Dictionary:
 	var need = dm.wage + dm.sign / span
 	if t.agent >= dm.agent * 1.5:
 		need *= 0.96
-	var have = t.wage + t.sign / span
+	var bon = bonus_amounts(p, t.wage, int(t.get("bon", 0)))
+	var have = t.wage + t.sign / span + bonus_week(p, bon) * (0.5 if G.PS.personality(p) == "Mercenary" else 0.75)
 	if have >= need * 0.97:
 		complete(d, t)
 		return {"res": "accept", "text": "%s agrees to a %d-year deal worth %s per week." % [G.pname(p), t.years, G.money(t.wage)]}
-	d.ppat -= 1
+	d.ppat -= clamp((0.97 - have / need) * 150.0, 10.0, 35.0)
 	if have >= need * 0.8:
 		var tx2 = "We are not far apart. %s would sign for %s a week with %s on signing." % [G.pname(p), G.money(dm.wage), G.money(dm.sign)]
 		say(d, "agent", tx2)
@@ -309,7 +491,7 @@ static func offer_terms(d: Dictionary, t: Dictionary) -> Dictionary:
 
 
 static func _talk_end(d: Dictionary, r: Dictionary) -> Dictionary:
-	if d.ppat <= 0:
+	if d.ppat <= 0.0:
 		var p = G.s.players[d.pid]
 		kill(d)
 		r.res = "dead"
@@ -323,6 +505,16 @@ static func complete(d: Dictionary, t: Dictionary):
 	var uc = G.uc()
 	var s = G.s
 	d.terms = t.duplicate()
+	if d.mode == "pre":
+		# signed now, joins when his contract runs out in June
+		p["pre"] = {"club": uc.id, "wage": int(t.wage), "years": int(t.years), "role": int(t.role), "rc": int(t.rc), "bon": bonus_amounts(p, t.wage, int(t.get("bon", 0)))}
+		uc.budget -= int(t.sign) + int(t.agent)
+		d.stage = "done"
+		say(d, "agent", "Pre-contract signed.")
+		G.news("%s has agreed to join %s when his %s contract ends in June." % [G.pfull(p), uc.name, G.s.clubs[p.club].name if p.club >= 0 else ""])
+		G.scrap("Pre-contract: %s" % G.pname(p), "%s agreed to join on a free transfer in the summer." % G.pfull(p))
+		G.save_game()
+		return
 	if d.mode == "renew":
 		G.TR.renew(p, t.wage, t.years)
 	else:
@@ -340,6 +532,10 @@ static func complete(d: Dictionary, t: Dictionary):
 				clauses().append({"pid": p.id, "from": uc.id, "to": from_id, "amt": d.addon, "base": p.cap, "apps": ADDON_APPS})
 			if d.sellon > 0:
 				p["sellon"] = [from_id, d.sellon]
+			if d.swap >= 0 and s.players.has(d.swap) and s.players[d.swap].club == uc.id:
+				var q = s.players[d.swap]
+				G.TR.move(q, from_id, 0, q.wage, 3)
+				G.msg("%s leaves in the %s deal" % [G.pname(q), G.pname(p)], "%s has joined %s as part of the agreement that brought %s to the club." % [G.pfull(q), s.clubs[from_id].name, G.pfull(p)], "info")
 		G.PS.learn(p, G.PS.country_of(uc.id))
 		G.scrap("Signed %s" % G.pname(p), "%s joined%s on a %d-year contract." % [G.pfull(p), (" for " + G.money(d.fee)) if d.fee > 0 else " on a free transfer", t.years])
 		G.SOC.on_signing(p, d.fee)
@@ -348,6 +544,11 @@ static func complete(d: Dictionary, t: Dictionary):
 	p.erase("rolew")
 	if t.rc > 0:
 		p["rc"] = int(t.rc)
+	var bn = bonus_amounts(p, t.wage, int(t.get("bon", 0)))
+	if bn.ab + bn.gb + bn.cs > 0:
+		p["bon"] = bn
+	else:
+		p.erase("bon")
 	d.stage = "done"
 	say(d, "agent", "Contract signed.")
 	G.save_game()
@@ -410,6 +611,7 @@ static func tick():
 			all().erase(pid)
 			continue
 		var p = s.players[pid]
+		upgrade(d)
 		if d.stage == "done" or d.stage == "dead":
 			if d.stage == "done" and s.day - d.started > 30 or d.stage == "dead" and d.block < s.day - 20:
 				all().erase(pid)
@@ -417,15 +619,17 @@ static func tick():
 		if d.mode != "buy":
 			if s.day - d.started > 21:
 				all().erase(pid)
+			elif d.mode == "pre" and p.club == s.user.club:
+				all().erase(pid)
 			continue
 		if p.club != d.club:
 			kill(d, 0)
 			G.msg("%s: deal off" % G.pname(p), "%s has left %s, so your talks have ended." % [G.pfull(p), s.clubs[d.club].name], "deal", pid, true)
 			continue
-		if d.stage == "enq_wait" and s.day >= d.wait:
-			_reply_enquiry(d)
-		elif d.stage == "bid_wait" and s.day >= d.wait:
-			_reply_bid(d)
+		if d.stage == "deleg" and s.day >= d.wait:
+			_delegate_result(d)
+		elif d.stage == "meet" and s.day >= d.meet:
+			_meeting(d)
 		elif d.stage == "talks" and s.day > d.exp:
 			kill(d, 7)
 			G.msg("%s: agreement lapsed" % G.pname(p), "Your agreed fee with %s for %s has lapsed because personal terms were not settled in time." % [s.clubs[d.club].name, G.pname(p)], "deal", pid, true)
@@ -450,7 +654,7 @@ static func _rival(d: Dictionary, p: Dictionary):
 				say(d, "news", "%s have joined the race." % c.name)
 				G.msg("%s: rival interest" % G.pname(p), "%s are reported to have made an approach for %s. %s now have two clubs at the table and will hold out for more — and the player may not wait for you." % [c.name, G.pfull(p), s.clubs[p.club].name], "deal", p.id, true)
 				return
-	elif d.stage == "talks" and s.clubs[d.rival].rep >= G.uc().rep - 3 and G.rng.randf() < 0.1:
+	elif d.stage in ["talks", "meet"] and s.clubs[d.rival].rep >= G.uc().rep - 3 and G.rng.randf() < 0.1:
 		var rc = s.clubs[d.rival]
 		var fee = min(rc.budget, max(d.fee, ask(p, d)))
 		kill(d, 30)

@@ -1,6 +1,6 @@
 extends "res://scripts/screens/screen.gd"
 # Transfer and contract talks. One screen, three panes: the player, the current stage, the record of talks.
-# Modes: buy (enquiry > club fee > personal terms), free and renew (personal terms only), sell (answer a bid).
+# Modes: buy (day 1: fee talks with the club; day 2: terms with the player), free, renew and pre (terms only), sell (answer a bid).
 
 const SHORT_ROLE = ["Star", "First team", "Rotation", "Backup", "Prospect"]
 const SELLON = [0, 10, 15, 20, 25]
@@ -23,6 +23,7 @@ var bidding := false
 var foot: Control
 var cfee := 0
 var csell := 0
+var swap := -1
 
 
 func _init_state(p: Dictionary):
@@ -34,6 +35,8 @@ func _init_state(p: Dictionary):
 			csell = int(o.get("csell", 0))
 		return
 	d = G.DL.start(p, args.mode)
+	G.DL.upgrade(d)
+	swap = int(d.get("swap", -1))
 	if d.stage == "club" or d.stage == "new":
 		_seed_bid(p)
 	if d.stage == "talks" or d.stage == "new":
@@ -71,15 +74,15 @@ func build():
 		_seed_bid(p)
 	if args.mode != "sell" and d.stage == "talks" and t.is_empty():
 		t = G.DL.default_terms(d)
-	body.add_child(UI.topbar({"buy": "Transfer talks", "free": "Contract talks", "renew": "New contract", "sell": "Offer received"}[args.mode]))
+	body.add_child(UI.topbar({"buy": "Transfer talks", "free": "Contract talks", "renew": "New contract", "sell": "Offer received", "pre": "Pre-contract talks"}[args.mode]))
 	UI.main.t_sub = "%s · %s · %d · %s" % [G.pfull(p), p.pos, G.age(p), "Free agent" if p.club < 0 else G.s.clubs[p.club].name]
 	var h = panes(12, 20)
 	_left(h, p)
 	var midp = UI.panel(UI.CARD, 18, 16, 12, UI.LINE)
 	midp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	midp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var mv = UI.vb(8)
-	var v = UI.vb(7)
+	var mv = UI.vb(6)
+	var v = UI.vb(4)
 	var scr = UI.scroll(v)
 	scr.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	mv.add_child(scr)
@@ -92,12 +95,12 @@ func build():
 	else:
 		_steps(v)
 		if reply != "":
-			var rp = UI.panel(Color(reply_col, 0.12), 12, 14, 9, Color(reply_col, 0.4))
-			rp.add_child(UI.wrap(reply, 20, UI.TEXT))
+			var rp = UI.panel(Color(reply_col, 0.12), 10, 12, 5, Color(reply_col, 0.4))
+			rp.add_child(UI.wrap(reply, 17, UI.TEXT))
 			v.add_child(rp)
 		match d.stage:
 			"new": _new(v, p)
-			"enq_wait", "bid_wait": _waiting(v, p)
+			"deleg", "meet": _waiting(v, p)
 			"club": _club(v, p)
 			"talks": _talks(v, p)
 			"done": _done(v, p)
@@ -108,7 +111,7 @@ func build():
 # ---------------------------------------------------------------- panes
 
 func _left(h: Control, p: Dictionary):
-	var a = pane(250, 6)
+	var a = pane(264, 4)
 	h.add_child(a[0])
 	var v = a[1]
 	var top = UI.hb(10)
@@ -116,40 +119,87 @@ func _left(h: Control, p: Dictionary):
 	top.add_child(UI.pos(p.pos, 20))
 	top.add_child(UI.flag(p.nat, 36))
 	v.add_child(top)
-	v.add_child(UI.lbl_fill(G.pname(p).to_upper(), 24, UI.TEXT, "xbold"))
-	v.add_child(UI.kv("Age", str(G.age(p))))
-	v.add_child(UI.kv("Value", G.money(G.value(p))))
-	v.add_child(UI.kv("Wage now", "%s/wk" % G.money(p.wage)))
-	v.add_child(UI.kv("Contract", "—" if p.club < 0 else "June %d" % p.cend))
+	v.add_child(UI.lbl_fill(G.pname(p).to_upper(), 22, UI.TEXT, "xbold"))
+	v.add_child(UI.kv("Age", str(G.age(p)), UI.TEXT, 17))
+	v.add_child(UI.kv("Value", G.money(G.value(p)), UI.TEXT, 17))
+	v.add_child(UI.kv("Wage now", "%s/wk" % G.money(p.wage), UI.TEXT, 17))
+	v.add_child(UI.kv("Contract", "—" if p.club < 0 else "June %d" % p.cend, UI.TEXT, 17))
 	if p.get("rc", 0) > 0:
-		v.add_child(UI.kv("Release clause", G.money(p.rc), UI.AMBER))
-	v.add_child(UI.kv("Personality", G.PS.personality(p)))
-	v.add_child(UI.kv("Favoured club", G.PS.favoured_name(p)))
-	if args.mode != "sell":
-		v.add_child(UI.kv("Sees himself as", SHORT_ROLE[G.DL.expected_role(p)], UI.accent))
-		v.add_child(UI.kv("Speaks the language", "Yes" if G.PS.speaks_local(p, G.uc().id) else "No", UI.GREEN if G.PS.speaks_local(p, G.uc().id) else UI.AMBER))
-	var b = UI.btn("Full profile", func(): UI.main.open("player", {"pid": p.id}), "secondary", "user", 50)
+		v.add_child(UI.kv("Release clause", G.money(p.rc), UI.AMBER, 17))
+	v.add_child(UI.kv("Personality", G.PS.personality(p), UI.TEXT, 17))
+	v.add_child(UI.kv("Favoured club", G.PS.favoured_name(p), UI.TEXT, 17))
+	if args.mode != "sell" and d != null and d.stage in ["talks", "meet"]:
+		_wants(v, p)
+	elif args.mode != "sell":
+		v.add_child(UI.kv("Sees himself as", SHORT_ROLE[G.DL.expected_role(p)], UI.accent, 17))
+		v.add_child(UI.kv("Speaks the language", "Yes" if G.PS.speaks_local(p, G.uc().id) else "No", UI.GREEN if G.PS.speaks_local(p, G.uc().id) else UI.AMBER, 17))
+		if p.club != G.uc().id:
+			v.add_child(UI.wrap(G.TC.fit_text(p), 14, UI.DIM))
+	var b = UI.btn("Full profile", func(): UI.main.open("player", {"pid": p.id}), "secondary", "", 40)
 	v.add_child(UI.sp(0, 2))
 	v.add_child(b)
 
 
+func _want_line(v: Control, text: String, ess: bool, col = null):
+	var r = UI.hb(6)
+	var dot = UI.panel(UI.RED if ess else UI.AMBER, 5, 0, 0)
+	dot.custom_minimum_size = Vector2(9, 9)
+	dot.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var dm = UI.margin(dot, 0, 6, 0, 0)
+	r.add_child(dm)
+	r.add_child(UI.wrap(text, 15, UI.TEXT if col == null else col))
+	v.add_child(r)
+
+
+func _wants(v: Control, p: Dictionary):
+	# what he wants, before you offer anything; red is essential, amber can be traded
+	var tt = t if not t.is_empty() else G.DL.default_terms(d)
+	var dm = G.DL.demand(d, tt)
+	var er = G.DL.expected_role(p)
+	v.add_child(UI.divider())
+	v.add_child(UI.caps("What he wants", 15, UI.accent))
+	_want_line(v, "About %s a week" % G.money(G.TR.wage_demand(p)), false)
+	_want_line(v, "To be a %s player" % G.DL.ROLES[er].to_lower(), er <= 1)
+	_want_line(v, "Agent: around %s for himself" % G.money(dm.agent), true)
+	if G.DL.knows_wants(d):
+		for w in dm.want:
+			_want_line(v, w.text, w.ess)
+		for n in dm.notes:
+			_want_line(v, n, false, UI.MUTED)
+	else:
+		v.add_child(UI.wrap("You have not scouted him, so the rest of what he wants is a guess. Offer and see.", 14, UI.DIM))
+	var lg = UI.hb(8)
+	lg.add_child(UI.caps("Red: essential", 12, UI.RED))
+	lg.add_child(UI.caps("Amber: can be traded", 12, UI.AMBER))
+	v.add_child(lg)
+
+
+func _pat_bar(top: Control, label: String, val: float):
+	top.add_child(UI.caps(label, 14, UI.DIM))
+	var b = UI.bar(clamp(val / 100.0, 0.0, 1.0), UI.GREEN if val > 60 else (UI.AMBER if val > 30 else UI.RED), 8)
+	b.custom_minimum_size = Vector2(110, 8)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_END
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(b)
+
+
 func _right(h: Control, p: Dictionary):
-	var a = pane(270, 6)
+	var a = pane(250, 4)
 	h.add_child(a[0])
 	var v = a[1]
 	var c = G.uc()
 	v.add_child(UI.caps("Your money", 16, UI.accent))
-	v.add_child(UI.kv("Transfer budget", G.money(c.budget), UI.GREEN))
-	v.add_child(UI.kv("Wage room", "%s/wk" % G.money(c.wage_budget - G.squad_wages(c) + (p.wage if p.club == c.id else 0))))
+	v.add_child(UI.kv("Transfer budget", G.money(c.budget), UI.GREEN, 17))
+	v.add_child(UI.kv("Wage room", "%s/wk" % G.money(c.wage_budget - G.squad_wages(c) + (p.wage if p.club == c.id else 0)), UI.TEXT, 17))
 	var ow = G.DL.owed_total(c.id)
 	if ow > 0:
-		v.add_child(UI.kv("Instalments owed", G.money(ow), UI.AMBER))
-	v.add_child(UI.kv("Squad size", "%d / %d" % [c.players.size(), G.TR.MAX_SQUAD]))
-	v.add_child(UI.kv("Window", "Open" if G.window_open() else "Closed", UI.GREEN if G.window_open() else UI.RED))
+		v.add_child(UI.kv("Instalments owed", G.money(ow), UI.AMBER, 17))
+	v.add_child(UI.kv("Squad size", "%d / %d" % [c.players.size(), G.TR.MAX_SQUAD], UI.TEXT, 17))
+	v.add_child(UI.kv("Window", "Open" if G.window_open() else "Closed", UI.GREEN if G.window_open() else UI.RED, 17))
 	if d == null:
 		return
 	if d.rival >= 0:
-		v.add_child(UI.kv("Rival bidder", G.s.clubs[d.rival].short, UI.RED))
+		v.add_child(UI.kv("Rival bidder", G.s.clubs[d.rival].short, UI.RED, 17))
 	v.add_child(UI.divider())
 	v.add_child(UI.caps("Record of talks", 16, UI.accent))
 	if d.log.size() == 0:
@@ -159,21 +209,21 @@ func _right(h: Control, p: Dictionary):
 		var col = {"you": UI.accent, "club": UI.AMBER, "agent": UI.GREEN, "news": UI.RED}.get(e[1], UI.MUTED)
 		var who = {"you": "You", "club": "Club", "agent": "Agent", "news": "News"}.get(e[1], "")
 		v.add_child(UI.caps("%s · %s" % [who, G.fmt_date(e[0])], 14, col))
-		v.add_child(UI.wrap(e[2], 17, UI.TEXT))
+		v.add_child(UI.wrap(e[2], 15, UI.TEXT))
 
 
 func _steps(v: Control):
-	var names = ["Enquiry", "Club fee", "Personal terms", "Signed"] if d.mode == "buy" else ["Personal terms", "Signed"]
-	var at = {"new": 0, "enq_wait": 0, "club": 1, "bid_wait": 1, "talks": 2, "done": 3, "dead": -1}[d.stage]
+	var names = ["Day 1 · Club fee", "Day 2 · Player terms", "Signed"] if d.mode == "buy" else ["Player terms", "Signed"]
+	var at = {"new": 0, "club": 0, "deleg": 0, "meet": 1, "talks": 1, "done": 2, "dead": -1}.get(d.stage, 0)
 	if d.mode != "buy":
-		at = max(-1, at - 2)
+		at = max(-1, at - 1)
 	var sh = UI.hb(6)
 	for i in names.size():
 		var done = at > i or d.stage == "done"
 		var col = UI.GREEN if done else (UI.accent if i == at else UI.DIM)
-		var pn = UI.panel(Color(col, 0.13), 10, 8, 6, Color(col, 0.45))
+		var pn = UI.panel(Color(col, 0.13), 10, 8, 4, Color(col, 0.45))
 		pn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var l = UI.caps("%d  %s" % [i + 1, names[i]], 15, col)
+		var l = UI.caps(names[i], 14, col)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		pn.add_child(l)
 		sh.add_child(pn)
@@ -191,8 +241,8 @@ func _srow(label: String, minv: float, maxv: float, val: float, step: float, fmt
 	var sl = UI.slider(minv, max(maxv, minv + step), val, step, func(x):
 		cb.call(x)
 		vl.text = fmt.call(x)
-		_summary())
-	sl.custom_minimum_size = Vector2(0, 40)
+		_summary(), true)
+	sl.custom_minimum_size = Vector2(0, 30)
 	var minus = _nudge("minus", func(): sl.value -= step)
 	var plus = _nudge("plus", func(): sl.value += step)
 	h.add_child(minus)
@@ -203,8 +253,8 @@ func _srow(label: String, minv: float, maxv: float, val: float, step: float, fmt
 
 
 func _nudge(ic: String, cb: Callable) -> Control:
-	var b = UI.panel(Color(1, 1, 1, 0.08), 10, 9, 9)
-	b.add_child(UI.icon(ic, 20, UI.TEXT))
+	var b = UI.panel(Color(1, 1, 1, 0.08), 8, 8, 5)
+	b.add_child(UI.icon(ic, 18, UI.TEXT))
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	UI.tap(b, cb, true)
 	return b
@@ -215,7 +265,7 @@ func _opt(label: String, options: Array, sel: int, cb: Callable) -> Control:
 	var l = UI.lbl(label, 18, UI.MUTED)
 	l.custom_minimum_size = Vector2(118, 0)
 	h.add_child(l)
-	var sg = UI.seg(options, sel, cb, 17)
+	var sg = UI.seg(options, sel, cb, 15, 5)
 	sg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(sg)
 	return h
@@ -230,49 +280,131 @@ func _m(x) -> String:
 func _new(v: Control, p: Dictionary):
 	var c = G.s.clubs[p.club]
 	var w = G.TR.willing(p)
-	v.add_child(UI.wrap("%s is under contract at %s until June %d. Nothing can happen until %s agree a fee — then you may talk to the player and his agent." % [G.pname(p), c.name, p.cend, c.short], 20, UI.TEXT))
+	v.add_child(UI.wrap("%s is under contract at %s until June %d. Today you sit down with %s and agree a fee. If you do, the player and his agent come in tomorrow to talk terms." % [G.pname(p), c.name, p.cend, c.short], 19, UI.TEXT))
 	var g = UI.hb(8)
 	g.add_child(UI.stat_tile("Market value", G.money(G.value(p))))
 	g.add_child(UI.stat_tile("Club stance", "Listed" if p.listed else ("Not for sale" if G.DL.untouchable(p) else "Has a price"), UI.GREEN if p.listed else (UI.RED if G.DL.untouchable(p) else UI.AMBER)))
 	g.add_child(UI.stat_tile("Player interest", "Open" if w.ok else "Doubtful", UI.GREEN if w.ok else UI.RED))
 	v.add_child(g)
 	if not w.ok:
-		v.add_child(UI.wrap(w.why, 18, UI.AMBER))
+		v.add_child(UI.wrap(w.why, 17, UI.AMBER))
 	if not G.window_open():
-		v.add_child(UI.wrap("The transfer window is closed. You can enquire now, but bids must wait until it opens.", 18, UI.AMBER))
+		v.add_child(UI.wrap("The transfer window is closed. You can ask their price now, but offers must wait until it opens.", 17, UI.AMBER))
 	var bh = UI.hb(10)
-	var b1 = UI.btn("Ask the price", func():
-		G.DL.enquire(d)
-		reply = "Enquiry sent. %s will answer by message — press Continue." % c.name
-		reply_col = UI.accent
+	var b1 = UI.btn("Ask their price", func():
+		reply = "“%s”" % G.DL.enquire(d)
+		reply_col = UI.AMBER
 		UI.sfx("message")
-		refresh(), "primary", "mail", 60)
-	var b2 = UI.btn("Bid now", func():
+		fee = 0
+		refresh(), "primary", "handshake", 58)
+	var b2 = UI.btn("Make an offer blind", func():
 		d.stage = "club"
 		reply = ""
-		refresh(), "secondary", "handshake", 60)
+		refresh(), "secondary", "", 58)
 	for b in [b1, b2]:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bh.add_child(b)
 	foot.add_child(bh)
-	v.add_child(UI.wrap("Asking first costs a day but tells you their price. Bidding blind is quicker, and each rejected offer uses up their patience.", 17, UI.DIM))
+	v.add_child(UI.wrap("Asking costs nothing and tells you where they stand. Every offer they turn down wears their manager's patience; when it runs out he walks, and they will not talk about this player for three weeks.", 16, UI.DIM))
 
 
 func _waiting(v: Control, p: Dictionary):
-	var c = G.s.clubs[p.club]
+	var c = G.s.clubs[d.club]
 	var card = UI.panel(Color(UI.accent, 0.1), 14, 18, 16, Color(UI.accent, 0.4))
 	var cv = UI.vb(6)
-	cv.add_child(UI.lbl("WAITING FOR %s" % c.short.to_upper(), 26, UI.TEXT, "xbold"))
-	if d.stage == "bid_wait":
-		cv.add_child(UI.wrap("Your bid of %s%s is with their board." % [G.money(d.fee), G.DL.extras(d)], 20, UI.TEXT))
+	if d.stage == "deleg":
+		cv.add_child(UI.lbl("YOUR ASSISTANT IS HANDLING IT", 26, UI.TEXT, "xbold"))
+		cv.add_child(UI.wrap("He is meeting %s today with a limit of %s." % [c.name, G.money(int(d.dmax))], 20, UI.TEXT))
+		cv.add_child(UI.wrap("His report arrives in your inbox on %s. Press Continue to move on a day." % G.fmt_date(d.wait), 19, UI.MUTED))
 	else:
-		cv.add_child(UI.wrap("You have asked whether %s is available." % G.pname(p), 20, UI.TEXT))
-	cv.add_child(UI.wrap("Their answer will arrive in your inbox on %s. Press Continue to move on a day." % G.fmt_date(d.wait), 19, UI.MUTED))
+		cv.add_child(UI.lbl("FEE AGREED: %s" % G.money(d.fee), 26, UI.GREEN, "xbold"))
+		var sw = (" plus %s" % G.pname(G.s.players[d.swap])) if d.swap >= 0 and G.s.players.has(d.swap) else ""
+		cv.add_child(UI.wrap("%s have accepted %s%s%s." % [c.name, G.money(d.fee), sw, G.DL.extras(d)], 20, UI.TEXT))
+		cv.add_child(UI.wrap("%s and his agent come in on %s to discuss his contract. Press Continue to move on a day; what he wants is already on the left." % [G.pname(p), G.fmt_date(d.meet)], 19, UI.MUTED))
+		if d.rival >= 0:
+			cv.add_child(UI.wrap("%s are still in the race and could move while you wait." % G.s.clubs[d.rival].name, 18, UI.RED))
 	card.add_child(cv)
 	v.add_child(card)
-	v.add_child(UI.btn("Withdraw", func():
+	foot.add_child(UI.btn("Withdraw from the deal", func():
 		G.DL.all().erase(p.id)
-		UI.main.back(), "danger", "x", 54))
+		UI.main.back(), "danger", "x", 50))
+
+
+func _pick_swap(p: Dictionary):
+	var uc = G.uc()
+	var build_sheet = func(v):
+		v.add_child(UI.wrap("Offer one of your players as part of the deal. %s value him by what they need, not by his price tag." % G.s.clubs[d.club].name, 19, UI.MUTED))
+		var none = UI.panel(UI.CARD, 12, 16, 8, UI.accent if swap < 0 else UI.LINE)
+		none.add_child(UI.lbl("No player in the deal", 22, UI.TEXT, "semi"))
+		UI.tap(none, func():
+			swap = -1
+			UI.close_sheet()
+			refresh())
+		v.add_child(none)
+		var list = []
+		for pid in uc.players:
+			var q = G.s.players[pid]
+			if G.DL.swap_ok(d, q) == "":
+				list.append(q)
+		list.sort_custom(func(x, y): return G.DL.swap_value(d, x) > G.DL.swap_value(d, y))
+		for q in list.slice(0, 14):
+			var r = UI.panel(UI.CARD, 12, 16, 6, UI.accent if swap == q.id else UI.LINE)
+			var hh = UI.hb(10)
+			hh.add_child(UI.pos(q.pos, 16))
+			hh.add_child(UI.lbl_fill(G.pname(q), 21, UI.TEXT, "semi"))
+			hh.add_child(UI.lbl("value %s" % G.money(G.value(q)), 15, UI.DIM))
+			hh.add_child(UI.lbl("worth %s to them" % G.money(int(G.DL.swap_value(d, q))), 17, UI.GREEN, "semi"))
+			hh.add_child(UI.ovr(q.ovr, 18))
+			r.add_child(hh)
+			var qid = q.id
+			UI.tap(r, func():
+				swap = qid
+				UI.close_sheet()
+				refresh())
+			v.add_child(r)
+	UI.sheet("Player in exchange", build_sheet)
+
+
+func _delegate(p: Dictionary):
+	var val = float(G.value(p))
+	var st = {"max": float(max(fee, d.ask if d.ask > 0 else int(val * 1.2)))}
+	var build_sheet = func(v):
+		v.add_child(UI.wrap("Your assistant goes in your place and reports back tomorrow. He is steady rather than sharp: he will agree close to their price if it is inside your limit, and will never get you a bargain.", 19, UI.MUTED))
+		var vl = UI.lbl(G.money(int(st.max)), 34, UI.TEXT, "xbold")
+		vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(UI.caps("Do not pay more than", 16, UI.accent))
+		v.add_child(vl)
+		var sl = UI.slider(val * 0.5, max(val * 2.8, float(d.ask) * 1.3), st.max, max(1000.0, float(G.nice(val / 50.0))), func(x):
+			st.max = x
+			vl.text = G.money(int(x)))
+		sl.custom_minimum_size = Vector2(0, 44)
+		v.add_child(sl)
+		v.add_child(UI.btn("Send him in", func():
+			var r = G.DL.delegate(d, int(st.max))
+			reply = r.text
+			reply_col = UI.accent if r.ok else UI.RED
+			UI.close_sheet()
+			refresh(), "primary", "user", 56))
+	UI.sheet("Delegate the fee talks", build_sheet)
+
+
+func _bid(p: Dictionary, final: bool):
+	var r = G.DL.submit_bid(d, fee, inst, addon, sellon, swap, final)
+	reply = r.text
+	match r.res:
+		"accept":
+			reply_col = UI.GREEN
+			UI.sfx("cash")
+		"counter":
+			reply_col = UI.AMBER
+			UI.sfx("message")
+		"error":
+			reply_col = UI.RED
+			UI.sfx("error")
+		_:
+			reply_col = UI.RED
+			UI.sfx("error")
+	refresh()
 
 
 func _club(v: Control, p: Dictionary):
@@ -283,14 +415,12 @@ func _club(v: Control, p: Dictionary):
 		maxv = max(maxv, p.rc * 1.05)
 	var step = max(1000.0, float(G.nice(val / 50.0)))
 	var top = UI.hb(8)
-	top.add_child(UI.caps("Offer to %s" % c.name, 16, UI.accent))
+	top.add_child(UI.caps("Across the table from %s" % c.short, 15, UI.accent))
+	var dg = UI.chip("DELEGATE TO ASSISTANT", Color(1, 1, 1, 0.07), UI.MUTED, 13)
+	UI.tap(dg, func(): _delegate(p), true)
+	top.add_child(dg)
 	top.add_child(UI.sp())
-	top.add_child(UI.caps("Patience", 14, UI.DIM))
-	for i in 3:
-		var dot = UI.panel(UI.GREEN if i < d.pat else Color(1, 1, 1, 0.12), 6, 0, 0)
-		dot.custom_minimum_size = Vector2(12, 12)
-		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		top.add_child(dot)
+	_pat_bar(top, "Their patience", float(d.pat))
 	v.add_child(top)
 	v.add_child(_srow("Transfer fee", 0.0, maxv, fee, step, _m, func(x): fee = int(x)))
 	v.add_child(_opt("Payment", ["Up front", "2 payments", "3 payments"], inst, func(i):
@@ -300,33 +430,45 @@ func _club(v: Control, p: Dictionary):
 	v.add_child(_opt("Sell-on clause", ["None", "10%", "15%", "20%", "25%"], SELLON.find(sellon), func(i):
 		sellon = SELLON[i]
 		refresh()))
-	sum_lbl = UI.wrap("", 18, UI.TEXT)
-	view_lbl = UI.lbl("", 18, UI.MUTED, "bold")
+	var sh = UI.hb(8)
+	var sl = UI.lbl("Player swap", 18, UI.MUTED)
+	sl.custom_minimum_size = Vector2(118, 0)
+	sh.add_child(sl)
+	var has_swap = swap >= 0 and G.s.players.has(swap) and G.s.players[swap].club == G.uc().id
+	if not has_swap:
+		swap = -1
+	var sc2 = UI.panel(Color(UI.accent, 0.14) if has_swap else Color(1, 1, 1, 0.05), 10, 12, 6)
+	sc2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var sch = UI.hb(8)
+	sch.add_child(UI.lbl_fill(("%s · worth %s to them" % [G.pname(G.s.players[swap]), G.money(int(G.DL.swap_value(d, G.s.players[swap])))]) if has_swap else "None · tap to offer one of your players", 17, UI.TEXT if has_swap else UI.MUTED))
+	sch.add_child(UI.icon("chevron-right", 18, UI.MUTED))
+	sc2.add_child(sch)
+	UI.tap(sc2, func(): _pick_swap(p), true)
+	sh.add_child(sc2)
+	v.add_child(sh)
+	sum_lbl = UI.wrap("", 17, UI.TEXT)
+	view_lbl = UI.lbl("", 17, UI.MUTED, "bold")
 	v.add_child(sum_lbl)
 	v.add_child(view_lbl)
 	_summary()
-	var bh = UI.hb(8)
-	var sb = UI.btn("Submit bid", func():
-		var r = G.DL.submit_bid(d, fee, inst, addon, sellon)
-		reply = r.text
-		reply_col = UI.accent if r.ok else UI.RED
-		UI.sfx("message" if r.ok else "error")
-		refresh(), "primary", "handshake", 58)
+	var bh = UI.hb(6)
+	var sb = UI.btn("Make offer", func(): _bid(p, false), "primary", "", 54)
 	sb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bh.add_child(sb)
+	bh.add_child(UI.btn("Final offer", func():
+		UI.confirm("Make this your final offer?", "Take it or leave it. They will accept a little less than usual to get it done, but if they refuse the talks are over for three weeks.", "Final offer", func(): _bid(p, true)), "danger", "", 54))
 	if d.counter.has("fee"):
-		var mb = UI.btn("Meet %s" % G.money(d.counter.fee), func():
+		bh.add_child(UI.btn("Meet %s" % G.money(d.counter.fee), func():
 			fee = int(d.counter.fee)
 			inst = 0
 			addon = 0
 			sellon = 0
-			refresh(), "secondary", "", 58)
-		bh.add_child(mb)
-	if p.get("rc", 0) > 0:
+			refresh(), "secondary", "", 54))
+	elif p.get("rc", 0) > 0:
 		bh.add_child(UI.btn("Pay clause", func():
 			fee = int(p.rc)
 			inst = 0
-			refresh(), "secondary", "", 58))
+			refresh(), "secondary", "", 54))
 	foot.add_child(bh)
 
 
@@ -338,16 +480,17 @@ func _summary():
 		var now = G.DL.pay_now(fee, inst)
 		sum_lbl.text = "Due on signing %s · later %s%s" % [G.money(now), G.money(fee - now), (" · bonus %s" % G.money(addon)) if addon > 0 else ""]
 		if d.ask > 0:
-			var r = G.DL.package(p, fee, inst, addon, sellon) / float(d.ask)
-			var words = "Acceptable" if r >= 0.95 else ("Close — expect a counter" if r >= 0.82 else ("Low" if r >= 0.72 else "Insulting"))
+			var r = G.DL.total_value(d, fee, inst, addon, sellon, swap) / float(d.ask)
+			var words = "Acceptable" if r >= 0.95 else ("Close, expect a counter" if r >= 0.82 else ("Low" if r >= 0.72 else "Insulting"))
 			view_lbl.text = "Their price %s · this offer looks: %s" % [G.money(d.ask), words]
 			view_lbl.add_theme_color_override("font_color", UI.GREEN if r >= 0.95 else (UI.AMBER if r >= 0.72 else UI.RED))
 		else:
-			view_lbl.text = "Their price is unknown — you have not asked."
+			view_lbl.text = "Their price is unknown: you have not asked."
 	elif d.stage == "talks":
 		var dm = G.DL.demand(d, t)
 		var span = 52.0 * t.years
-		var r2 = (t.wage + t.sign / span) / (dm.wage + dm.sign / span)
+		var bw = G.DL.bonus_week(p, G.DL.bonus_amounts(p, t.wage, int(t.get("bon", 0)))) * (0.5 if G.PS.personality(p) == "Mercenary" else 0.75)
+		var r2 = (t.wage + t.sign / span + bw) / (dm.wage + dm.sign / span)
 		sum_lbl.text = "Due today %s · total cost of the contract %s" % [G.money(G.DL.upfront(d, t)), G.money(int(t.wage * span) + int(t.sign) + int(t.agent) + (d.fee if d.mode == "buy" else 0))]
 		var words2 = "Should be accepted" if r2 >= 0.97 else ("Close" if r2 >= 0.88 else ("Some way off" if r2 >= 0.8 else "Far apart"))
 		if dm.blocked != "":
@@ -365,14 +508,9 @@ func _talks(v: Control, p: Dictionary):
 	var head = "Terms for %s" % G.pname(p)
 	if d.mode == "buy":
 		head += " · fee %s agreed · %d days left" % [G.money(d.fee), max(0, d.exp - G.s.day)]
-	top.add_child(UI.caps(head, 16, UI.accent))
+	top.add_child(UI.caps(head, 15, UI.accent))
 	top.add_child(UI.sp())
-	top.add_child(UI.caps("Agent", 14, UI.DIM))
-	for i in 4:
-		var dot = UI.panel(UI.GREEN if i < d.ppat else Color(1, 1, 1, 0.12), 6, 0, 0)
-		dot.custom_minimum_size = Vector2(12, 12)
-		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		top.add_child(dot)
+	_pat_bar(top, "Agent's patience", float(d.ppat))
 	v.add_child(top)
 	var wstep = max(50.0, float(G.nice(base / 60.0)))
 	v.add_child(_srow("Weekly wage", G.nice(base * 0.5), base * 2.0, t.wage, wstep, func(x): return _m(x) + "/wk", func(x): t.wage = int(x)))
@@ -388,15 +526,25 @@ func _talks(v: Control, p: Dictionary):
 		rc_i = i
 		t.rc = G.nice(G.value(p) * RC_MULT[i]) if i > 0 else 0
 		refresh()))
-	sum_lbl = UI.wrap("", 18, UI.TEXT)
-	view_lbl = UI.lbl("", 18, UI.MUTED, "bold")
-	v.add_child(sum_lbl)
+	if not t.has("bon"):
+		t["bon"] = 0
+	var bn = G.DL.bonus_amounts(p, t.wage, int(t.bon))
+	var parts = []
+	if bn.ab > 0: parts.append("%s an appearance" % G.money(bn.ab))
+	if bn.gb > 0: parts.append("%s a goal" % G.money(bn.gb))
+	if bn.cs > 0: parts.append("%s a clean sheet" % G.money(bn.cs))
+	v.add_child(_opt("Bonuses", G.DL.BONUS_DEF if G.LINE[p.pos] <= 1 else G.DL.BONUS, int(t.bon), func(i):
+		t.bon = i
+		refresh()))
+	sum_lbl = UI.wrap("", 14, UI.MUTED)
+	view_lbl = UI.lbl("", 16, UI.MUTED, "bold")
 	v.add_child(view_lbl)
+	v.add_child(sum_lbl)
 	_summary()
-	if dm.notes.size() > 0:
-		v.add_child(UI.wrap("Scout's note: " + " · ".join(dm.notes), 16, UI.DIM))
+	if parts.size() > 0:
+		sum_lbl.text += " · bonuses " + ", ".join(parts)
 	var bh = UI.hb(8)
-	var ob = UI.btn("Offer contract", func(): _offer_terms(p), "primary", "handshake", 58)
+	var ob = UI.btn("Offer contract", func(): _offer_terms(p), "primary", "handshake", 54)
 	ob.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bh.add_child(ob)
 	if hint.has("wage"):
@@ -405,7 +553,7 @@ func _talks(v: Control, p: Dictionary):
 			t.sign = int(hint.sign)
 			t.agent = int(hint.agent)
 			hint = {}
-			refresh(), "secondary", "", 58))
+			refresh(), "secondary", "", 54))
 	foot.add_child(bh)
 
 
@@ -456,7 +604,10 @@ func _done(v: Control, p: Dictionary):
 	rule.custom_minimum_size = Vector2(0, 3)
 	pv.add_child(rule)
 	var surname = G.pname(p).to_upper()
-	if d.mode == "renew":
+	if d.mode == "pre":
+		pv.add_child(_ink("%s TO JOIN %s IN THE SUMMER" % [surname, c.short.to_upper()], 34, "xbold"))
+		pv.add_child(_ink("The %d-year-old has signed a pre-contract and will move on a free transfer when his current deal runs out in June." % G.age(p), 18, "body", Color("3a372f")))
+	elif d.mode == "renew":
 		pv.add_child(_ink("%s COMMITS FUTURE TO %s" % [surname, c.short.to_upper()], 34, "xbold"))
 		pv.add_child(_ink("The %d-year-old has signed a new contract that runs until June %d, ending talk of a move away." % [G.age(p), p.cend], 18, "body", Color("3a372f")))
 	else:

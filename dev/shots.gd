@@ -137,22 +137,26 @@ func run(m):
 		main.root("nego", {"pid": tp.id, "mode": "buy"})
 		await snap("deal_new")
 		var dd = G.DL.find(tp.id)
-		G.DL.enquire(dd)
-		G.s.day += 1
-		G.DL.tick()
-		main.stack[-1].refresh()
+		var scd = main.stack[-1]
+		scd.reply = "\u201c%s\u201d" % G.DL.enquire(dd)
+		scd.reply_col = UI.AMBER
+		scd.refresh()
 		await snap("deal_club")
-		G.DL.submit_bid(dd, int(dd.ask * 0.85), 1, 0, 10)
-		main.stack[-1].refresh()
-		await snap("deal_wait")
+		scd.fee = int(dd.ask * 0.85)
+		scd.swap = c.players[20]
+		scd._bid(tp, false)
+		await snap("deal_counter1")
+		scd.fee = int(dd.ask)
+		scd.swap = -1
+		scd._bid(tp, false)
+		await snap("deal_meet")
 		G.s.day += 1
 		G.DL.tick()
-		dd.fee = dd.ask
-		G.DL._agree(dd, "ok")
 		main.root("nego", {"pid": tp.id, "mode": "buy"})
 		await snap("deal_talks")
 		var sc = main.stack[-1]
 		sc.t.wage = int(sc.t.wage * 0.95)
+		sc.t.bon = 3
 		sc._offer_terms(tp)
 		await snap("deal_counter")
 		var dm = G.DL.demand(dd, sc.t)
