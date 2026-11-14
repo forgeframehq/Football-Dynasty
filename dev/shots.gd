@@ -93,6 +93,12 @@ func run(m):
 		await snap("fixtures_round")
 		main.root("clubview", {"cid": 2})
 		await snap("clubview")
+	if want.call("cal"):
+		main.root("calendar")
+		await snap("calendar")
+		main.travel_menu()
+		await snap("travel", 0.6)
+		main.close_sheet()
 	if want.call("kit"):
 		main.root("kit")
 		await snap("kit")

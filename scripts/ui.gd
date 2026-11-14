@@ -171,8 +171,48 @@ func _music_pl() -> AudioStreamPlayer:
 		music_pl = AudioStreamPlayer.new()
 		add_child(music_pl)
 		music_pl.finished.connect(func(): music_step(1))
-	music_pl.volume_db = vol_db("vol_music", -17.0)
 	return music_pl
+
+
+var music_tw: Tween = null
+var ducked := false
+
+
+func _fade_to(db: float, t: float, then := Callable()):
+	# glide the music volume; used for every start, stop and the match duck
+	if music_pl == null:
+		return
+	if music_tw != null and music_tw.is_valid():
+		music_tw.kill()
+	music_tw = create_tween()
+	music_tw.tween_property(music_pl, "volume_db", db, t)
+	if then.is_valid():
+		music_tw.tween_callback(then)
+
+
+func _start_song(path: String):
+	var pl = _music_pl()
+	pl.stream = load(path)
+	pl.volume_db = -50.0
+	pl.stream_paused = false
+	pl.play()
+	if ducked:
+		pl.stream_paused = true
+	else:
+		_fade_to(vol_db("vol_music", -17.0), 1.6)
+	song_changed.emit()
+
+
+func music_duck(on: bool):
+	# matches: the soundtrack fades away at kick-off and returns afterwards
+	ducked = on
+	if music_pl == null or not music_pl.playing:
+		return
+	if on:
+		_fade_to(-50.0, 1.4, func(): music_pl.stream_paused = true)
+	else:
+		music_pl.stream_paused = false
+		_fade_to(vol_db("vol_music", -17.0), 2.2)
 
 
 func music(on: bool):
@@ -186,12 +226,11 @@ func music(on: bool):
 			if not song_on(tr[music_i].id):
 				music_step(1)
 				return
-			pl.stream = load(tr[music_i].path)
-			pl.play()
-			song_changed.emit()
+			_start_song(tr[music_i].path)
 	elif pl.playing:
-		pl.stop()
-		song_changed.emit()
+		_fade_to(-50.0, 0.8, func():
+			pl.stop()
+			song_changed.emit())
 
 
 func music_play(i: int):
@@ -203,11 +242,8 @@ func music_play(i: int):
 	if float(G.settings.get("vol_music", 70)) <= 0.0:
 		G.settings["vol_music"] = 70
 	G.save_settings()
-	var pl = _music_pl()
 	music_i = posmod(i, tr.size())
-	pl.stream = load(tr[music_i].path)
-	pl.play()
-	song_changed.emit()
+	_start_song(tr[music_i].path)
 
 
 func music_step(dir: int):
@@ -236,14 +272,16 @@ func music_step(dir: int):
 				break
 	music_i = nxt
 	var pl = _music_pl()
-	pl.stream = load(tr[nxt].path)
-	pl.play()
-	song_changed.emit()
+	if pl.playing and not ducked:
+		_fade_to(-50.0, 0.5, func(): _start_song(tr[nxt].path))
+	else:
+		_start_song(tr[nxt].path)
 
 
 func apply_volumes():
 	if music_pl != null:
-		music_pl.volume_db = vol_db("vol_music", -17.0)
+		if not ducked and (music_tw == null or not music_tw.is_running()):
+			music_pl.volume_db = vol_db("vol_music", -17.0)
 		if not music_on() and music_pl.playing:
 			music_pl.stop()
 			song_changed.emit()
@@ -262,7 +300,7 @@ func _stream(nm: String):
 
 
 func sfx(nm: String, db := -6.0):
-	if not G.settings.get("sound", true):
+	if not G.settings.get("sound", true) or nm == "sting_news":
 		return
 	if not players.has(nm):
 		var st = _stream(nm)

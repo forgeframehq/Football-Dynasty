@@ -73,6 +73,7 @@ const MENTALITY = ["Park the Bus", "Defensive", "Balanced", "Attacking", "All-Ou
 const PRESSING = ["Low Block", "Standard", "High Press"]
 const TEMPO = ["Patient", "Normal", "Fast"]
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 const WDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 const FORMATIONS = {
@@ -1051,6 +1052,48 @@ func inj_text(days: int) -> String:
 
 
 # ---------------------------------------------------------------- time
+
+func advance_day() -> void:
+	# exactly one day; the caller decides whether to keep going
+	play_day_fixtures()
+	s.day += 1
+	start_of_day()
+
+
+func travel_stop(before: Dictionary) -> String:
+	# why fast travel should stop today ("" = keep going); what stops it is chosen in the travel menu
+	var st = settings.get("stops", {})
+	var now = travel_mark()
+	if st.get("offer", true) and now.offers > before.offers:
+		return "A club has made an offer for one of your players"
+	if st.get("injury", true) and now.inj > before.inj:
+		return "A first-team player is injured"
+	if st.get("scout", true) and now.scout > before.scout:
+		return "A scouting report is in"
+	for m in s.inbox:
+		if int(m.id) <= int(before.msg):
+			break
+		if st.get("board", true) and str(m.kind) in ["board", "mycontract", "sponsor"]:
+			return str(m.title)
+		if st.get("contract", true) and str(m.kind) == "contract":
+			return str(m.title)
+		if st.get("any", false):
+			return str(m.title)
+	return ""
+
+
+func travel_mark() -> Dictionary:
+	var c = uc()
+	var off = 0
+	for o in s.offers:
+		if s.players.has(o.pid) and s.players[o.pid].club == c.id:
+			off += 1
+	var inj = 0
+	for pid in c.xi:
+		if s.players.has(pid) and s.players[pid].inj > 0:
+			inj += 1
+	return {"offers": off, "inj": inj, "scout": s.scout.get("reports", []).size() if s.scout.get("reports") is Array else 0, "msg": s.msg_id - 1}
+
 
 func advance() -> void:
 	# moves time forward until something needs the manager's attention

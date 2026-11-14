@@ -251,6 +251,7 @@ func _kickoff():
 	UI.sfx("whistle")
 	UI.sfx("vo_kickoff", -4.0)
 	UI.ambience(true)
+	UI.music_duck(true)
 	stage = "live"
 	refresh()
 
@@ -910,6 +911,7 @@ func _sub_row(p: Dictionary, role: String, cond: float, on: bool, cb: Callable) 
 
 func _exit_tree():
 	UI.ambience(false)
+	UI.music_duck(false)
 
 
 func _show_ft():

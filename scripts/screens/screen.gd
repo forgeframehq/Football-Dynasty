@@ -25,6 +25,14 @@ func _ready():
 	body.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(body)
 	build()
+	_push_title()
+
+
+func _push_title():
+	# screens that only set title/subtitle get them shown in the top bar
+	if title != "" and UI.main != null and UI.main.t_title == "":
+		UI.main.t_title = title
+		UI.main.t_sub = subtitle
 
 
 func build():
@@ -39,7 +47,11 @@ func refresh():
 	for c in body.get_children():
 		body.remove_child(c)
 		c.queue_free()
+	if UI.main != null and UI.main.stack.size() > 0 and UI.main.stack[-1] == self:
+		UI.main.t_title = ""
+		UI.main.t_sub = ""
 	build()
+	_push_title()
 	if UI.main != null:
 		UI.main.refresh_nav()
 	if y > 0:

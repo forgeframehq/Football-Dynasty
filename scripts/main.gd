@@ -4,6 +4,7 @@ extends Control
 
 const SCREENS = {
 	"menu": preload("res://scripts/screens/menu.gd"),
+	"calendar": preload("res://scripts/screens/calendar.gd"),
 	"new_career": preload("res://scripts/screens/new_career.gd"),
 	"intro": preload("res://scripts/screens/intro.gd"),
 	"home": preload("res://scripts/screens/home.gd"),
@@ -422,6 +423,8 @@ func root(sname: String, args := {}):
 		old.queue_free()
 	stack = []
 	t_right = null
+	t_title = ""
+	t_sub = ""
 	var scr = _mk(sname, args)
 	stack.append(scr)
 	holder.add_child(scr)
@@ -435,6 +438,8 @@ func open(sname: String, args := {}):
 	if stack.size() > 0:
 		stack[-1].visible = false
 	t_right = null
+	t_title = ""
+	t_sub = ""
 	var scr = _mk(sname, args)
 	stack.append(scr)
 	holder.add_child(scr)
@@ -523,7 +528,7 @@ func _rail_key() -> String:
 		return ""
 	var nm = stack[0].sname
 	var groups = {"inbox": ["inbox"], "home": ["home"],
-		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists", "kit", "city3d"],
+		"club": ["squad", "tactics", "training", "fixtures", "calendar", "finances", "campus", "lists", "kit", "city3d"],
 		"manager": ["board", "trophies", "jobs", "life"], "world": ["table", "comps", "stats", "clubview"],
 		"search": ["search", "transfers", "scouting", "player", "nego", "compare"]}
 	if nm == "lists" or nm == "hub" or nm == "settings":
@@ -539,7 +544,8 @@ const RAIL_GROUPS = [["inbox", "home"], ["club", "manager"], ["world", "search"]
 
 
 func _build_rail():
-	# laid out by hand so the icons can use the strip beside the camera and step over the hole itself
+	# the FM Mobile way: eight equal cells down the full height, full-width highlight on the open one.
+	# A small camera hole is ignored: a button may sit partly behind it but always stays visible and tappable.
 	_clear(rail)
 	var lay = Control.new()
 	lay.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -548,78 +554,70 @@ func _build_rail():
 	var w = rail_w()
 	var pad_l = notch_l if rail_wide() else 0
 	var H = size.y - safe.get_theme_constant("margin_top") - safe.get_theme_constant("margin_bottom")
-	var h0 = hole.x if not rail_wide() and hole.x >= 0 else -1.0
-	var h1 = hole.y if h0 >= 0 else -1.0
-	var back_h = 46.0
-	var div_h = 11.0
-	var cell = clamp(floor((H - back_h - div_h * RAIL_GROUPS.size() - (h1 - h0 if h0 >= 0 else 0.0)) / 7.0), 44.0, 64.0)
-	var labels = cell >= 56.0
-	var step = func(y: float, h: float) -> float:
-		# the first position at or below y where something h tall clears the camera
-		return h1 if h0 >= 0 and y < h1 and y + h > h0 else y
-	var y = step.call(0.0, back_h)
-	var bk = Control.new()
-	bk.position = Vector2(pad_l, y)
-	bk.size = Vector2(w - pad_l, back_h)
-	var can_back = stack.size() > 1 or (stack.size() == 1 and stack[0].sname != "home")
-	var bi = UI.center(UI.icon("chevron-left", 32, UI.TEXT if can_back else UI.DIM))
-	bi.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bk.add_child(bi)
-	UI.tap(bk, back, true)
-	lay.add_child(bk)
-	y += back_h
+	var keys = ["back"]
+	for g in RAIL_GROUPS:
+		keys.append_array(g)
+	keys.append("options")
+	var cell = H / float(keys.size())
 	var n = G.unread()
-	var place = func(key: String, at: float):
+	var can_back = stack.size() > 1 or (stack.size() == 1 and stack[0].sname != "home")
+	var isz = int(clamp(cell * 0.5, 30.0, 40.0))
+	var div_after = ["back"]
+	for g in RAIL_GROUPS:
+		div_after.append(g[-1])
+	for i in keys.size():
+		var key = keys[i]
 		var sel = key == cur
 		var c = Control.new()
-		c.position = Vector2(pad_l, at)
-		c.size = Vector2(w - pad_l, cell)
-		var pill = UI.panel(Color(UI.accent, 0.95) if sel else Color(0, 0, 0, 0), 14, 0, 0)
-		pill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		pill.offset_left = 7
-		pill.offset_right = -7
-		pill.offset_top = 2
-		pill.offset_bottom = -2
-		pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var fg = UI.on_color(UI.accent) if sel else (UI.MUTED if key == "options" else UI.TEXT)
-		var iv = UI.vb(-1)
-		iv.alignment = BoxContainer.ALIGNMENT_CENTER
-		var isz = 30 if labels else 32
-		var ic: Control = UI.badge(G.uc(), isz + 6) if key == "club" else UI.icon(RAIL_ICON[key], isz, fg)
-		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		iv.add_child(ic)
-		if labels:
-			var lb = UI.caps(RAIL_LABEL[key], 12, fg if sel else UI.MUTED)
-			lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			iv.add_child(lb)
-		pill.add_child(iv)
-		c.add_child(pill)
+		c.position = Vector2(0, i * cell)
+		c.size = Vector2(w, cell)
+		if sel:
+			var hl = ColorRect.new()
+			hl.color = Color(UI.accent, 0.22)
+			hl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			c.add_child(hl)
+			var bar = ColorRect.new()
+			bar.color = UI.accent
+			bar.position = Vector2(w - 4, 0)
+			bar.size = Vector2(4, cell)
+			bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			c.add_child(bar)
+		var fg = UI.TEXT
+		if key == "back":
+			fg = UI.TEXT if can_back else UI.DIM
+		elif sel:
+			fg = UI.accent.lightened(0.35)
+		elif key == "options":
+			fg = UI.MUTED
+		var ic: Control
+		if key == "back":
+			ic = UI.icon("chevron-left", isz, fg)
+		elif key == "club":
+			ic = UI.badge(G.uc(), isz + 6)
+		else:
+			ic = UI.icon(RAIL_ICON[key], isz, fg)
+		var ctr = UI.center(ic)
+		ctr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		ctr.offset_left = pad_l
+		ctr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		c.add_child(ctr)
 		if key == "inbox" and n > 0:
 			var bd = UI.chip(str(n), UI.RED, Color.WHITE, 14)
-			bd.position = Vector2((w - pad_l) * 0.5 + 6, 1)
+			bd.position = Vector2(pad_l + (w - pad_l) * 0.5 + 8, max(1.0, cell * 0.5 - isz * 0.5 - 8))
 			c.add_child(bd)
-		UI.tap(c, func(): _rail_tap(key), true)
+		if key in div_after and i < keys.size() - 1:
+			var ln = ColorRect.new()
+			ln.color = Color(1, 1, 1, 0.09)
+			ln.position = Vector2(pad_l + 12, cell - 1)
+			ln.size = Vector2(w - pad_l - 24, 1)
+			ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			c.add_child(ln)
+		if key == "back":
+			UI.tap(c, back, true)
+		else:
+			UI.tap(c, func(): _rail_tap(key), true)
 		lay.add_child(c)
-	for gi in RAIL_GROUPS.size():
-		if gi > 0:
-			var dy = step.call(y, div_h)
-			if dy == y:
-				var ln = ColorRect.new()
-				ln.color = Color(1, 1, 1, 0.1)
-				ln.position = Vector2(pad_l + 18, y + 5)
-				ln.size = Vector2(w - pad_l - 36, 1)
-				ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				lay.add_child(ln)
-				y += div_h
-		for key in RAIL_GROUPS[gi]:
-			y = step.call(y, cell)
-			place.call(key, y)
-			y += cell
-	# Settings: pinned to the bottom, clear of the camera
-	var yo = max(y, H - cell - 2)
-	if h0 >= 0 and yo < h1 and yo + cell > h0:
-		yo = h0 - cell if h0 - cell >= y else h1
-	place.call("options", yo)
 
 
 func _rail_tap(key: String):
@@ -682,6 +680,7 @@ func _build_top():
 	var dp = UI.panel(Color(1, 1, 1, 0.05), 12, 14, 6)
 	dp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	dp.add_child(dv)
+	UI.tap(dp, func(): root("calendar"), true)
 	h.add_child(dp)
 	var st = cont_state()
 	var cb = UI.panel(UI.accent, 12, 18, 4)
@@ -717,11 +716,41 @@ func _build_top():
 	cb.mouse_exited.connect(func():
 		pressing = false
 		cb.modulate = Color.WHITE)
-	h.add_child(cb)
+	var todo = SCREENS["home"].todo_count() if st.label == "Continue" else 0
+	var cw = Control.new()
+	cw.custom_minimum_size = cb.custom_minimum_size
+	cw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	cb.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cw.add_child(cb)
+	if todo > 0:
+		var bd = UI.chip(str(todo), UI.AMBER, Color("14110a"), 14)
+		bd.position = Vector2(cb.custom_minimum_size.x - 20, -7)
+		bd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cw.add_child(bd)
+	var hh = UI.hb(4)
+	hh.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hh.add_child(cw)
+	if st.label == "Continue":
+		var ar = UI.panel(Color(UI.accent, 0.22), 12, 9, 4, Color(UI.accent, 0.6))
+		ar.custom_minimum_size = Vector2(44, 54)
+		ar.add_child(UI.center(UI.icon("chevrons-right", 24, UI.accent.lightened(0.3))))
+		UI.tap(ar, travel_menu, true)
+		hh.add_child(ar)
+	h.add_child(hh)
 	topbar.add_child(h)
 
 
 func _continue(to_match: bool):
+	_go("match" if to_match else "day")
+
+
+func travel(target_day: int):
+	close_sheet()
+	_go("date", target_day)
+
+
+func _go(mode: String, target := 0):
+	# Continue is one day. Fast travel (next match, a week, a chosen date) stops for matches and urgent things.
 	if busy or not G.active:
 		return
 	var s = G.s
@@ -737,15 +766,37 @@ func _continue(to_match: bool):
 		return
 	busy = true
 	UI.sfx("continue", -10.0)
-	UI.toast("Simulating to the next match…" if to_match else "Simulating…", UI.MUTED)
+	var days = 1
+	if mode == "match":
+		var nf = G.next_user_fixture()
+		days = clamp(nf.day - s.day, 1, 60) if nf != null else 14
+	elif mode == "week":
+		days = 7
+	elif mode == "date":
+		days = clamp(target - s.day, 1, 120)
+	if days > 1:
+		UI.toast("Moving on %d days…" % days, UI.MUTED)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var before = G.unread()
 	var first_id = s.inbox[0].id if s.inbox.size() > 0 else -1
-	for i in (8 if to_match else 1):
-		G.advance()
+	var why = ""
+	for i in days:
+		var mark = G.travel_mark()
+		G.stop_flag = false
+		G.advance_day()
 		if G.user_fixture_today() != null or s.review != null or s.user.sacked:
 			break
+		if days > 1:
+			if G.stop_flag:
+				why = str(s.inbox[0].title) if s.inbox.size() > 0 else "Something needs you"
+				break
+			why = G.travel_stop(mark)
+			if why != "":
+				break
+			if i % 4 == 3:
+				await get_tree().process_frame
+	G.save_game()
 	busy = false
 	if s.review != null:
 		root("review")
@@ -753,12 +804,84 @@ func _continue(to_match: bool):
 	if s.user.sacked:
 		root("jobs", {"sacked": true})
 		return
-	if stack.size() > 0:
+	if days > 1 and stack.size() > 0 and stack[0].sname != "home":
+		root("home")
+	elif stack.size() > 0:
 		stack[-1].refresh()
 	_update_chrome()
-	if G.unread() > before and s.inbox.size() > 0 and s.inbox[0].id != first_id:
+	if why != "":
+		UI.sfx("message", -8.0)
+		UI.toast("Stopped: %s" % why, UI.AMBER)
+	elif G.unread() > before and s.inbox.size() > 0 and s.inbox[0].id != first_id:
 		UI.sfx("message", -8.0)
 		UI.toast("New message: %s" % s.inbox[0].title, UI.accent)
+
+
+const STOPS = [["offer", "An offer for one of your players"], ["injury", "A first-team injury"], ["scout", "A scouting report arriving"],
+	["board", "Board, sponsor and contract messages"], ["contract", "Player contract news"], ["any", "Any new message"]]
+
+
+func travel_menu():
+	UI.sheet("Move on", func(v):
+		var f = G.next_user_fixture()
+		var d = (f.day - G.s.day) if f != null else 0
+		var row = UI.hb(8)
+		for o in [["One day", "day", "play", "The normal Continue"], ["Next match", "match", "skip-forward", "%d day%s away" % [d, "" if d == 1 else "s"] if f != null else "None scheduled"], ["One week", "week", "fast-forward", "Seven days"]]:
+			var b = UI.panel(Color(1, 1, 1, 0.06), 12, 14, 10, UI.LINE)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var bv = UI.vb(0)
+			bv.add_child(UI.center(UI.icon(o[2], 26, UI.accent)))
+			var l = UI.lbl(o[0].to_upper(), 20, UI.TEXT, "xbold")
+			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			bv.add_child(l)
+			var l2 = UI.lbl(o[3], 14, UI.MUTED)
+			l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			bv.add_child(l2)
+			b.add_child(bv)
+			var md = o[1]
+			UI.tap(b, func():
+				close_sheet()
+				_go(md), true)
+			row.add_child(b)
+		var cb2 = UI.panel(Color(1, 1, 1, 0.06), 12, 14, 10, UI.LINE)
+		cb2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var cv2 = UI.vb(0)
+		cv2.add_child(UI.center(UI.icon("calendar-days", 26, UI.accent)))
+		var cl = UI.lbl("PICK A DATE", 20, UI.TEXT, "xbold")
+		cl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cv2.add_child(cl)
+		var cl2 = UI.lbl("Open the calendar", 14, UI.MUTED)
+		cl2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cv2.add_child(cl2)
+		cb2.add_child(cv2)
+		UI.tap(cb2, func():
+			close_sheet()
+			root("calendar"), true)
+		row.add_child(cb2)
+		v.add_child(row)
+		v.add_child(UI.caps("Moving on more than a day always stops for a match. It also stops for:", 14, UI.DIM))
+		var st = G.settings.get("stops", {})
+		var grid = GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 8)
+		grid.add_theme_constant_override("v_separation", 6)
+		for k in STOPS:
+			var on = st.get(k[0], k[0] != "any")
+			var r = UI.panel(Color(UI.accent, 0.12) if on else Color(1, 1, 1, 0.04), 10, 10, 6)
+			r.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var rh = UI.hb(8)
+			rh.add_child(UI.icon("square-check" if on else "square", 20, UI.accent if on else UI.DIM))
+			rh.add_child(UI.lbl_fill(k[1], 17, UI.TEXT if on else UI.MUTED))
+			r.add_child(rh)
+			var key = k[0]
+			UI.tap(r, func():
+				var d2 = G.settings.get("stops", {})
+				d2[key] = not d2.get(key, key != "any")
+				G.settings["stops"] = d2
+				G.save_settings()
+				travel_menu(), true)
+			grid.add_child(r)
+		v.add_child(grid))
 
 
 # ---------------------------------------------------------------- slide-out menus

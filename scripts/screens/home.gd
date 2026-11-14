@@ -154,7 +154,16 @@ func _league(c: Dictionary) -> Control:
 	return k[0]
 
 
-func todo_items(c: Dictionary) -> Array:
+static func todo_count() -> int:
+	# things worth doing today (greyed suggestions do not count); shown on the Continue button
+	var n = 0
+	for it in todo_items(G.uc()):
+		if it[2] != UI.MUTED and it[0] != "mail":
+			n += 1
+	return n
+
+
+static func todo_items(c: Dictionary) -> Array:
 	var s = G.s
 	var a: Array = []
 	var f = G.user_fixture_today()
@@ -204,6 +213,17 @@ func todo_items(c: Dictionary) -> Array:
 			unhappy += 1
 	if unhappy > 0:
 		a.append(["heart", "%d unhappy player%s" % [unhappy, "" if unhappy == 1 else "s"], UI.RED, func(): UI.main.root("squad")])
+	if G.window_open():
+		var cd = G.cur
+		var left = (31 - int(cd.day)) if (cd.month == 8 or cd.month == 1) else -1
+		if left >= 0 and left <= 7:
+			a.append(["clock", "Transfer window shuts in %d day%s" % [left, "" if left == 1 else "s"] if left > 0 else "The transfer window shuts tonight", UI.AMBER, func(): UI.main.root("transfers")])
+	var tired = 0
+	for pid in c.xi:
+		if s.players.has(pid) and s.players[pid].cond < 70 and s.players[pid].inj <= 0:
+			tired += 1
+	if tired >= 2 and nf != null and nf.day - s.day <= 2:
+		a.append(["battery-low", "%d tired players in your XI before the match" % tired, UI.AMBER, func(): UI.main.root("tactics")])
 	if c.get("build") == null or c.build.is_empty():
 		a.append(["hammer", "No building work in progress", UI.MUTED, func(): UI.main.root("campus")])
 	if s.scout.queue.is_empty() and G.window_open():
@@ -213,7 +233,7 @@ func todo_items(c: Dictionary) -> Array:
 
 func _todo(c: Dictionary) -> Control:
 	var items = todo_items(c)
-	var k = _card("To do", "%d item%s" % [items.size(), "" if items.size() == 1 else "s"])
+	var k = _card("Today", "%d thing%s to look at" % [items.size(), "" if items.size() == 1 else "s"])
 	var v = k[1]
 	v.add_theme_constant_override("separation", 4)
 	if items.is_empty():
