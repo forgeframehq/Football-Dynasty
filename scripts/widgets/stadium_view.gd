@@ -2,7 +2,7 @@ extends SubViewportContainer
 # A still 3D picture of a stadium, rendered once: used as the backdrop of the match-day fixture card.
 
 var model := "res://assets/city3d/stadium/Fst_Eng_001.FBX"
-var ground := 0.66375
+var gnd := 0.66375
 var night := false
 var tint := Color.WHITE
 
@@ -44,7 +44,7 @@ func _ready():
 		var bb = _aabb(st)
 		var k = 9.0 / max(1.0, bb.size.x)
 		st.scale = Vector3(k, k, k)
-		st.position = Vector3(-(bb.position.x + bb.size.x * 0.5) * k, 0.02 - (bb.position.y + ground * bb.size.y) * k, -(bb.position.z + bb.size.z * 0.5) * k)
+		st.position = Vector3(-(bb.position.x + bb.size.x * 0.5) * k, 0.02 - (bb.position.y + gnd * bb.size.y) * k, -(bb.position.z + bb.size.z * 0.5) * k)
 	if night:
 		for p in [Vector3(-4, 3.2, -3), Vector3(4, 3.2, -3), Vector3(-4, 3.2, 3), Vector3(4, 3.2, 3)]:
 			var l = OmniLight3D.new()

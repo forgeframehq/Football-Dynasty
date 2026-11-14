@@ -125,6 +125,13 @@ static func fill(sim, side: int) -> String:
 	var r = sim.rng.randf()
 	var tp = max(1, at.poss + df.poss)
 	var share = int(round(100.0 * at.poss / tp))
+	var wk = str(sim.wx.get("k", "clear"))
+	if r > 0.9 and wk not in ["clear", "cloud"]:
+		var wl = {"rain": ["The ball zips off the wet surface.", "A slip there on the greasy turf."], "heavy": ["The rain is hammering down now.", "Standing water is slowing the passing."],
+			"wind": ["The wind takes that pass away from its man.", "Hard to judge anything in the air in this wind."], "snow": ["Heavy going out there in the snow.", "The orange ball is out, and the pitch is turning white."],
+			"heat": ["The players take on water during a break in play.", "It is draining out there in this heat."]}
+		if wl.has(wk):
+			return wl[wk][sim.rng.randi() % 2]
 	if r < 0.16 and m >= 15 and share >= 60:
 		return "%s have had %d%% of the ball so far." % [at.club.name, share]
 	if r < 0.3 and at.has("mu") and not at.mu.notes.is_empty():

@@ -302,6 +302,8 @@ func _stream(nm: String):
 func sfx(nm: String, db := -6.0):
 	if not G.settings.get("sound", true) or nm == "sting_news":
 		return
+	if nm.begins_with("vo_") and not G.settings.get("voice", true):
+		return
 	if not players.has(nm):
 		var st = _stream(nm)
 		if st == null:
@@ -355,7 +357,7 @@ func lbl(text, size := 24, color := TEXT, font := "body") -> Label:
 	var l = Label.new()
 	l.text = str(text)
 	l.add_theme_font_override("font", fonts[font])
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", max(int(size), 14))   # nothing smaller than 14: it has to read on a phone
 	l.add_theme_color_override("font_color", color)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
@@ -467,6 +469,7 @@ func scroll(inner: Control) -> ScrollContainer:
 
 
 func tap(c: Control, cb: Callable, stop := false):
+	c.set_meta("tap", true)
 	c.mouse_filter = Control.MOUSE_FILTER_STOP if stop else Control.MOUSE_FILTER_PASS
 	c.set_meta("tp", null)
 	c.gui_input.connect(func(e):

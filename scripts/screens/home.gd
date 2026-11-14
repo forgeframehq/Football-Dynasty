@@ -94,7 +94,9 @@ func _next_match(c: Dictionary) -> Control:
 	mh.add_child(mid)
 	mh.add_child(_side(ac))
 	v.add_child(mh)
-	var venue = UI.caps("%s · %s · %s" % [G.fmt_date(f.day), "Home" if f.h == c.id else "Away", hc.stadium if hc.stadium != "" else hc.name], 16, UI.DIM)
+	var wx = G.weather(f)
+	var venue = UI.caps("%s · %s · %s · %s %d°" % [G.fmt_date(f.day), "Home" if f.h == c.id else "Away", hc.stadium if hc.stadium != "" else hc.name, wx.n, int(wx.temp)], 16, UI.BLUE if str(wx.k) not in ["clear", "cloud"] else UI.DIM)
+	venue.clip_text = true
 	venue.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(venue)
 	return k[0]

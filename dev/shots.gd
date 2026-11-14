@@ -397,8 +397,7 @@ func run(m):
 		main.close_sheet()
 		await snap("md_ht", 0.8)
 		ms._resume_ht(0)
-		ms._sim_to(999, false)
-		main.close_sheet()
+		ms._skip()
 		await snap("md_ft", 0.8)
 	if want.call("m3d"):
 		for i in 8:

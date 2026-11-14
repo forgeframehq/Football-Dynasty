@@ -112,6 +112,10 @@ func _soundtrack(row: Control):
 		_put("fps", i)
 		UI.apply_perf()
 		refresh(), 17, 5))
+	_head(c2, "Commentary voice")
+	c2.add_child(UI.seg(["On", "Off"], 0 if G.settings.get("voice", true) else 1, func(i):
+		_put("voice", i == 0)
+		refresh(), 15, 6))
 	_head(c2, "Battery saver")
 	c2.add_child(UI.seg(["On", "Off"], 0 if G.settings.get("saver", true) else 1, func(i):
 		_put("saver", i == 0)

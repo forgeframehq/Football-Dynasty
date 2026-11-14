@@ -35,10 +35,15 @@ func check(label: String, ms: float, errs_before: int):
 	await main.get_tree().process_frame
 	await main.get_tree().process_frame
 	var vs: Vector2 = main.size
-	var res = {"name": label, "ms": ms, "nodes": 0, "off": 0, "off_ex": "", "scroll": 0, "tiny": 0, "errs": G.errlog.total - errs_before}
+	var res = {"name": label, "ms": ms, "nodes": 0, "off": 0, "off_ex": "", "scroll": 0, "tiny": 0, "errs": G.errlog.total - errs_before, "lap": 0, "lap_ex": ""}
 	var scr = main.stack[-1] if main.stack.size() > 0 else main
+	var taps = []
 	_walk(scr, func(n):
 		res.nodes += 1
+		if n is Control and n.has_meta("tap") and n.size.x > 4 and n.size.y > 4:
+			var tr: Rect2 = n.get_global_rect()
+			if tr.position.x < vs.x and tr.position.y < vs.y and tr.end.x > 0 and tr.end.y > 0:
+				taps.append([n, tr])
 		if n is ScrollContainer:
 			var sb = n.get_v_scroll_bar()
 			var extra = sb.max_value - n.size.y
@@ -53,7 +58,31 @@ func check(label: String, ms: float, errs_before: int):
 					res.off += 1
 					if res.off_ex == "":
 						res.off_ex = n.text.substr(0, 28))
+	# buttons that sit on top of each other (neither inside the other)
+	for i in taps.size():
+		for j in range(i + 1, taps.size()):
+			var a: Rect2 = taps[i][1]
+			var b: Rect2 = taps[j][1]
+			if not a.intersects(b):
+				continue
+			if taps[i][0].is_ancestor_of(taps[j][0]) or taps[j][0].is_ancestor_of(taps[i][0]):
+				continue
+			var inter = a.intersection(b)
+			if inter.get_area() > 0.2 * min(a.get_area(), b.get_area()):
+				res.lap += 1
+				if res.lap_ex == "":
+					res.lap_ex = "%s / %s" % [_txt(taps[i][0]), _txt(taps[j][0])]
 	rows.append(res)
+
+
+func _txt(n: Node) -> String:
+	if n is Label and n.text.strip_edges() != "":
+		return n.text.substr(0, 18)
+	for ch in n.get_children():
+		var t = _txt(ch)
+		if t != "":
+			return t
+	return ""
 
 
 func visit(label: String, fn: Callable):
@@ -103,6 +132,28 @@ func run(m):
 			main.stack[-1].refresh())
 	await visit("Settings", func(): main.root("settings", {"grp": "options"}))
 	await visit("Kit & Sponsors", func(): main.root("kit"))
+	await visit("Calendar", func(): main.root("calendar"))
+	main.travel_menu()
+	await check("Move-on menu", 0.0, G.errlog.total)
+	main.close_sheet()
+	G.TC.plans_init(G.uc())
+	G.uc().plans.append({"n": "Test plan", "pr": G.make_preset(G.uc())})
+	main.root("plans")
+	for i in 4:
+		await visit("Plans tab %d" % (i + 1), func():
+			main.stack[-1].tab = i
+			main.stack[-1].refresh())
+	await visit("Search: bargains", func(): main.root("search", {"list": "bargains", "grp": "search"}))
+	for i in 3:
+		await visit("Search: customise %d" % (i + 1), func():
+			main.stack[-1].cust = true
+			main.stack[-1].ctab = i
+			main.stack[-1].refresh())
+	await visit("My Home 3D", func(): main.root("home3d"))
+	for i in 5:
+		await visit("My Home room %d" % (i + 1), func():
+			main.stack[-1].room = i
+			main.stack[-1].refresh())
 	await visit("Club City 3D", func(): main.root("city3d"))
 	await visit("Club City classic", func(): main.root("campus"))
 	# 3. a match day
@@ -114,6 +165,13 @@ func run(m):
 		await visit("Match: pre-match", func(): main.root("match", {"fx": G.user_fixture_today()}))
 		var ms = main.stack[-1]
 		await visit("Match: live (3D)", func(): ms._kickoff())
+		await visit("Match: sim to half-time", func(): ms._sim_to(45, false))
+		main.close_sheet()
+		await visit("Match: live tactics", func(): ms._open_tactics())
+		main.back()
+		await visit("Match: shouts", func(): ms._team_sheet())
+		main.close_sheet()
+		ms._resume_ht(0)
 		var e0 = G.errlog.total
 		ms._skip()
 		await check("Match: full time", 0.0, e0)
@@ -171,7 +229,10 @@ func run(m):
 	var scrolls = []
 	var offs = []
 	var tiny = []
+	var laps = []
 	for r in rows:
+		if r.lap > 0:
+			laps.append("%s (%d, e.g. %s)" % [r.name, r.lap, r.lap_ex])
 		total_err += r.errs
 		if r.ms >= 120.0:
 			slow.append("%s (%d ms)" % [r.name, int(r.ms)])
@@ -188,6 +249,7 @@ func run(m):
 	say("Need scrolling: %s" % (", ".join(scrolls) if not scrolls.is_empty() else "none"))
 	say("Text pushed off screen: %s" % (", ".join(offs) if not offs.is_empty() else "none"))
 	say("Text under 14 px: %s" % (", ".join(tiny) if not tiny.is_empty() else "none"))
+	say("Buttons overlapping: %s" % (", ".join(laps) if not laps.is_empty() else "none"))
 	for e in G.errlog.snapshot().slice(0, 12):
 		say("LOG " + e)
 	var f = FileAccess.open("/tmp/audit.txt", FileAccess.WRITE)

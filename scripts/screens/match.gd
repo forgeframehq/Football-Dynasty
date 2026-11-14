@@ -46,6 +46,7 @@ var snap = null              # the club's tactics before kick-off, put back at f
 var replays: Array = []      # goals queued for a replay after a sim
 var replaying := false
 var ht_panel: Control = null
+var main_row: Control = null
 var pitch_box: Control = null
 const STADIUM = preload("res://scripts/widgets/stadium_view.gd")
 
@@ -77,6 +78,10 @@ func build():
 	chrome = false
 	f = args.fx
 	us = 0 if f.h == G.s.user.club else 1
+	if stage == "pre" and f.get("fr", false) and G.settings.get("auto_fr", false) and not args.get("_auto", false):
+		args["_auto"] = true
+		_quick.call_deferred()
+		return
 	if stage == "pre":
 		_build_pre()
 	else:
@@ -122,7 +127,7 @@ func _build_pre():
 		sv.night = d0.weekday in [2, 3] or d0.month in [11, 12, 1]
 		var sm = G.OPS.stadium_model(G.OPS.stadium_level(hc))
 		sv.model = sm[0]
-		sv.ground = sm[1]
+		sv.gnd = sm[1]
 		sv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		layer.add_child(sv)
 	var shade = ColorRect.new()
@@ -481,6 +486,7 @@ func _build_live():
 	sb.add_child(row)
 	body.add_child(UI.margin(sb, 14, 6, 14, 6))
 	var hbx = UI.hb(10)
+	main_row = hbx
 	hbx.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var hm = UI.margin(hbx, 14, 0, 14, 8)
 	hm.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1180,19 +1186,45 @@ func _apply(evs: Array) -> bool:
 			UI.sfx("vo_half", -4.0)
 		elif e.t == "ft":
 			UI.sfx("whistle_end")
-			UI.sfx("vo_full", -4.0)
+			if sim.sd[0].goals + sim.agg[0] == sim.sd[1].goals + sim.agg[1]:
+				UI.sfx("vo_draw" if not f.ko else "vo_shootout", -4.0)
+			else:
+				var won = (sim.sd[us].goals + sim.agg[us]) > (sim.sd[1 - us].goals + sim.agg[1 - us])
+				UI.sfx("vo_win" if won else "vo_lose", -4.0)
 		elif e.t == "save":
 			UI.sfx("kick", -8.0)
 			UI.sfx("applause" if e.s != us else "groan", -12.0)
+			if randf() < 0.6:
+				UI.sfx(["vo_save", "vo_save2", "vo_save3"][randi() % 3], -5.0)
 		elif e.t == "miss":
 			UI.sfx("kick", -8.0)
+			if e.get("blk", false):
+				if randf() < 0.4:
+					UI.sfx("vo_block", -6.0)
+			elif randf() < 0.5:
+				UI.sfx("vo_miss%d" % (1 + randi() % 4), -6.0)
 		elif e.t == "red":
 			UI.sfx("vo_red", -4.0)
 			UI.sfx("boo", -8.0)
+		elif e.t == "yellow" and randf() < 0.3:
+			UI.sfx("vo_yellow", -7.0)
+		elif e.t == "injury":
+			UI.sfx("vo_injury", -6.0)
+		elif e.t == "sub" and randf() < 0.25:
+			UI.sfx("vo_sub", -8.0)
+		elif e.t == "info" and str(e.x).contains("extra time"):
+			UI.sfx("whistle")
+			UI.sfx("vo_et", -4.0)
 		if e.t == "goal":
 			UI.sfx("kick", -6.0)
 			UI.sfx("cheer" if e.s == us else "groan", -3.0)
-			UI.sfx("vo_goal%d" % (1 + randi() % 4), -3.0)
+			var gd = sim.sd[e.s].goals - sim.sd[1 - e.s].goals
+			if gd == 0 and randf() < 0.6:
+				UI.sfx("vo_level", -3.0)
+			elif gd == 1 and randf() < 0.35:
+				UI.sfx("vo_lead", -3.0)
+			else:
+				UI.sfx("vo_goal%d" % (1 + randi() % 6), -3.0)
 			hold = 1.8 if speed != 2 else 0.7
 			banner_l.text = "GOAL!"
 			var sub = "%s %d'" % [G.pname(G.s.players[e.p]), min(e.m, 90)]
@@ -1386,88 +1418,159 @@ func _exit_tree():
 
 
 func _show_ft():
-	if view3d != null and is_instance_valid(view3d) and pitch.get_parent() == null:
-		# full time: the flat pitch takes over to show the shot map
-		var host = view3d.get_parent()
+	# full time: one page, no scrolling. Result and scorers, the numbers and the shot map, and your players' ratings.
+	UI.ambience(false)
+	if view3d != null and is_instance_valid(view3d):
 		view3d.visible = false
 		view3d.process_mode = Node.PROCESS_MODE_DISABLED
-		pitch.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		host.add_child(pitch)
-		host.move_child(pitch, 0)
-	UI.ambience(false)
-	for c in lower.get_children():
-		lower.remove_child(c)
-		c.queue_free()
 	feed = null
-	tab_holder.visible = false
 	banner.visible = false
+	if ht_panel != null and is_instance_valid(ht_panel):
+		ht_panel.queue_free()
+		ht_panel = null
+	for c in main_row.get_children():
+		c.visible = false
+	if pitch.get_parent() != null:
+		pitch.get_parent().remove_child(pitch)
 	pitch.shot_mode = true
-	pitch.queue_redraw()
 	var me = sim.sd[us]
 	var op = sim.sd[1 - us]
-	var v = UI.vb(12)
-	var sc2 = UI.scroll(UI.margin(v, 20, 0, 20, 24))
-	sc2.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	lower.add_child(sc2)
 	var w = sim.winner()
 	var res = "DRAW"
 	var col = UI.MUTED
-	if w == us or me.goals > op.goals:
+	if w == us:
 		res = "VICTORY"
 		col = UI.GREEN
-	elif w == 1 - us or me.goals < op.goals:
+	elif w == 1 - us:
 		res = "DEFEAT"
 		col = UI.RED
-	var head = UI.panel(Color(col, 0.12), 22, 20, 12, Color(col, 0.4))
-	var hh = UI.hb(12)
-	hh.add_child(UI.lbl(res, 42, col, "xbold"))
-	hh.add_child(UI.sp())
-	hh.add_child(UI.caps("Pens %d–%d" % [sim.pens[0], sim.pens[1]] if sim.pens != null else "Shot map above · gold = goal", 18, UI.MUTED))
-	head.add_child(hh)
-	v.add_child(head)
-	v.add_child(UI.btn("Continue", _finish, "primary", "chevron-right", 84))
+	# ---- result
+	var p1 = UI.panel(UI.CARD, 16, 14, 10, Color(col, 0.5))
+	p1.custom_minimum_size = Vector2(330, 0)
+	var v1 = UI.vb(4)
+	v1.add_child(UI.lbl(res, 40, col, "xbold"))
+	v1.add_child(UI.lbl_fill(G.fx_caption(f), 15, UI.MUTED))
+	var notes = []
+	if sim.et:
+		notes.append("after extra time")
+	if sim.pens != null:
+		notes.append("%d–%d on penalties" % [sim.pens[0], sim.pens[1]])
+	if int(f.get("leg", 0)) == 2:
+		notes.append("%d–%d on aggregate" % [sim.sd[0].goals + sim.agg[0], sim.sd[1].goals + sim.agg[1]])
+	if notes.size() > 0:
+		v1.add_child(UI.wrap(", ".join(notes).capitalize(), 16, UI.GOLD))
+	for i in 2:
+		var t = sim.sd[i]
+		var th = UI.hb(8)
+		th.add_child(UI.badge(t.club, 30))
+		th.add_child(UI.lbl_fill(t.club.name, 20, UI.TEXT, "semi"))
+		th.add_child(UI.lbl(str(t.goals), 26, UI.TEXT, "xbold"))
+		v1.add_child(th)
+		var parts = []
+		for g in t.scorers:
+			parts.append("%s %s%s" % [G.pname(G.s.players[g.pid]), _mtxt(int(g.m)), " (pen)" if g.pen else ""])
+		if parts.size() > 0:
+			v1.add_child(UI.wrap(", ".join(parts), 15, UI.MUTED))
 	if sim.motm >= 0:
 		var mp = G.s.players[sim.motm]
-		var mc = UI.panel(Color(UI.GOLD, 0.1), 20, 18, 12, Color(UI.GOLD, 0.35))
-		var mh = UI.hb(12)
-		mh.add_child(UI.icon("star-f", 28, UI.GOLD))
-		var mv = UI.vb(-2)
+		var mc = UI.panel(Color(UI.GOLD, 0.1), 12, 12, 6, Color(UI.GOLD, 0.35))
+		var mh = UI.hb(8)
+		mh.add_child(UI.icon("star-f", 22, UI.GOLD))
+		var mv = UI.vb(-4)
 		mv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mv.add_child(UI.caps("Player of the match", 18, UI.GOLD))
-		mv.add_child(UI.lbl_fill("%s · %s" % [G.pname(mp), G.s.clubs[mp.club].short], 26, UI.TEXT, "semi"))
+		mv.add_child(UI.caps("Player of the match", 14, UI.GOLD))
+		mv.add_child(UI.lbl_fill("%s · %s" % [G.pname(mp), G.s.clubs[mp.club].short], 19, UI.TEXT, "semi"))
 		mh.add_child(mv)
-		mh.add_child(UI.lbl("%.1f" % sim.pm[sim.motm].r, 36, UI.GOLD, "xbold"))
+		mh.add_child(UI.lbl("%.1f" % sim.pm[sim.motm].r, 26, UI.GOLD, "xbold"))
 		mc.add_child(mh)
-		v.add_child(mc)
-	v.add_child(UI.section("Match stats"))
-	v.add_child(_momentum())
-	v.add_child(_stats_card())
-	v.add_child(UI.section("Your player ratings"))
+		v1.add_child(mc)
+	var sp1 = UI.sp()
+	sp1.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v1.add_child(sp1)
+	v1.add_child(UI.btn("Continue", _finish, "primary", "chevron-right", 64))
+	p1.add_child(v1)
+	main_row.add_child(p1)
+	# ---- numbers and shot map
+	var p2 = UI.panel(UI.CARD, 16, 14, 10, UI.LINE)
+	p2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var v2 = UI.vb(4)
+	v2.add_child(UI.caps("Shot map · gold is a goal", 14, UI.DIM))
+	pitch.custom_minimum_size = Vector2(0, 150)
+	pitch.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pitch.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	v2.add_child(pitch)
+	var mom = MOM.new()
+	mom.data = sim.momentum
+	mom.ch = pitch.cols[0] if pitch.cols[0].get_luminance() > 0.12 else pitch.rims[0]
+	mom.ca = pitch.cols[1] if pitch.cols[1].get_luminance() > 0.12 else pitch.rims[1]
+	for i in 2:
+		for sc in sim.sd[i].scorers:
+			mom.goals.append([sc.m, i])
+	mom.custom_minimum_size = Vector2(0, 54)
+	mom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v2.add_child(mom)
+	var h0 = sim.sd[0]
+	var a0 = sim.sd[1]
+	var tp = max(1, h0.poss + a0.poss)
+	var ph = int(round(100.0 * h0.poss / tp))
+	var g = GridContainer.new()
+	g.columns = 2
+	g.add_theme_constant_override("h_separation", 18)
+	g.add_theme_constant_override("v_separation", 1)
+	for r in [["Possession", "%d%%" % ph, "%d%%" % (100 - ph)], ["Shots", str(h0.shots), str(a0.shots)], ["On target", str(h0.sot), str(a0.sot)], ["Expected goals", "%.2f" % h0.xg, "%.2f" % a0.xg],
+			["Corners", str(h0.corners), str(a0.corners)], ["Fouls", str(h0.fouls), str(a0.fouls)], ["Yellow cards", str(h0.yc), str(a0.yc)], ["Red cards", str(h0.rc), str(a0.rc)]]:
+		var rh = UI.hb(6)
+		rh.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var l1 = UI.lbl(r[1], 18, UI.TEXT, "disp")
+		l1.custom_minimum_size = Vector2(44, 0)
+		rh.add_child(l1)
+		var l2 = UI.caps(r[0], 14, UI.MUTED)
+		l2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rh.add_child(l2)
+		var l3 = UI.lbl(r[2], 18, UI.TEXT, "disp")
+		l3.custom_minimum_size = Vector2(44, 0)
+		l3.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		rh.add_child(l3)
+		g.add_child(rh)
+	v2.add_child(g)
+	p2.add_child(v2)
+	main_row.add_child(p2)
+	# ---- ratings
+	var p3 = UI.panel(UI.CARD, 16, 14, 10, UI.LINE)
+	p3.custom_minimum_size = Vector2(400, 0)
+	var v3 = UI.vb(2)
+	v3.add_child(UI.caps("Your players", 14, UI.DIM))
 	var list = []
 	for pid in sim.pm:
 		if sim.pm[pid].tin >= 0 and G.s.players[pid].club == me.cid:
 			list.append(pid)
 	list.sort_custom(func(x, y): return sim.pm[x].r > sim.pm[y].r)
-	for pid in list:
+	for pid in list.slice(0, 16):
 		var p = G.s.players[pid]
 		var q = sim.pm[pid]
-		var r = UI.panel(UI.CARD, 16, 14, 8, UI.LINE)
-		var rh = UI.hb(10)
-		rh.add_child(UI.pos(p.pos, 18))
-		rh.add_child(UI.lbl_fill(G.pname(p), 23, UI.TEXT, "semi"))
+		var rh2 = UI.hb(6)
+		rh2.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		rh2.add_child(UI.pos(p.pos, 14))
+		rh2.add_child(UI.lbl_fill(G.pname(p), 17, UI.TEXT, "semi"))
 		var bits = []
-		if q.g > 0: bits.append("%d G" % q.g)
-		if q.a > 0: bits.append("%d A" % q.a)
+		if q.g > 0: bits.append("%dG" % q.g)
+		if q.a > 0: bits.append("%dA" % q.a)
 		if q.yc > 0: bits.append("YC")
 		if q.rc > 0: bits.append("RC")
 		if q.inj > 0: bits.append("INJ")
-		if q.tin > 0: bits.append("sub %d'" % q.tin)
+		if q.tin > 0: bits.append("on %s" % _mtxt(int(q.tin)))
 		if bits.size() > 0:
-			rh.add_child(UI.caps(" · ".join(bits), 17, UI.MUTED))
+			rh2.add_child(UI.caps(" ".join(bits), 14, UI.MUTED))
 		var rc = UI.GOLD if q.r >= 8.0 else (UI.GREEN if q.r >= 7.0 else (UI.TEXT if q.r >= 6.0 else UI.RED))
-		rh.add_child(UI.chip("%.1f" % q.r, Color(rc, 0.14), rc, 24, 62))
-		r.add_child(rh)
-		v.add_child(r)
+		var rl = UI.lbl("%.1f" % q.r, 18, rc, "disp")
+		rl.custom_minimum_size = Vector2(36, 0)
+		rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		rh2.add_child(rl)
+		v3.add_child(rh2)
+	p3.add_child(v3)
+	main_row.add_child(p3)
+	pitch.queue_redraw()
 
 
 func _finish():
