@@ -1141,6 +1141,7 @@ func start_of_day():
 	if cur.day == 15:
 		refresh_jobs()
 	OPS.daily()
+	OPS.talks_daily()
 	MK.daily()
 	if s.day == ymd(s.season + 1, 6, 12):
 		LG.rollover()
@@ -1163,7 +1164,7 @@ func develop_all():
 			elif a <= 26: pr = 0.15
 			pr *= 0.75 + min(0.5, p.ss.ap * 0.03)
 			if p.club == ucid:
-				pr *= OPS.growth_mult(p)
+				pr *= OPS.growth_mult(p) * OPS.mentor_mult(p)
 			if rng.randf() < pr:
 				ch = 1
 		elif a >= 31:

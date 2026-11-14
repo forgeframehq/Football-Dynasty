@@ -760,3 +760,99 @@ static func return_loans():
 			p.erase("loan")
 			if o != p.club:
 				_shift(p, o)
+
+
+# ---------------------------------------------------------------- conversations with players
+const TALKS = [
+	{"k": "praise", "n": "Praise his form", "d": "Lands when he has been playing well", "i": "star"},
+	{"k": "push", "n": "Ask for more", "d": "Works on professionals, backfires on some", "i": "zap"},
+	{"k": "games", "n": "Promise more games", "d": "Lifts him now; break it and he turns", "i": "calendar-check"},
+	{"k": "patient", "n": "Ask him to be patient", "d": "May calm an unhappy player", "i": "hourglass"},
+]
+
+
+static func talk_ok(p: Dictionary, k: String) -> bool:
+	if k == "games":
+		return not p.has("pg")
+	if k == "patient":
+		return p.get("unhappy", 0) > 0 or p.mor < 60
+	return true
+
+
+static func talk(p: Dictionary, k: String) -> Dictionary:
+	# one conversation: what you say, what he answers, what it does to morale
+	var s = G.s
+	var per = G.PS.personality(p)
+	var pro = per in ["Professional", "Model professional", "Driven", "Ambitious", "Leader", "Determined"]
+	var form = float(p.get("form", 6.5))
+	var r = {"you": "", "reply": "", "mor": 0, "note": ""}
+	p["talk"] = s.day
+	match k:
+		"praise":
+			r.you = "You have been excellent lately. Keep it going."
+			if form >= 7.0 and p.ss.ap >= 3:
+				r.mor = 6
+				r.reply = "Thanks, boss. That means a lot."
+			elif p.ss.ap < 3:
+				r.mor = -1
+				r.reply = "I have hardly played, boss."
+			else:
+				r.mor = -2
+				r.reply = "We both know I can do better than that."
+		"push":
+			r.you = "I need more from you. You are better than this."
+			if form >= 7.2:
+				r.mor = -5
+				r.reply = "More? I am giving you everything."
+			elif pro:
+				r.mor = 4
+				r.reply = "You are right. I will put it right in training."
+				p.form = min(10.0, form + 0.2)
+				r.note = "sharper in training"
+			else:
+				r.mor = -4
+				r.reply = "Maybe pick me in my proper position, then."
+		"games":
+			r.you = "You will get more football over the next month. My word on it."
+			r.mor = 8
+			r.reply = "That is all I wanted to hear."
+			p["pg"] = {"day": s.day, "ap": int(p.ss.ap)}
+			p["unhappy"] = 0
+			r.note = "he expects 3 games in 30 days"
+		"patient":
+			r.you = "Your chance will come. I need you to stay ready."
+			if pro or G.rng.randf() < 0.45:
+				r.mor = 5
+				p["unhappy"] = 0
+				r.reply = "All right. I will keep working."
+			else:
+				r.mor = -2
+				r.reply = "I have heard that before."
+	p.mor = clampf(p.mor + r.mor, 5, 100)
+	return r
+
+
+static func talks_daily():
+	# promises of more games fall due after 30 days; mentors give young players a small lift each month
+	var s = G.s
+	var c = G.uc()
+	for pid in c.players:
+		var p = s.players[pid]
+		if p.has("pg") and s.day - int(p.pg.day) >= 30:
+			var got = int(p.ss.ap) - int(p.pg.ap)
+			if got >= 3:
+				p.mor = min(100.0, p.mor + 4)
+			else:
+				p.mor = max(5.0, p.mor - 14)
+				p["unhappy"] = max(int(p.get("unhappy", 0)), 20)
+				G.msg("%s: promise broken" % G.pname(p), "You promised %s more football a month ago and he has played %d game%s since. He is angry, and the dressing room has noticed." % [G.pname(p), got, "" if got == 1 else "s"], "info", p.id)
+			p.erase("pg")
+
+
+static func mentor_mult(p: Dictionary) -> float:
+	var m = int(p.get("mentor", -1))
+	if m < 0 or not G.s.players.has(m) or G.s.players[m].club != p.club:
+		return 1.0
+	var q = G.s.players[m]
+	var per = G.PS.personality(q)
+	return 1.12 + clampf((q.ovr - p.ovr) * 0.008, 0.0, 0.08) + (0.06 if per in ["Professional", "Model professional", "Leader", "Driven", "Determined"] else 0.0)

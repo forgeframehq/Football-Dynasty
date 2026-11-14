@@ -531,6 +531,8 @@ func _rail_key() -> String:
 		"club": ["squad", "tactics", "training", "fixtures", "calendar", "finances", "campus", "lists", "kit", "city3d"],
 		"manager": ["board", "trophies", "jobs", "life"], "world": ["table", "comps", "stats", "clubview"],
 		"search": ["search", "transfers", "scouting", "player", "nego", "compare"]}
+	if nm == "search" and stack[0].args.has("grp"):
+		return str(stack[0].args.grp)
 	if nm == "lists" or nm == "hub" or nm == "settings":
 		return str(stack[0].args.get("grp", "club"))
 	for k in groups:
@@ -954,16 +956,16 @@ func menu_items(key: String) -> Array:
 		a.append(_row("list", "League Standards", "Leagues ranked", func(): root("hub", {"kind": "standards", "grp": "world"})))
 		a.append(_row("chart-bar", "Player Stats", "Scorers, assists, ratings", func(): root("stats", {"lg": c.lg})))
 		a.append(_row("award", "Team of the Week", "The best eleven of the last seven days", func(): root("lists", {"kind": "totw", "grp": "world"})))
-		a.append(_row("crown", "Top 50 Players", "Best in the world", func(): root("lists", {"kind": "top50", "grp": "world"})))
-		a.append(_row("sparkles", "Wonderkids", "Best aged 21 or under", func(): root("lists", {"kind": "wonderkids", "grp": "world"})))
+		a.append(_row("crown", "Top 50 Players", "Best in the world", func(): root("search", {"list": "top50", "grp": "world"})))
+		a.append(_row("sparkles", "Wonderkids", "Best aged 21 or under", func(): root("search", {"list": "wonderkids", "grp": "world"})))
 	elif key == "search":
 		a.append(_row("search", "Player Search", "Every player, sortable", func(): root("search")))
 		a.append(_row("handshake", "Transfer Market", "Offers, shortlist, your deals", func(): root("transfers")))
 		a.append(_row("binoculars", "Scouting", "%d being watched" % s.scout.queue.size(), func(): root("scouting")))
-		a.append(_row("tags", "Bargains", "Good players, low prices", func(): root("lists", {"kind": "bargains", "grp": "search"})))
-		a.append(_row("clock", "Expiring Contracts", "Out of contract in June", func(): root("lists", {"kind": "expiring", "grp": "search"})))
-		a.append(_row("users", "Free Agents", "Available now", func(): root("lists", {"kind": "free", "grp": "search"})))
-		a.append(_row("flag", "Transfer Listed", "Clubs want to sell", func(): root("lists", {"kind": "listed", "grp": "search"})))
+		a.append(_row("tags", "Bargains", "Good players, low prices", func(): root("search", {"list": "bargains", "grp": "search"})))
+		a.append(_row("clock", "Expiring Contracts", "Out of contract in June", func(): root("search", {"list": "expiring", "grp": "search"})))
+		a.append(_row("users", "Free Agents", "Available now", func(): root("search", {"list": "free", "grp": "search"})))
+		a.append(_row("flag", "Transfer Listed", "Clubs want to sell", func(): root("search", {"list": "listed", "grp": "search"})))
 		a.append(_row("target", "Role Finder", "Players for your roles", func(): root("hub", {"kind": "rolefinder", "grp": "search"})))
 		a.append(_row("shield", "Find Club", "Search every club", func(): root("hub", {"kind": "findclub", "grp": "search"})))
 		a.append(_row("briefcase", "Jobs", "Clubs interested in you", func(): root("jobs")))

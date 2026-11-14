@@ -9,6 +9,11 @@ func build():
 	var s = G.s
 	var c = G.uc()
 	var kind = str(args.get("kind", "top50"))
+	if kind in ["bargains", "expiring", "free", "listed", "top50", "wonderkids", "similar", "role", "pos"]:
+		var a2 = args.duplicate()
+		a2["list"] = kind
+		UI.main.call_deferred("root", "search", a2)
+		return
 	var rows: Array = []
 	var note = ""
 	if kind == "medical":

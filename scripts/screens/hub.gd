@@ -278,7 +278,7 @@ func _report(v: Control):
 			h.add_child(UI.ovr(r.ovr, 20))
 		var fb = UI.chip("FIND", Color(1, 1, 1, 0.08), UI.TEXT, 17)
 		var pos = r.pos
-		UI.tap(fb, func(): UI.main.open("lists", {"kind": "pos", "pos": pos, "grp": "search"}), true)
+		UI.tap(fb, func(): UI.main.open("search", {"list": "pos", "pos": pos, "grp": "search"}), true)
 		h.add_child(fb)
 		p.add_child(h)
 		v.add_child(p)
@@ -1151,7 +1151,7 @@ func _rolefinder(v: Control):
 		h.add_child(UI.icon("chevron-right", 20, UI.DIM))
 		p.add_child(h)
 		var pos = slots[i][0]
-		UI.tap(p, func(): UI.main.open("lists", {"kind": "role", "rid": rid, "pos": pos, "grp": "search"}))
+		UI.tap(p, func(): UI.main.open("search", {"list": "role", "rid": rid, "pos": pos, "grp": "search"}))
 		v.add_child(p)
 
 

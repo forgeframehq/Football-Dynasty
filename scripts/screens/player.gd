@@ -445,85 +445,267 @@ func build():
 		_page(p, own, free)
 		_bar(p)
 		return
-	var v = content(14)
-	# actions
-	v.add_child(UI.sp(0, 4))
+	_manage(p, own, free)
+	if UI.main.uses_chrome():
+		UI.main.t_sub = "%s · %s · %d yrs · %s" % [s.clubs[p.club].name if p.club >= 0 else "Free agent", p.pos, G.age(p), p.nat]
+		UI.main.refresh_nav.call_deferred()
+
+
+func _act(v: Control, text: String, sub: String, ic: String, cb: Callable, col := Color(0, 0, 0, 0), on := true):
+	# one action row: icon, name, what it does. Greyed when it cannot be used now.
+	var hot = col.a > 0
+	var r = UI.panel(Color(col, 0.16) if hot else Color(1, 1, 1, 0.045), 10, 12, 6, Color(col, 0.5) if hot else Color(0, 0, 0, 0))
+	var h = UI.hb(10)
+	h.add_child(UI.icon(ic, 22, (col.lightened(0.25) if hot else UI.accent) if on else UI.DIM))
+	var tv = UI.vb(-4)
+	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tv.add_child(UI.lbl_fill(text, 19, UI.TEXT if on else UI.DIM, "semi"))
+	if sub != "":
+		tv.add_child(UI.lbl_fill(sub, 14, UI.MUTED if on else UI.DIM))
+	h.add_child(tv)
+	if on:
+		h.add_child(UI.icon("chevron-right", 16, UI.DIM))
+	r.add_child(h)
+	if on:
+		UI.tap(r, cb, true)
+	v.add_child(r)
+
+
+func _manage(p: Dictionary, own: bool, free: bool):
+	# three panes, nothing repeated: his place in the squad and talks, his development, his future
+	var s = G.s
+	var uc = G.uc()
+	var h = panes(10, 20)
 	var loaned_in = own and p.get("loan", -1) >= 0
 	var loaned_out = (not own) and p.get("loan", -1) == uc.id
-	if loaned_in:
-		v.add_child(_note("clock", "On loan from %s until the end of the season." % s.clubs[p.loan].name, UI.BLUE))
-	if loaned_out:
-		v.add_child(_note("clock", "Your player, on loan at %s until the end of the season.%s" % [s.clubs[p.club].name, " You kept a recall clause." if p.get("lrecall", false) else ""], UI.BLUE))
-		if G.MK.can_recall(p):
-			v.add_child(UI.btn("Recall from loan", func():
-				G.MK.recall(p)
-				UI.toast("%s is back" % G.pname(p), UI.GREEN)
-				refresh(), "secondary", "repeat", 60))
-	if own and not loaned_in:
-		if p.get("youth", false):
-			v.add_child(UI.btn("Promote to first team", func():
-				p.erase("youth")
-				UI.toast("%s joins the first-team squad" % G.pname(p), UI.GREEN)
-				refresh(), "gold", "arrow-up"))
-		v.add_child(UI.section("Squad status", "how he reacts to being left out"))
-		v.add_child(UI.seg(["Key", "Rotation", "Backup", "Prospect"], G.status_of(p), func(i):
-			p["status"] = i
-			refresh(), 20))
+	var a = pane(0, 5)
+	h.add_child(a[0])
+	var v = a[1]
+	var b = pane(0, 5)
+	h.add_child(b[0])
+	var w = b[1]
+	var d = pane(0, 5)
+	h.add_child(d[0])
+	var x = d[1]
+	if own:
+		# ---- pane 1: squad place and conversations
+		v.add_child(UI.caps("Place in the squad", 15, UI.accent))
+		if not loaned_in:
+			v.add_child(UI.seg(["Key", "Rotation", "Backup", "Prospect"], G.status_of(p), func(i):
+				p["status"] = i
+				refresh(), 16, 6))
+		var better = 0
+		var same = 0
+		for pid in uc.players:
+			var q = s.players[pid]
+			if q.pos == p.pos:
+				same += 1
+				if q.ovr > p.ovr:
+					better += 1
+		var played = 0
+		for pid in uc.players:
+			played = max(played, int(s.players[pid].ss.ap))
+		v.add_child(UI.kv("Depth at %s" % p.pos, "%s of %d" % [G.LG.ordinal(better + 1), same], UI.TEXT, 18))
+		v.add_child(UI.kv("Games this season", "%d of %d" % [int(p.ss.ap), played], UI.TEXT, 18))
+		v.add_child(UI.kv("Morale", "%d%%" % int(p.mor), UI.cond_color(p.mor), 18))
+		v.add_child(UI.kv("Mood", "Unhappy" if p.get("unhappy", 0) > 0 else ("Promised more games" if p.has("pg") else "Settled"), UI.RED if p.get("unhappy", 0) > 0 else UI.TEXT, 18))
+		v.add_child(UI.caps("Talk to him", 15, UI.accent))
+		var wait = int(p.get("talk", -99)) + 14 - s.day
+		if wait > 0:
+			v.add_child(UI.wrap("You spoke %d day%s ago. Give it %d more before another word." % [14 - wait, "" if 14 - wait == 1 else "s", wait], 15, UI.MUTED))
+		for t in G.OPS.TALKS:
+			var tk = t
+			_act(v, t.n, t.d, t.i, func(): _talk(p, tk), Color(0, 0, 0, 0), wait <= 0 and G.OPS.talk_ok(p, t.k))
+		# ---- pane 2: development
+		w.add_child(UI.caps("Development", 15, UI.accent))
 		var tf = p.get("tr", "")
+		_act(w, "Individual training", "Now: %s" % (tf if tf != "" else "general"), "activity", func(): _indiv(p))
 		var rt = p.get("rt", null)
-		var th = UI.hb(10)
-		var tb = UI.btn("Training: %s" % (tf if tf != "" else "general"), func(): _indiv(p), "secondary", "activity", 68)
-		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		th.add_child(tb)
-		var rb0 = UI.btn("Learning %s" % rt[0] if rt != null else "New position", func(): _retrain(p), "secondary", "repeat", 68)
-		rb0.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		th.add_child(rb0)
-		v.add_child(th)
-	v.add_child(UI.btn("Compare with…", func(): _compare(p), "secondary", "users", 68))
-	v.add_child(UI.btn("Find similar players", func(): UI.main.open("lists", {"kind": "similar", "pid": p.id, "grp": "search"}), "secondary", "search", 56))
+		_act(w, "New position", "Learning %s" % rt[0] if rt != null else "Plays %s%s" % [p.pos, (", " + ", ".join(p.alt)) if p.alt.size() > 0 else ""], "repeat", func(): _retrain(p))
+		var lr = p.get("lsk", null)
+		_act(w, "Learn a skill", "Working on one now" if lr != null else "%d of %d skills" % [p.get("sk", []).size(), G.TC.MAX_SKILLS], "sparkles", func(): _learn(p))
+		var ag = G.age(p)
+		var men = int(p.get("mentor", -1))
+		if ag <= 23:
+			_act(w, "Mentor", ("Learning from %s" % G.pname(s.players[men])) if men >= 0 and s.players.has(men) and s.players[men].club == uc.id else "Pair him with a senior player: faster growth", "graduation-cap", func(): _mentor(p))
+		else:
+			var pupils = 0
+			for pid in uc.players:
+				if int(s.players[pid].get("mentor", -1)) == p.id:
+					pupils += 1
+			w.add_child(UI.kv("Mentoring", "%d young player%s" % [pupils, "" if pupils == 1 else "s"] if pupils > 0 else "Nobody", UI.TEXT, 18))
+		w.add_child(UI.caps("Duties and number", 15, UI.accent))
+		var duty = UI.hb(6)
+		for k in [["capt", "Captain"], ["pk", "Penalties"], ["fk", "Free kicks"], ["ck", "Corners"]]:
+			var on = int(uc.get(k[0], -1)) == p.id
+			var ch = UI.panel(Color(UI.accent, 0.25) if on else Color(1, 1, 1, 0.05), 10, 8, 7, UI.accent if on else Color(0, 0, 0, 0))
+			ch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var cl = UI.lbl(k[1], 15, UI.TEXT if on else UI.MUTED, "semi")
+			cl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			ch.add_child(cl)
+			var kk = k[0]
+			UI.tap(ch, func():
+				uc[kk] = -1 if int(uc.get(kk, -1)) == p.id else p.id
+				refresh(), true)
+			duty.add_child(ch)
+		w.add_child(duty)
+		_act(w, "Shirt number", "Wears %d" % int(p.get("num", 0)), "hash", func(): _number(p))
+		# ---- pane 3: future
+		x.add_child(UI.caps("Future", 15, UI.accent))
+		if loaned_in:
+			x.add_child(_note("clock", "On loan from %s until the end of the season." % s.clubs[p.loan].name, UI.BLUE))
+		else:
+			var yrs = max(0, p.cend - s.season - 1)
+			_act(x, "Offer new contract", "%s a week · %s" % [G.money(p.wage), "ends this June" if yrs == 0 else "%d year%s left" % [yrs, "" if yrs == 1 else "s"]], "handshake", func(): UI.main.open("nego", {"pid": p.id, "mode": "renew"}), UI.AMBER if yrs == 0 else Color(0, 0, 0, 0))
+			if p.get("youth", false):
+				_act(x, "Promote to first team", "He is in the youth squad", "arrow-up", func():
+					p.erase("youth")
+					UI.toast("%s joins the first-team squad" % G.pname(p), UI.GREEN)
+					refresh(), UI.GOLD)
+			_act(x, "Take off the transfer list" if p.listed else "Transfer list", "Clubs are being told he is for sale" if p.listed else "Worth about %s" % G.money(G.value(p)), "flag", func():
+				p.listed = not p.listed
+				UI.toast("%s %s the transfer list" % [G.pname(p), "added to" if p.listed else "removed from"])
+				refresh(), UI.GREEN if p.listed else Color(0, 0, 0, 0))
+			_act(x, "Loan out", "Games elsewhere, wages shared", "arrow-left-right", func(): _loan_out(p))
+			_act(x, "Release", "Ends his contract now", "log-out", func(): _release(p), UI.RED)
+		x.add_child(UI.caps("Tools", 15, UI.accent))
+		_act(x, "Compare with another player", "", "users", func(): _compare(p))
+		_act(x, "Find similar players", "", "search", func(): UI.main.open("search", {"list": "similar", "pid": p.id, "grp": "search"}))
+	else:
+		# ---- someone else's player (or a free agent)
+		v.add_child(UI.caps("What we know", 15, UI.accent))
+		v.add_child(UI.kv("Value", G.money(G.value(p)), UI.TEXT, 18))
+		if not free:
+			v.add_child(UI.kv("Asking price", "about %s" % G.money(G.TR.asking_price(p)), UI.GOLD, 18))
+			v.add_child(UI.kv("Club's stance", "Listed for sale" if p.listed else ("Not for sale" if G.TR.squad_rank(p) < 3 else "Open to offers"), UI.GREEN if p.listed else UI.TEXT, 18))
+			v.add_child(UI.kv("Contract", "Until June %d" % p.cend, UI.AMBER if p.cend <= s.season + 1 else UI.TEXT, 18))
+		v.add_child(UI.kv("Would want", "%s a week" % G.money(G.wage_for(p.ovr, G.age(p))), UI.TEXT, 18))
+		if p.get("rc", 0) > 0:
+			v.add_child(UI.kv("Release clause", G.money(p.rc), UI.AMBER, 18))
+		_scout_btn(v, p)
+		w.add_child(UI.caps("Deal", 15, UI.accent))
+		if loaned_out:
+			w.add_child(_note("clock", "Your player, on loan at %s until the end of the season.%s" % [s.clubs[p.club].name, " You kept a recall clause." if p.get("lrecall", false) else ""], UI.BLUE))
+			if G.MK.can_recall(p):
+				_act(w, "Recall from loan", "Bring him back now", "repeat", func():
+					G.MK.recall(p)
+					UI.toast("%s is back" % G.pname(p), UI.GREEN)
+					refresh(), UI.GREEN)
+		elif free:
+			_act(w, "Offer contract", "No fee: agree wages and role", "handshake", func(): UI.main.open("nego", {"pid": p.id, "mode": "free"}), UI.accent)
+		else:
+			var dl = G.DL.find(p.id)
+			var lab = "Approach %s" % s.clubs[p.club].short
+			if dl != null and dl.mode == "buy" and dl.stage != "dead" and dl.stage != "done":
+				lab = {"new": lab, "club": "Continue fee talks", "deleg": "Your assistant is talking", "meet": "He meets you tomorrow", "talks": "Agree personal terms"}.get(dl.stage, lab)
+			_act(w, lab, "Open the talks", "handshake", func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"}), UI.accent)
+			if G.window_open():
+				_act(w, "Ask about a loan", "A season or half-season", "arrow-left-right", func(): _loan_in(p))
+			else:
+				w.add_child(UI.wrap("The transfer window is closed: a fee can be agreed, the move waits for it to open.", 15, UI.MUTED))
+			_special(w, p)
+		x.add_child(UI.caps("Tools", 15, UI.accent))
+		var short = p.id in s.shortlist
+		_act(x, "On your shortlist" if short else "Add to shortlist", "Tap to remove" if short else "Keep an eye on him", "star", func():
+			if p.id in s.shortlist:
+				s.shortlist.erase(p.id)
+			else:
+				s.shortlist.append(p.id)
+			refresh(), UI.GOLD if short else Color(0, 0, 0, 0))
+		_act(x, "Compare with another player", "", "users", func(): _compare(p))
+		_act(x, "Find similar players", "", "search", func(): UI.main.open("search", {"list": "similar", "pid": p.id, "grp": "search"}))
 	if G.settings.get("editor", false):
 		var eh = UI.hb(8)
-		for d in [-1, 1]:
-			var eb = UI.btn("Rating %+d" % d, func():
-				G.change_ovr(p, d)
+		for dd in [-1, 1]:
+			var eb = UI.btn("Rating %+d" % dd, func():
+				G.change_ovr(p, dd)
 				p.pot = max(p.pot, p.ovr)
-				refresh(), "ghost", "pencil", 52)
+				refresh(), "ghost", "pencil", 44)
 			eb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			eh.add_child(eb)
-		v.add_child(eh)
-	if own and not loaned_in:
-		v.add_child(UI.btn("Offer new contract", func(): UI.main.open("nego", {"pid": p.id, "mode": "renew"}), "primary", "handshake"))
-		var hb2 = UI.hb(10)
-		var lb = UI.btn("Unlist" if p.listed else "Transfer list", func():
-			p.listed = not p.listed
-			UI.toast("%s %s the transfer list" % [G.pname(p), "added to" if p.listed else "removed from"])
-			refresh(), "secondary", "flag", 72)
-		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hb2.add_child(lb)
-		var lo = UI.btn("Loan out", func(): _loan_out(p), "secondary", "arrow-left-right", 72)
-		lo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hb2.add_child(lo)
-		var rb = UI.btn("Release", func(): _release(p), "danger", "log-out", 72)
-		rb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hb2.add_child(rb)
-		v.add_child(hb2)
-	elif free:
-		_scout_btn(v, p)
-		v.add_child(UI.btn("Offer contract", func(): UI.main.open("nego", {"pid": p.id, "mode": "free"}), "primary", "handshake"))
-	elif not own and not loaned_out:
-		_scout_btn(v, p)
-		_special(v, p)
-		v.add_child(UI.btn("Approach %s" % s.clubs[p.club].short, func(): UI.main.open("nego", {"pid": p.id, "mode": "buy"}), "primary", "handshake"))
-		if G.window_open():
-			var ap = UI.caps("Asking price around %s%s" % [G.money(G.TR.asking_price(p)), (" · release clause %s" % G.money(p.rc)) if p.get("rc", 0) > 0 else ""], 19, UI.MUTED)
-			ap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			v.add_child(ap)
-			v.add_child(UI.btn("Ask about a loan", func(): _loan_in(p), "secondary", "arrow-left-right", 68))
-		else:
-			v.add_child(_note("clock", "The transfer window is closed. You can approach %s when it reopens." % G.pname(p), UI.MUTED))
+		x.add_child(eh)
 
 
-	_bar(p)
+func _talk(p: Dictionary, t: Dictionary):
+	var res = G.OPS.talk(p, t.k)
+	UI.sheet(t.n, func(v):
+		v.add_child(UI.wrap("You: “%s”" % res.you, 20, UI.MUTED))
+		v.add_child(UI.wrap("%s: “%s”" % [G.pname(p), res.reply], 22, UI.TEXT))
+		v.add_child(UI.lbl_fill("Morale %+d%s" % [res.mor, " · " + res.note if res.note != "" else ""], 18, UI.GREEN if res.mor > 0 else (UI.RED if res.mor < 0 else UI.MUTED), "semi"))
+		v.add_child(UI.btn("Done", func():
+			UI.close_sheet()
+			refresh(), "primary", "check", 50)))
+
+
+func _mentor(p: Dictionary):
+	var s = G.s
+	var uc = G.uc()
+	UI.sheet("Mentor for %s" % G.pname(p), func(v):
+		v.add_child(UI.wrap("A senior player in the same part of the pitch. The better and more professional he is, the more it helps. Each senior takes up to two.", 17, UI.MUTED))
+		var cands = []
+		for pid in uc.players:
+			var q = s.players[pid]
+			if q.id != p.id and G.age(q) >= 27 and G.LINE.get(q.pos, 2) == G.LINE.get(p.pos, 2) and q.ovr >= p.ovr:
+				cands.append(q)
+		cands.sort_custom(func(a, b): return a.ovr > b.ovr)
+		if cands.is_empty():
+			v.add_child(UI.wrap("Nobody suitable: he needs someone 27 or older, in his line, at least as good as he is.", 18, UI.AMBER))
+		for q in cands:
+			var n = 0
+			for pid in uc.players:
+				if int(s.players[pid].get("mentor", -1)) == q.id:
+					n += 1
+			var on = int(p.get("mentor", -1)) == q.id
+			var r = UI.panel(Color(UI.accent, 0.16) if on else Color(1, 1, 1, 0.05), 10, 12, 6)
+			var rh = UI.hb(8)
+			rh.add_child(UI.pos(q.pos, 16))
+			rh.add_child(UI.lbl_fill("%s · %d · %s" % [G.pname(q), G.age(q), G.PS.personality(q)], 19, UI.TEXT, "semi"))
+			rh.add_child(UI.lbl("%d pupil%s" % [n, "" if n == 1 else "s"], 15, UI.MUTED))
+			rh.add_child(UI.ovr(q.ovr, 17))
+			r.add_child(rh)
+			var qq = q
+			if n < 2 or on:
+				UI.tap(r, func():
+					if on:
+						p.erase("mentor")
+					else:
+						p["mentor"] = qq.id
+					UI.close_sheet()
+					refresh(), true)
+			else:
+				r.modulate.a = 0.5
+			v.add_child(r))
+
+
+func _number(p: Dictionary):
+	var s = G.s
+	var uc = G.uc()
+	var used = {}
+	for pid in uc.players:
+		if pid != p.id:
+			used[int(s.players[pid].get("num", 0))] = G.pname(s.players[pid])
+	UI.sheet("Shirt number", func(v):
+		v.add_child(UI.wrap("Taken numbers are dimmed. Tap a free one.", 16, UI.MUTED))
+		var g = GridContainer.new()
+		g.columns = 11
+		g.add_theme_constant_override("h_separation", 5)
+		g.add_theme_constant_override("v_separation", 5)
+		for n in range(1, 56):
+			var taken = used.has(n)
+			var on = int(p.get("num", 0)) == n
+			var c = UI.panel(UI.accent if on else Color(1, 1, 1, 0.03 if taken else 0.08), 8, 0, 6)
+			c.custom_minimum_size = Vector2(52, 0)
+			var l = UI.lbl(str(n), 19, UI.on_color(UI.accent) if on else (UI.DIM if taken else UI.TEXT), "disp")
+			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			c.add_child(l)
+			if not taken:
+				var nn = n
+				UI.tap(c, func():
+					p["num"] = nn
+					UI.close_sheet()
+					refresh(), true)
+			g.add_child(c)
+		v.add_child(g))
 
 
 func _bar(p: Dictionary):
@@ -551,7 +733,7 @@ func _bar(p: Dictionary):
 		elif G.MK.can_pre(p).ok:
 			acts.append(["Pre-contract", "", "gold", func(): UI.main.open("nego", {"pid": p.id, "mode": "pre"})])
 	acts.append(["Compare", "users", "secondary", func(): _compare(p)])
-	acts.append(["Similar", "search", "secondary", func(): UI.main.open("lists", {"kind": "similar", "pid": p.id, "grp": "search"})])
+	acts.append(["Similar", "search", "secondary", func(): UI.main.open("search", {"list": "similar", "pid": p.id, "grp": "search"})])
 	if not own:
 		acts.append(["Shortlisted" if short else "Shortlist", "star", "secondary", func():
 			if p.id in s.shortlist:

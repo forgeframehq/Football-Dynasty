@@ -93,6 +93,32 @@ func run(m):
 		await snap("fixtures_round")
 		main.root("clubview", {"cid": 2})
 		await snap("clubview")
+	if want.call("srch"):
+		main.root("search", {"list": "bargains", "grp": "search"})
+		await snap("bargains")
+		main.stack[-1].cust = true
+		main.stack[-1].refresh()
+		await snap("cust_general")
+		main.stack[-1].ctab = 1
+		main.stack[-1].refresh()
+		await snap("cust_pos")
+		main.stack[-1].ctab = 2
+		main.stack[-1].refresh()
+		await snap("cust_attr")
+		main.stack[-1]._template(G.s.players[G.uc().xi[9]])
+		main.stack[-1].cust = false
+		main.stack[-1].refresh()
+		await snap("similar")
+	if want.call("manage"):
+		main.root("player", {"pid": G.uc().xi[9], "page": 5})
+		await snap("manage_own")
+		var other = -1
+		for q in G.s.players.values():
+			if q.club >= 0 and q.club != G.uc().id and q.ovr > 84:
+				other = q.id
+				break
+		main.root("player", {"pid": other, "page": 5})
+		await snap("manage_other")
 	if want.call("cal"):
 		main.root("calendar")
 		await snap("calendar")
