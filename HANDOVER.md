@@ -1,8 +1,8 @@
-# Football Dynasty 26 — Handover (13 Nov 2026, v0.7.1 on `main`, v0.8.0 on `dev`)
+# Football Dynasty 26 — Handover (14 Nov 2026, v0.9.0 on `main`)
 
 ## Where things stand
-- `main` and the published APK are v0.7.1. `dev` is v0.8.0 (match engine rework), not yet built into an APK. Work on `dev`; push to `main` only when Sudhi asks for an APK.
-- Locked in with Sudhi but not built: real 3D Club City from the Kenney kits with one of his stadium models (CC0), a 3D manager's home (dollhouse and walk-in views) tied to Lifestyle, a car ladder using the Kenney Car Kit only, a simple-view fallback. Packs he uploaded are not in the repo yet.
+- `main`, `dev` and the published APK are v0.9.0, built overnight 13-14 Nov at Sudhi's request. Work on `dev`; push to `main` only when he asks for an APK.
+- Awaiting from Sudhi: Kenney Furniture Kit and Car Kit zips (for the 3D manager's home and cars), phone feedback on speed and heat in the 3D views.
 - v0.7.0 adds the tactics system, the transfer system, the Football Dynasty 26 branding (icon, wordmark, purple and gold scheme) and the intro film. See ROADMAP.md for the ticked list.
 - Personal football manager for Android (not for publishing): FIFA/PES career feel with Football Manager Mobile depth.
 - Godot 4.7.2, GDScript, GL Compatibility, all UI built in code. Landscape, base viewport 1100×620, immersive and edge-to-edge.
@@ -23,7 +23,7 @@ Standing rules:
 - Godot is not preinstalled: download `Godot_v4.7.2-stable_linux.x86_64.zip` from the godotengine/godot GitHub releases.
 - Build check: `gh run list -R forgeframehq/Football-Dynasty --limit 1`; APK: `gh api repos/forgeframehq/Football-Dynasty/releases/tags/latest -q '.assets[]'`.
 - Commits: author `Claude <noreply@anthropic.com>`; end messages with the Co-Authored-By and Claude-Session lines the session supplies.
-- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.8.0, code 11).
+- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.9.0, code 12).
 
 ## Code map
 - Autoloads: `DB` (data), `UI` (`scripts/ui.gd`), `G` (`scripts/game.gd`). Save is `G.s`, binary, integer keys survive.
@@ -102,3 +102,17 @@ Standing rules:
 - Strength curve flattened slightly (chance exponent 1.95, possession 2.4) and `PS_K` retuned: about 2.75-2.85 goals a game.
 - `dev/tactest.gd` (`-- --tactest n=400`) measures all of this: strength, each choice at equal strength, the 5x5 style grid, the underdog grid and cup ties. Results swing by about +/-0.07 points a game at n=400; do not tune on single cells.
 - Measured after the change: best-to-worst style choice against a given opponent style is worth roughly 0.3-0.4 points a game at equal strength; mastered-and-settled against poor-and-unsettled 1.53 v 1.00; worst roles 1.08; underdog win chance against the top side 7-26% depending on plan (was about 14% whatever you did); best second-tier side at home to the best top-tier side goes through 26%.
+
+## v0.9.0: 3D match, commentary, sounds, contract talks, car market, 3D city, game check
+- Match view: `scripts/widgets/match3d.gd` (SubViewportContainer). A textured pitch, simple stands, 22 figures built from boxes in kit colours, a ball. Open play follows the engine's `sim.ball` with the same shape maths as the flat pitch. Each shot event is staged by `play(e)` (pass, shot, outcome, celebration); `impact` fires when the ball arrives, `seq_done` at the end. The engine's shot events now carry `k` (kind), `as` (assister), `blk`.
+- Viewing mode `G.settings.view`: 0 watch, 1 key moments (default), 2 text only; chosen before kick-off or in Settings. In match.gd, events from a step with a shot are held in `deferred` until `impact`, so the score never spoils the move. At full time the flat pitch returns for the shot map.
+- Textures come from `tools/make_match_tex.py` (grass source `tools/grass_src.jpg`, from a free Unity ground pack Sudhi sent) into `assets/m3d/`.
+- Commentary: `scripts/commentary.gd` (`G.CM`). `ME.ev()` passes shot lines through `CM.shot()` (build-up line by kind, alternatives, a closing remark from the match state); quiet minutes use `CM.fill()`.
+- Sounds: click, open, back, confirm, continue, message, error, cash, build, tick, sign were regenerated with ElevenLabs sound generation to be soft and low. The key was used from the shell only and is not in the repo; it was pasted in chat again and should be regenerated.
+- Performance: `UI.apply_perf()` caps the frame rate (`fps`: auto = 60 on menus, 30 while a 3D view is up) and turns on low-processor mode (`saver`) outside 3D. `lowgfx` halves 3D resolution and drops anti-aliasing and shadows. `UI.enter3d()` is called by the 3D views.
+- Errors: `scripts/errlog.gd` is a `Logger` registered in `G.load_settings`; Settings > Diagnostics shows the count and the last entries, saved to user://errors.log.
+- Manager contract: `u.mc` via `G.OPS.mc()` (end season, bonus level, release clause, patience). `mc_propose`, `board_value`, `mc_daily` (board opens talks in the final season), `mc_rollover` (one-year option if confidence is 50+, otherwise the manager is out), `mgr_bonus` on trophies and promotion. The My Contract page in hub.gd is the negotiation.
+- Car market: 14 cars (`life.gd CARS`, `OPS.CAR_PRICE/CAR_UP`), `OPS.car_stock()` gives seven on sale each month with the first 12% off.
+- Club City 3D: `scripts/screens/city3d.gd`, models in `assets/city3d/` (Kenney roads, suburban, commercial kits, CC0; stadium `Fst_Eng_001.FBX`, which sits on a modelling pedestal sunk by a fixed ratio). The Club menu opens it unless `lowgfx` is on; "Classic view" opens the old `campus` screen.
+- Game check: `GODOT=... dev/audit.sh days=120 notch=70` visits every menu page, tactics tabs, player pages, lifestyle tabs and a match, then plays on; reports errors, slow pages, pages that scroll, off-screen and tiny text, and data problems to /tmp/audit.txt. First run found and fixed a crash on Investments in a new career.
+- Not done: manager's home in 3D (needs the Kenney Furniture Kit), voice commentary, extra time and shoot-outs, the tactics pitch overlay for the new instructions. The stadium in the match view is built from boxes, not the stadium model.

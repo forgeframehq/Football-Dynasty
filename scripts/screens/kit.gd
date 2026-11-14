@@ -137,7 +137,7 @@ func _sponsor(row: Control, c: Dictionary, sp):
 func _sign(deal: Dictionary):
 	UI.confirm("Sign with %s?" % deal.name, "%s deal: %s a week%s. It runs for the whole season and cannot be changed once signed." % [deal.type, G.money(deal.weekly), " and %s for every win" % G.money(deal.win) if deal.win > 0 else ""], "Sign the deal", func():
 		G.s.user["sponsor"] = deal
-		UI.sfx("cash", -8.0)
+		UI.sfx("sign", -4.0)
 		UI.toast("%s are your shirt sponsor" % deal.name, UI.GREEN)
 		refresh()
 		UI.main.refresh_nav())

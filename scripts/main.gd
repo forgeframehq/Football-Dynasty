@@ -85,13 +85,17 @@ func _ready():
 		return
 	_build()
 	root("menu")
-	if ("--shots" in ua or "--uitest" in ua) and not ("--intro" in ua):
+	if ("--shots" in ua or "--uitest" in ua or "--audit" in ua) and not ("--intro" in ua):
 		UI.music(true)
 	elif not _play_intro():
 		UI.music(true)
 	if "--uitest" in ua:
 		dev = load("res://dev/uitest.gd").new()
 		dev.run(self)
+	if "--audit" in ua:
+		dev = load("res://dev/audit.gd").new()
+		dev.run(self)
+		return
 	if "--shots" in ua:
 		dev = load("res://dev/shots.gd").new()
 		dev.run(self)
@@ -444,6 +448,7 @@ func back():
 		return
 	if sheet_node != null:
 		close_sheet()
+		UI.sfx("back", -12.0)
 		return
 	if menu_node != null:
 		close_menu()

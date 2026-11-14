@@ -323,9 +323,13 @@ static func invest_init(lf: Dictionary):
 		lf["props"] = []
 		lf["shares"] = {}
 		lf["px"] = []
+		while lf.px.size() < 16:
+			lf.px.append(float(G.rng.randi_range(20, 180)))
 		lf["stakes"] = {}
 		lf["agent"] = false
 		lf["media"] = false
+	while lf.px.size() < 16:
+		lf.px.append(float(G.rng.randi_range(20, 180)))
 
 
 static func life_ledger(lf: Dictionary) -> Array:
