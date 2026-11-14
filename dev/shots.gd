@@ -261,6 +261,14 @@ func run(m):
 			main.stack[-1].pick = -1
 			main.stack[-1].refresh()
 			await snap("life_%d" % i)
+	if want.call("mycontract"):
+		main.root("hub", {"kind": "contract", "grp": "manager"})
+		await snap("mycontract")
+		var hc = main.stack[-1]
+		hc.mc_ask = int(G.OPS.salary() * 1.6)
+		hc.mc_last = G.OPS.mc_propose(hc.mc_ask, 2, 1, 0)
+		hc.refresh()
+		await snap("mycontract_reply")
 	if want.call("tactics2"):
 		if G.s.user.links.is_empty():
 			for id in G.TC.LINK_ORDER:

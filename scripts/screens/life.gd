@@ -15,7 +15,16 @@ const CARS = [
 	["Executive saloon", "Aurel S5 Hybrid", 45000, 300, 250, 5.6, "car_1"],
 	["Sports coupe", "Kestrel GT", 160000, 480, 295, 3.9, "car_2"],
 	["Supercar", "Fulmine V12", 600000, 800, 345, 2.8, "car_3"],
-	["Classic collection", "1962 Corsa Rossa and four more", 2500000, 300, 260, 6.4, "car_4"]]
+	["Classic collection", "1962 Corsa Rossa and four more", 2500000, 300, 260, 6.4, "car_4"],
+	["City car", "Piccolo 1.0", 14000, 70, 165, 13.5, "car_1"],
+	["Hot hatch", "Vento RS", 38000, 300, 250, 5.2, "car_1"],
+	["Family SUV", "Montero X5", 62000, 280, 220, 6.9, "car_1"],
+	["Luxury saloon", "Aurel S9 Long", 120000, 450, 250, 4.6, "car_1"],
+	["Luxury SUV", "Granvia Imperial", 210000, 560, 270, 4.4, "car_1"],
+	["Roadster", "Kestrel Spyder", 95000, 350, 270, 4.8, "car_2"],
+	["Grand tourer", "Bellatrix GT12", 320000, 640, 320, 3.5, "car_2"],
+	["Track special", "Fulmine Corsa", 950000, 900, 350, 2.5, "car_3"],
+	["Hypercar", "Vortice Uno", 2900000, 1500, 410, 2.2, "car_3"]]
 const BIZ = [["Local restaurant", 250000, 1800, "Forty covers, full most nights when the team wins."], ["Football academy school", 1200000, 9500, "Fee-paying coaching for local children, with your name over the door."],
 	["Boutique hotel", 5000000, 42000, "Thirty rooms in the city centre. Away fans book it out."]]
 
@@ -150,18 +159,29 @@ func _showroom(h: Control, lf: Dictionary, homes: bool):
 	var a = pane(330, 4)
 	h.add_child(a[0])
 	var v = a[1]
-	v.add_child(UI.caps("Estate agent" if homes else "Showroom", 15, UI.accent))
-	for i in items.size():
+	v.add_child(UI.caps("Estate agent" if homes else "Car market · this month's stock", 15, UI.accent))
+	# homes: the whole ladder. cars: what you own, then what the dealers have this month (the first is on offer)
+	var show = range(items.size())
+	var stock = [] if homes else G.OPS.car_stock()
+	if not homes:
+		show = lf.cars.duplicate()
+		show.sort()
+		for ci in stock:
+			if not (ci in show) and show.size() < 9:
+				show.append(ci)
+		if not (pick in show):
+			pick = show[0]
+	for i in show:
 		var it = items[i]
 		var on = i == pick
 		var owned = (i == lf.home) if homes else (i in lf.cars)
-		var r = UI.panel(Color(UI.accent, 0.16) if on else Color(1, 1, 1, 0.03), 10, 8, 6, Color(UI.accent, 0.55) if on else Color(0, 0, 0, 0))
+		var r = UI.panel(Color(UI.accent, 0.16) if on else Color(1, 1, 1, 0.03), 10, 8, 6 if homes else 3, Color(UI.accent, 0.55) if on else Color(0, 0, 0, 0))
 		var rh = UI.hb(10)
-		rh.add_child(_pic(("home_%d" % (i + 1)) if homes else it[6], 74, 46))
+		rh.add_child(_pic(("home_%d" % (i + 1)) if homes else it[6], 74 if homes else 56, 46 if homes else 34))
 		var tv = UI.vb(-4)
 		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tv.add_child(UI.lbl_fill(it[0] if homes else it[1], 19, UI.TEXT, "semi"))
-		tv.add_child(UI.lbl_fill(("Lives here" if homes else ("Driving" if i == lf.car else "In your garage")) if owned else (G.money(it[1] if homes else it[2]) if (it[1] if homes else it[2]) > 0 else "Club property"), 15, UI.GOLD if owned else UI.MUTED))
+		tv.add_child(UI.lbl_fill(("Lives here" if homes else ("Driving" if i == lf.car else "In your garage")) if owned else ((G.money(it[1]) if homes else (G.money(G.OPS.car_price(i)) + ("  ·  12% off this month" if not stock.is_empty() and stock[0] == i else ""))) if (it[1] if homes else it[2]) > 0 else "Club property"), 15, UI.GOLD if owned else UI.MUTED))
 		rh.add_child(tv)
 		r.add_child(rh)
 		var idx = i
@@ -174,7 +194,7 @@ func _showroom(h: Control, lf: Dictionary, homes: bool):
 	h.add_child(b[0])
 	v = b[1]
 	var it2 = items[pick]
-	var price = int(it2[1] if homes else it2[2])
+	var price = int(it2[1]) if homes else (G.OPS.car_price(pick) if not (pick in lf.cars) else int(it2[2]))
 	v.add_child(_pic(("home_%d" % (pick + 1)) if homes else it2[6], 0, 165))
 	var th = UI.hb(10)
 	var tv2 = UI.vb(-4)

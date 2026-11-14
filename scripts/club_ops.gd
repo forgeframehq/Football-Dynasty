@@ -103,6 +103,7 @@ static func _thousands(n: int) -> String:
 # ---------------------------------------------------------------- daily / weekly
 
 static func daily():
+	mc_daily()
 	var s = G.s
 	var c = G.uc()
 	if not c.has("fac"):
@@ -170,9 +171,146 @@ static func club_value(c: Dictionary) -> int:
 
 
 const HOME_UP = [0, 300, 1200, 4000, 12000]
-const CAR_UP = [0, 150, 500, 1800, 5000]
+const CAR_UP = [0, 150, 500, 1800, 5000, 60, 140, 220, 420, 700, 330, 1000, 2600, 7000]
 const HOME_PRICE = [0, 180000, 900000, 3500000, 12000000]
-const CAR_PRICE = [0, 45000, 160000, 600000, 2500000]
+const CAR_PRICE = [0, 45000, 160000, 600000, 2500000, 14000, 38000, 62000, 120000, 210000, 95000, 320000, 950000, 2900000]
+
+
+static func car_stock() -> Array:
+	# the cars the dealers have this month: seven of the range, the first of them on offer
+	var ids = range(1, CAR_PRICE.size())
+	var rng = RandomNumberGenerator.new()
+	rng.seed = G.s.season * 97 + int(G.s.day / 30) * 13 + 5
+	for i in range(ids.size() - 1, 0, -1):
+		var j = rng.randi() % (i + 1)
+		var t = ids[i]
+		ids[i] = ids[j]
+		ids[j] = t
+	return ids.slice(0, 7)
+
+
+static func car_price(i: int) -> int:
+	var st = car_stock()
+	return int(CAR_PRICE[i] * 0.88) if not st.is_empty() and st[0] == i else CAR_PRICE[i]
+
+
+# ---------------------------------------------------------------- the manager's own contract
+
+const MC_BONUS = [["None", 0.0], ["Standard", 1.0], ["Big", 2.0]]
+
+
+static func mc() -> Dictionary:
+	# the manager's deal with his club: last season it covers, bonus level, release clause (weeks of salary a
+	# new club must pay; 0 = none), patience left in the current talks
+	var u = G.s.user
+	if not u.has("mc"):
+		u["mc"] = {"end": G.s.season + 1, "bonus": 1, "clause": 0, "pat": 100, "talk_day": -400, "asked": -1}
+	return u.mc
+
+
+static func board_value() -> int:
+	# the most the board will pay a week, before the extras are counted
+	var u = G.s.user
+	var c = G.uc()
+	var base = c.wage_budget * 0.012 * (0.5 + u.rep / 100.0)
+	var v = base * (0.75 + u.conf / 100.0 * 0.7)
+	if life().get("agent", false):
+		v *= 1.08
+	if not u.get("jobs", []).is_empty():
+		v *= 1.07          # other clubs are asking about you
+	return G.nice(max(v, salary() * (0.9 if u.conf < 40.0 else 1.0)))
+
+
+static func mc_can_talk() -> String:
+	# "" when talks can open, otherwise the reason they cannot
+	var u = G.s.user
+	var m = mc()
+	if G.s.day - int(m.talk_day) < 90 and int(m.pat) <= 0:
+		return "The board walked away from the last talks. They will sit down again in %d days." % (90 - (G.s.day - int(m.talk_day)))
+	if u.conf < 35.0:
+		return "The board will not discuss a new deal while confidence in you is this low."
+	if int(m.end) > G.s.season and G.s.day - int(u.get("raise_day", -400)) < 180:
+		return "You signed recently. The board will talk again in %d days." % (180 - (G.s.day - int(u.get("raise_day", -400))))
+	return ""
+
+
+static func mc_propose(ask: int, years: int, bonus: int, clause: int) -> Dictionary:
+	# -> {res: "accept" | "counter" | "reject" | "dead", text, offer}
+	var u = G.s.user
+	var m = mc()
+	if int(m.pat) <= 0 or G.s.day - int(m.talk_day) > 30:
+		m.pat = 100
+	m.talk_day = G.s.day
+	var top = float(board_value())
+	top *= 1.0 - 0.04 * bonus                      # bonuses come out of what they will pay weekly
+	if clause == 1:
+		top *= 0.95                                # a cheap way out for you costs them security
+	elif clause == 2:
+		top *= 1.02
+	var max_years = 1 if u.conf < 50.0 else (2 if u.conf < 65.0 else (3 if u.conf < 80.0 else 4))
+	if years > max_years:
+		m.pat = max(0, int(m.pat) - 20)
+		return {"res": "counter", "text": "The board will not commit beyond %d season%s at the moment." % [max_years, "" if max_years == 1 else "s"], "offer": G.nice(min(ask, top)), "years": max_years}
+	if ask <= top:
+		u["salary"] = ask
+		u["raise_day"] = G.s.day
+		m.end = G.s.season + years - (0 if (G.s.day > 200 and int(m.end) <= G.s.season) else 1)
+		m.bonus = bonus
+		m.clause = clause
+		m.pat = 100
+		m.asked = -1
+		u.conf = min(100.0, u.conf + 1.0)
+		G.msg("New contract signed", "You have agreed terms with the board of %s: %s a week until the end of the %d/%02d season, %s bonuses%s." % [G.uc().name, G.money(ask), int(m.end), (int(m.end) + 1) % 100, MC_BONUS[bonus][0].to_lower(), "" if clause == 0 else ", with a release clause"], "board")
+		return {"res": "accept", "text": "The chairman shakes your hand. It is done.", "offer": ask, "years": years}
+	if ask <= top * 1.15:
+		m.pat = max(0, int(m.pat) - 25)
+		if int(m.pat) <= 0:
+			u.conf = max(0.0, u.conf - 2.0)
+			return {"res": "dead", "text": "The board has run out of patience and ended the talks.", "offer": 0, "years": years}
+		return {"res": "counter", "text": "Too much, the chairman says, but he can go to %s a week." % G.money(G.nice(top)), "offer": G.nice(top), "years": years}
+	m.pat = max(0, int(m.pat) - 40)
+	if int(m.pat) <= 0:
+		u.conf = max(0.0, u.conf - 3.0)
+		return {"res": "dead", "text": "The board has run out of patience and ended the talks.", "offer": 0, "years": years}
+	return {"res": "reject", "text": "The chairman laughs it off. That is nowhere near what the club will pay.", "offer": 0, "years": years}
+
+
+static func mc_daily():
+	# in the last season of the deal the board comes to you, once, if they want to keep you
+	var u = G.s.user
+	var m = mc()
+	if int(m.end) <= G.s.season and int(m.asked) != G.s.season and G.s.day >= 150 and not u.sacked:
+		m.asked = G.s.season
+		if u.conf >= 45.0:
+			G.msg("The board wants to talk", "Your contract at %s runs out at the end of this season. The board would like you to stay and has invited you to discuss new terms. Open My Contract to negotiate: salary, length, bonuses and a release clause are all on the table." % G.uc().name, "mycontract", null, true)
+		else:
+			G.msg("No new contract on the table", "Your contract at %s runs out at the end of this season and the board has not offered new terms. Results between now and then will decide whether they do." % G.uc().name, "mycontract", null, true)
+
+
+static func mc_rollover() -> bool:
+	# called when a season ends. Returns true if the manager is out of contract and has to leave.
+	var u = G.s.user
+	var m = mc()
+	if int(m.end) >= G.s.season or u.sacked:
+		return false
+	if u.conf >= 50.0:
+		m.end = G.s.season
+		G.msg("One more year", "You let your contract run down, but the board has used its option to keep you for one more season on the same terms. Sort out a proper deal before it runs out again.", "mycontract", null, true)
+		return false
+	G.msg("Your contract has expired", "Your deal at %s ran out and the board chose not to renew it. You are free to look for a new club." % G.uc().name, "board", null, true)
+	return true
+
+
+static func mgr_bonus(kind: String):
+	# trophies and promotion pay the manager, according to the bonus level in his contract
+	var lvl = float(MC_BONUS[int(mc().bonus)][1])
+	if lvl <= 0.0:
+		return
+	var weeks = {"league": 20, "euro": 26, "cup": 8, "promo": 14}.get(kind, 0)
+	var amt = G.nice(salary() * weeks * lvl * 0.5)
+	if amt > 0:
+		life().cash += amt
+		G.msg("Bonus paid", "Your contract pays a bonus for this: %s has gone into your account." % G.money(amt), "board")
 
 
 static func invest_init(lf: Dictionary):

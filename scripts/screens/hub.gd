@@ -901,35 +901,86 @@ func _doc(v: Control):
 	v.add_child(nav)
 
 
+var mc_ask := -1
+var mc_years := 2
+var mc_bonus := 1
+var mc_clause := 0
+var mc_last: Dictionary = {}
+
+
 func _contract(v: Control):
 	var s = G.s
 	var u = s.user
+	var m = G.OPS.mc()
 	var sal = G.OPS.salary()
+	if mc_ask < 0:
+		mc_ask = G.nice(sal * 1.15)
+		mc_bonus = int(m.bonus)
+		mc_clause = int(m.clause)
+	var left = int(m.end) - s.season
 	var cv = _card(v, "Your deal at %s" % G.uc().name)
-	cv.add_child(UI.lbl("%s a week" % G.money(sal), 40, UI.TEXT, "xbold"))
+	cv.add_child(UI.lbl("%s a week" % G.money(sal), 38, UI.TEXT, "xbold"))
 	cv.add_child(UI.kv("A year", G.money(sal * 52)))
-	cv.add_child(UI.kv("Board confidence", "%d%%" % int(u.conf)))
+	cv.add_child(UI.kv("Runs until", "end of %d/%02d" % [int(m.end), (int(m.end) + 1) % 100], UI.RED if left <= 0 else UI.TEXT))
+	cv.add_child(UI.kv("Trophy bonuses", G.OPS.MC_BONUS[int(m.bonus)][0]))
+	cv.add_child(UI.kv("Release clause", "None" if int(m.clause) == 0 else ("Low: clubs can take you easily" if int(m.clause) == 1 else "High: the club is protected")))
+	cv.add_child(UI.kv("Board confidence", "%d%%" % int(u.conf), UI.GREEN if u.conf >= 60 else (UI.AMBER if u.conf >= 40 else UI.RED)))
 	cv.add_child(UI.kv("Reputation", "%d / 100" % int(u.rep)))
-	var wait = int(u.get("raise_day", -400)) + 180 - s.day
-	var rv = _card(v, "Ask for a new contract")
-	if wait > 0:
-		rv.add_child(UI.wrap("You can open talks again in %d days." % wait, 20, UI.AMBER))
+	if left <= 0:
+		cv.add_child(UI.wrap("This is the last season of your deal. Without a new one the board decides in the summer whether you stay.", 17, UI.AMBER))
+	var nv = _card(v, "Negotiate with the board")
+	var why = G.OPS.mc_can_talk()
+	if why != "":
+		nv.add_child(UI.wrap(why, 19, UI.AMBER))
 	else:
-		rv.add_child(UI.wrap("The board pays more to managers they trust. Above 60% confidence they usually agree; below 45% asking only annoys them.", 19, UI.MUTED))
-		for pct in [10, 25]:
-			var p = pct
-			rv.add_child(UI.btn("Ask for %d%% more" % p, func():
-				u["raise_day"] = s.day
-				var chance = clamp(0.5 + (u.conf - (55.0 + p * 0.6)) * 0.03 + (0.15 if G.OPS.life().get("agent", false) else 0.0), 0.03, 0.95)
-				if G.rng.randf() < chance:
-					u["salary"] = int(sal * (1.0 + p / 100.0))
-					UI.sfx("cash", -8.0)
-					UI.toast("New contract agreed: %s a week" % G.money(u.salary), UI.GREEN)
-				else:
-					u.conf = max(0.0, u.conf - 2.0)
-					UI.sfx("error", -8.0)
-					UI.toast("The board refused", UI.RED)
-				refresh(), "secondary", "file-text", 52))
+		var hh = UI.hb(8)
+		hh.add_child(UI.lbl_fill("Weekly salary", 19, UI.MUTED))
+		var al = UI.lbl(G.money(mc_ask), 24, UI.GOLD, "disp")
+		hh.add_child(al)
+		nv.add_child(hh)
+		var lo = G.nice(sal * 0.9)
+		var hi = G.nice(sal * 2.0)
+		nv.add_child(UI.slider(lo, hi, clamp(mc_ask, lo, hi), max(100, G.nice((hi - lo) / 40.0)), func(x):
+			mc_ask = int(x)
+			al.text = G.money(mc_ask), true))
+		nv.add_child(UI.caps("Length", 14, UI.DIM))
+		nv.add_child(UI.seg(["1 season", "2", "3", "4"], mc_years - 1, func(i):
+			mc_years = i + 1
+			refresh(), 17, 5))
+		nv.add_child(UI.caps("Trophy bonuses", 14, UI.DIM))
+		nv.add_child(UI.seg(["None", "Standard", "Big"], mc_bonus, func(i):
+			mc_bonus = i
+			refresh(), 17, 5))
+		nv.add_child(UI.caps("Release clause", 14, UI.DIM))
+		nv.add_child(UI.seg(["None", "Low", "High"], mc_clause, func(i):
+			mc_clause = i
+			refresh(), 17, 5))
+		nv.add_child(UI.btn("Put it to the board", func():
+			mc_last = G.OPS.mc_propose(mc_ask, mc_years, mc_bonus, mc_clause)
+			if mc_last.res == "accept":
+				UI.sfx("sign", -4.0)
+				mc_ask = -1
+			elif mc_last.res == "counter":
+				UI.sfx("message", -8.0)
+				if int(mc_last.offer) > 0:
+					mc_ask = int(mc_last.offer)
+				mc_years = int(mc_last.years)
+			else:
+				UI.sfx("error", -8.0)
+			refresh(), "primary", "file-text", 54))
+	var bv = _card(v, "Across the table")
+	var pat = int(m.pat)
+	var ph = UI.hb(8)
+	ph.add_child(UI.lbl("Board patience", 18, UI.MUTED))
+	ph.add_child(UI.bar(pat / 100.0, UI.GREEN if pat > 50 else (UI.AMBER if pat > 25 else UI.RED), 8))
+	bv.add_child(ph)
+	if not mc_last.is_empty():
+		bv.add_child(UI.wrap(mc_last.text, 20, UI.GREEN if mc_last.res == "accept" else (UI.AMBER if mc_last.res == "counter" else UI.RED)))
+	bv.add_child(UI.wrap("What moves them: board confidence above all, then your reputation. An agent gets you about 8% more, and so does interest from other clubs.", 17, UI.MUTED))
+	bv.add_child(UI.wrap("Bigger bonuses and a low release clause both come out of the weekly figure they will agree to. A high clause, which protects the club, earns you a little more.", 17, UI.MUTED))
+	bv.add_child(UI.wrap("Bonuses pay on a league title, a cup, a European trophy or promotion. Standard pays about ten weeks' salary for the title; Big pays double.", 17, UI.MUTED))
+	bv.add_child(UI.kv("Agent", "Hired" if G.OPS.life().get("agent", false) else "None"))
+	bv.add_child(UI.kv("Clubs interested in you", str(u.get("jobs", []).size())))
 
 
 # ---------------------------------------------------------------- world

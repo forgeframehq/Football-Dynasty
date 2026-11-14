@@ -412,10 +412,12 @@ static func rollover():
 		note = "Champions"
 		u.trophies.append("%s %s" % [s.leagues[old_lg].name, G.season_name()])
 		u["film"] = "league"
+		G.OPS.mgr_bonus("league")
 		G.OPS.life().cash += G.OPS.salary() * 20
 		G.scrap("Champions", "%s won the %s" % [ucl.name, s.leagues[old_lg].name])
 	elif promoted:
 		u["film"] = "promo"
+		G.OPS.mgr_bonus("promo")
 		note = "Promoted"
 	elif relegated:
 		note = "Relegated"
@@ -547,6 +549,8 @@ static func rollover():
 		G.msg("Contracts expired", "These players left the club at the end of their contracts: " + ", ".join(left) + ".", "contract")
 	G.msg("Season %s" % G.season_name(), "A new season begins. The board's objective: %s.\n\nTransfer budget: %s. The transfer window is open until 31 August." % [u.obj.text, G.money(ucl.budget)], "board")
 	if u.conf < 12.0:
+		u.sacked = true
+	if G.OPS.mc_rollover():
 		u.sacked = true
 	s.review = review
 	G.refresh_jobs()
