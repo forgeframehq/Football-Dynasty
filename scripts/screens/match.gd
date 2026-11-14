@@ -3,6 +3,8 @@ extends "res://scripts/screens/screen.gd"
 
 const PITCH = preload("res://scripts/widgets/match_pitch.gd")
 const MOM = preload("res://scripts/widgets/momentum.gd")
+const VIEW3D = preload("res://scripts/widgets/match3d.gd")
+const VIEWS = ["Watch", "Key moments", "Text only"]
 const SPEEDS = [0.85, 0.4, 0.13, 0.85]
 const TABS = ["Feed", "Stats", "Line-ups", "Live"]
 const MENT_SHORT = ["Bus", "Def", "Bal", "Att", "All out"]
@@ -37,6 +39,9 @@ var tabv: VBoxContainer
 var feed_sc: ScrollContainer
 var tab_sc: ScrollContainer
 var tab_holder: Control
+var view3d = null            # the 3D pitch, when the match is being watched
+var vmode: int = int(G.settings.get("view", 1))   # 0 watch the match, 1 key moments, 2 text only
+var deferred: Array = []     # events held back until the staged move on the pitch reaches its outcome
 
 
 func can_leave() -> bool:
@@ -116,7 +121,11 @@ func _build_pre():
 		cv.add_child(r)
 	cc.add_child(cv)
 	v.add_child(cc)
-	v.add_child(UI.btn("Kick off", _kickoff, "primary", "play", 92))
+	v.add_child(UI.seg(VIEWS, vmode, func(i):
+		vmode = i
+		G.settings["view"] = i
+		G.save_settings(), 19, 6))
+	v.add_child(UI.btn("Kick off", _kickoff, "primary", "play", 84))
 	var opp = ac if f.h == G.s.user.club else hc
 	var ro = ra if f.h == G.s.user.club else rh
 	var rep_card = UI.card()
@@ -307,7 +316,20 @@ func _build_live():
 	pitch.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	pitch.custom_minimum_size = Vector2(0, 300)
 	pitch.setup(sim)
-	left.add_child(pitch)
+	var pitch_host: Control = pitch
+	view3d = null
+	if vmode != 2:
+		# watching: the 3D pitch takes the place of the flat one (which still works out the two kit colours)
+		pitch_host = Control.new()
+		pitch_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		pitch_host.custom_minimum_size = Vector2(0, 300)
+		pitch_host.clip_contents = true
+		view3d = VIEW3D.new()
+		view3d.setup(sim, pitch.cols[0], pitch.cols[1], _second(h.club, pitch.cols[0]), _second(a.club, pitch.cols[1]))
+		view3d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		pitch_host.add_child(view3d)
+		view3d.impact.connect(_on_impact)
+	left.add_child(pitch_host)
 	banner = UI.panel(Color("0b111c"), 20, 26, 12, UI.GOLD)
 	var bv = UI.vb(-2)
 	banner_l = UI.lbl("GOAL!", 52, UI.GOLD, "xbold")
@@ -321,7 +343,7 @@ func _build_live():
 	bc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bc.add_child(banner)
-	pitch.add_child(bc)
+	pitch_host.add_child(bc)
 	banner.visible = false
 	# possession strip
 	var pr = UI.hb(12)
@@ -605,8 +627,39 @@ func _team_talk():
 	UI.sheet("Team talk", build_sheet)
 
 
+func _second(c: Dictionary, shirt: Color) -> Color:
+	# shorts colour: the club's other colour, unless that is the shirt colour
+	var c2 = Color(str(c.c2))
+	if abs(c2.r - shirt.r) + abs(c2.g - shirt.g) + abs(c2.b - shirt.b) < 0.25:
+		c2 = Color(str(c.c1))
+	return c2
+
+
+func _on_impact():
+	var evs = deferred
+	deferred = []
+	if not evs.is_empty() and sim != null:
+		_apply(evs)
+
+
 func _process(delta):
+	if view3d != null and stage == "live":
+		view3d.process_mode = Node.PROCESS_MODE_DISABLED if (paused or UI.main.sheet_node != null) else Node.PROCESS_MODE_INHERIT
 	if stage != "live" or paused or sim == null or UI.main.sheet_node != null:
+		return
+	if view3d != null and (view3d.playing() or not deferred.is_empty()):
+		return
+	if view3d != null and vmode == 1:
+		# key moments: the clock runs quickly between chances, each chance is played out on the pitch
+		acc += delta
+		if hold > 0.0:
+			hold -= delta
+			if hold <= 0.0 and banner != null:
+				banner.visible = false
+			return
+		if acc >= 0.05:
+			acc = 0.0
+			_tick()
 		return
 	if hold > 0.0:
 		hold -= delta
@@ -627,6 +680,17 @@ func _process(delta):
 
 func _tick() -> bool:
 	var evs = sim.step()
+	if view3d != null:
+		for e in evs:
+			if e.has("k"):
+				# a chance: show it first; the score, sounds and commentary follow when the ball gets there
+				deferred = evs
+				view3d.play(e)
+				return true
+	return _apply(evs)
+
+
+func _apply(evs: Array) -> bool:
 	var notable = false
 	for e in evs:
 		_add_event(e)
@@ -662,6 +726,8 @@ func _tick() -> bool:
 			tw.tween_method(pitch.set_flash, 1.0, 0.0, 1.2)
 	pitch.ball_color = pitch.cols[sim.ball_side]
 	pitch.tick()
+	if view3d != null:
+		view3d.tick()
 	_update()
 	if tab != 0 and (notable or sim.minute % 3 == 0):
 		_refresh_tab()
@@ -681,6 +747,9 @@ func _skip():
 	if sim == null or stage == "ft":
 		return
 	sim.sd[us].auto = true
+	for e in deferred:
+		_add_event(e)
+	deferred = []
 	while sim.phase != 4:
 		for e in sim.step():
 			_add_event(e)
@@ -844,6 +913,14 @@ func _exit_tree():
 
 
 func _show_ft():
+	if view3d != null and is_instance_valid(view3d) and pitch.get_parent() == null:
+		# full time: the flat pitch takes over to show the shot map
+		var host = view3d.get_parent()
+		view3d.visible = false
+		view3d.process_mode = Node.PROCESS_MODE_DISABLED
+		pitch.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		host.add_child(pitch)
+		host.move_child(pitch, 0)
 	UI.ambience(false)
 	for c in lower.get_children():
 		lower.remove_child(c)

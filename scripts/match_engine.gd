@@ -304,8 +304,14 @@ func nm(pid: int) -> String:
 	return G.pname(pl[pid])
 
 
-func ev(type: String, side: int, text: String, pid := -1) -> Dictionary:
+func ev(type: String, side: int, text: String, pid := -1, kind := "", asst := -1, header := false, blocked := false) -> Dictionary:
+	if kind != "":
+		text = G.CM.shot(self, type, side, text, pid, kind, asst, header, blocked)
 	var e = {"m": minute, "t": type, "s": side, "x": text, "p": pid}
+	if kind != "":
+		e["k"] = kind
+		e["as"] = asst
+		e["blk"] = blocked
 	events.append(e)
 	return e
 
@@ -378,7 +384,7 @@ func step() -> Array:
 		ball = Vector2(adv if ai == 0 else 1.0 - adv, rng.randf_range(0.15, 0.85))
 		carrier = -1
 		if detailed and rng.randf() < 0.07:
-			out.append(ev("info", ai, T_FILL[rng.randi() % T_FILL.size()] % at.club.name))
+			out.append(ev("info", ai, G.CM.fill(self, ai)))
 	if detailed:
 		momentum.append((1 if ai == 0 else -1) * (3 if ball_state == "SHOT" or ball_state == "GOAL" else (2 if ball_state == "ATTACK" else 1)))
 	if rng.randf() < 0.24:
@@ -595,7 +601,7 @@ func _shot(ai: int, out: Array, pen: bool):
 				tx += " Assist: %s." % nm(asst)
 			if lk != null:
 				tx += " That is the %s link-up at work!" % G.TC.LINKS[lk.id].n
-			var e = ev("goal", ai, tx, sh)
+			var e = ev("goal", ai, tx, sh, kind, asst, header)
 			e["a"] = asst
 			if lk != null:
 				e["link"] = lk.id
@@ -622,12 +628,12 @@ func _shot(ai: int, out: Array, pen: bool):
 				tx = "%s gets on the end of the cross — %s keeps it out." % [nm(sh), nm(gk) if gk >= 0 else "the keeper"]
 			else:
 				tx = _save_text(sh, gk)
-			out.append(ev("save", ai, tx, sh))
+			out.append(ev("save", ai, tx, sh, kind, asst, header))
 	elif r3 < 0.62 and not pen:
 		if rng.randf() < 0.35:
 			at.corners += 1
 		if detailed:
-			out.append(ev("miss", ai, T_BLOCK[rng.randi() % T_BLOCK.size()] % nm(sh), sh))
+			out.append(ev("miss", ai, T_BLOCK[rng.randi() % T_BLOCK.size()] % nm(sh), sh, kind, asst, header, true))
 	else:
 		if detailed:
 			var tx = ""
@@ -643,7 +649,7 @@ func _shot(ai: int, out: Array, pen: bool):
 				tx = T_BIG[rng.randi() % T_BIG.size()] % nm(sh)
 			else:
 				tx = T_WIDE[rng.randi() % T_WIDE.size()] % nm(sh)
-			out.append(ev("miss", ai, tx, sh))
+			out.append(ev("miss", ai, tx, sh, kind, asst, header))
 
 
 func _save_text(sh: int, gk: int) -> String:

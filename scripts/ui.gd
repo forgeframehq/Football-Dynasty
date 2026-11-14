@@ -107,6 +107,22 @@ func apply_accent():
 			accent = col
 
 
+var in3d := 0        # how many 3D views are on screen
+
+
+func apply_perf():
+	# Frame rate and idle behaviour, to keep the phone cool. "fps": 0 automatic (60 on menus, 30 while a 3D
+	# view is showing), 1 always 30, 2 always 60. Battery saver lets the screen idle when nothing is moving.
+	var mode = int(G.settings.get("fps", 0))
+	Engine.max_fps = 30 if (mode == 1 or (mode == 0 and in3d > 0)) else 60
+	OS.low_processor_usage_mode = bool(G.settings.get("saver", true)) and in3d == 0
+
+
+func enter3d(on: bool):
+	in3d = max(0, in3d + (1 if on else -1))
+	apply_perf()
+
+
 func vol_db(key: String, full_db: float) -> float:
 	# sliders run 0-100; the default of 70 sits about 3 dB under full
 	var v = float(G.settings.get(key, 70))

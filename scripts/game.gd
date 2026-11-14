@@ -9,12 +9,14 @@ const CP = preload("res://scripts/comps.gd")
 const OPS = preload("res://scripts/club_ops.gd")
 const PS = preload("res://scripts/persona.gd")
 const DL = preload("res://scripts/deals.gd")
+const CM = preload("res://scripts/commentary.gd")
 const TC = preload("res://scripts/tac.gd")
 const MK = preload("res://scripts/market.gd")
 
 const SAVE_V = 2
 var slot := 0
 const CUR_RATE = {"€": 1.0, "£": 0.85, "$": 1.15}
+var errlog = null      # runtime error catcher (scripts/errlog.gd)
 var settings: Dictionary = {"sound": true}
 
 
@@ -52,6 +54,10 @@ func load_settings():
 		settings["vol_music"] = 0
 		settings["music"] = true
 	UI.apply_skin()
+	UI.apply_perf()
+	if errlog == null:
+		errlog = load("res://scripts/errlog.gd").new()
+		OS.add_logger(errlog)
 
 
 func save_settings():

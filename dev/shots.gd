@@ -285,6 +285,56 @@ func run(m):
 				main.stack[-1].zoom = 1.0
 				main.stack[-1].refresh()
 				await snap("city_sel")
+	if want.call("m3d"):
+		for i in 8:
+			if G.user_fixture_today() != null:
+				break
+			G.advance()
+		G.settings["view"] = 0
+		main.root("match", {"fx": G.user_fixture_today()})
+		await snap("m3d_pre")
+		var m3 = main.stack[-1]
+		m3._kickoff()
+		await snap("m3d_open", 2.5)
+		m3.set_process(false)
+		var sd0 = m3.sim.sd[0]
+		for kind in ["cross", "big", "fk"]:
+			m3.view3d.play({"t": "goal" if kind != "big" else "save", "s": 0, "p": sd0.xi[10], "k": kind, "as": sd0.xi[7], "blk": false})
+			await snap("m3d_%s_a" % kind, 1.5)
+			await snap("m3d_%s_b" % kind, 0.75)
+			await snap("m3d_%s_c" % kind, 1.3)
+			while m3.view3d.playing():
+				await main.get_tree().process_frame
+		m3.set_process(true)
+		m3._skip()
+		await main.get_tree().process_frame
+	if want.call("m3drun"):
+		for i in 8:
+			if G.user_fixture_today() != null:
+				break
+			G.advance()
+		G.settings["view"] = 1
+		main.root("match", {"fx": G.user_fixture_today()})
+		var mr = main.stack[-1]
+		mr._kickoff()
+		var waited = 0.0
+		var shots_n = 0
+		while mr.stage != "ft" and waited < 150.0:
+			await main.get_tree().create_timer(0.5).timeout
+			waited += 0.5
+			if mr.stage == "ht":
+				mr.stage = "live"
+				mr.sim.phase = 3
+			if mr.view3d != null and mr.view3d.playing() and shots_n < 3:
+				shots_n += 1
+				await snap("m3drun_%d" % shots_n, 0.9)
+		print("M3DRUN stage=%s minute=%d score=%s waited=%.0f events=%d" % [mr.stage, mr.sim.minute, mr.sim.score_text(), waited, mr.sim.events.size()])
+		await snap("m3drun_end")
+		for e in mr.sim.events.slice(0, 14):
+			if e.x != "":
+				print("M3DRUN  ", e.m, " ", e.x)
+		print("M3DRUN errlog ", G.errlog.snapshot())
+		mr._skip()
 	if want.call("scout"):
 		for i in 8:
 			if G.user_fixture_today() != null:

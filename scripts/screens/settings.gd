@@ -90,6 +90,42 @@ func _soundtrack(row: Control):
 	songs_box = UI.vb(4)
 	v.add_child(songs_box)
 	_fill_songs()
+	v.add_child(UI.sp(0, 2))
+	var h2 = UI.hb(12)
+	v.add_child(h2)
+	var c1 = UI.vb(4)
+	c1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h2.add_child(c1)
+	var c2 = UI.vb(4)
+	c2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h2.add_child(c2)
+	_head(c1, "Match view")
+	c1.add_child(UI.seg(["Watch", "Key moments", "Text"], int(G.settings.get("view", 1)), func(i):
+		_put("view", i)
+		refresh(), 17, 5))
+	_head(c1, "3D detail")
+	c1.add_child(UI.seg(["Full", "Light"], 1 if G.settings.get("lowgfx", false) else 0, func(i):
+		_put("lowgfx", i == 1)
+		refresh(), 17, 5))
+	_head(c2, "Frame rate")
+	c2.add_child(UI.seg(["Auto", "30", "60"], int(G.settings.get("fps", 0)), func(i):
+		_put("fps", i)
+		UI.apply_perf()
+		refresh(), 17, 5))
+	_head(c2, "Battery saver")
+	c2.add_child(UI.seg(["On", "Off"], 0 if G.settings.get("saver", true) else 1, func(i):
+		_put("saver", i == 0)
+		UI.apply_perf()
+		refresh(), 17, 5))
+	var errs = G.errlog.snapshot() if G.errlog != null else []
+	var dg = UI.hb(8)
+	dg.add_child(UI.caps("Diagnostics", 16, UI.accent))
+	dg.add_child(UI.lbl_fill("%d fps  ·  %s" % [Engine.get_frames_per_second(), "no errors logged" if errs.is_empty() else "%d errors logged" % G.errlog.total], 17, UI.MUTED if errs.is_empty() else UI.AMBER))
+	if not errs.is_empty():
+		var b = UI.chip("VIEW", UI.CARD2, UI.TEXT, 16, 64)
+		UI.tap(b, _show_errors, true)
+		dg.add_child(b)
+	v.add_child(dg)
 
 
 func _fill_songs():
@@ -193,3 +229,17 @@ func _look(row: Control):
 	v.add_child(UI.seg(["1x", "2x", "4x", "Key"], int(G.settings.get("speed", 0)), func(i):
 		_put("speed", i)
 		refresh(), 19, 5))
+
+
+func _show_errors():
+	UI.sheet("Error log", func(v):
+		var errs = G.errlog.snapshot()
+		errs.reverse()
+		for k in min(12, errs.size()):
+			v.add_child(UI.wrap(errs[k], 15, UI.MUTED))
+		v.add_child(UI.wrap("The full list is saved on the phone as errors.log in the game's data folder.", 15, UI.DIM))
+		v.add_child(UI.btn("Clear the log", func():
+			G.errlog.clear()
+			UI.close_sheet()
+			refresh(), "ghost", "", 56)))
+	G.errlog.save()
