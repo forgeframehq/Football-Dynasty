@@ -223,9 +223,15 @@ static func add_ko(lg: int, h: int, a: int, day: int, label: String) -> int:
 
 
 static func fx_winner(f: Dictionary) -> int:
-	if f.hg > f.ag:
+	var hg = int(f.hg)
+	var ag = int(f.ag)
+	if int(f.get("leg", 0)) == 2 and f.has("first"):
+		var f1 = G.s.fixtures[int(f.first)]
+		hg += int(f1.ag)
+		ag += int(f1.hg)
+	if hg > ag:
 		return f.h
-	if f.ag > f.hg:
+	if ag > hg:
 		return f.a
 	return f.h if f.pens[0] > f.pens[1] else f.a
 

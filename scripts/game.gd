@@ -100,6 +100,7 @@ var fx_by_day: Dictionary = {}
 var cur: Dictionary = {}
 var rng = RandomNumberGenerator.new()
 var stop_flag := false
+var live = null            # {"sim", "us"} while the Tactics screen is open during a match
 var active := false
 var fit_table: Dictionary = {}
 var lu_cache: Dictionary = {}
@@ -873,6 +874,75 @@ func club_fixtures(cid: int) -> Array:
 			out.append(f)
 	out.sort_custom(func(a, b): return a.day < b.day)
 	return out
+
+
+const WX = {
+	"clear": {"n": "Clear", "i": "sun", "d": "No effect on play.", "line": "", "drain": 1.0},
+	"cloud": {"n": "Overcast", "i": "cloud", "d": "No effect on play.", "line": "", "drain": 1.0},
+	"rain": {"n": "Rain", "i": "cloud-drizzle", "d": "A slick pitch: short passing is a little harder.", "line": "Steady rain is falling and the surface is slick.", "drain": 1.0},
+	"heavy": {"n": "Heavy rain", "i": "cloud-rain", "d": "Short passing and a fast tempo suffer; direct play holds up.", "line": "It is pouring down, and the ball is skidding off the turf.", "drain": 1.05},
+	"wind": {"n": "Strong wind", "i": "wind", "d": "Long balls and crosses from wide are harder to judge.", "line": "A strong wind is swirling around the ground.", "drain": 1.0},
+	"snow": {"n": "Snow", "i": "snowflake", "d": "A heavy pitch: attacks slow down and a high line is risky.", "line": "Snow is falling and the lines have been swept clear.", "drain": 1.08},
+	"heat": {"n": "Hot", "i": "thermometer-sun", "d": "Players tire faster, most of all if you press high.", "line": "It is a hot one today: expect tired legs late on.", "drain": 1.2},
+}
+
+
+func weather(f: Dictionary) -> Dictionary:
+	# the same fixture always gets the same weather, so the forecast and the match agree; no postponements
+	var d = date(int(f.day))
+	var r = float(absi(hash(int(f.id) * 7919 + int(f.day) * 31 + int(f.h) * 131)) % 1000) / 1000.0
+	var m = int(d.month)
+	var k = "clear"
+	var temp = 14
+	if m in [12, 1, 2]:
+		temp = 3 + int(r * 7.0)
+		k = "snow" if r < 0.08 else ("heavy" if r < 0.2 else ("rain" if r < 0.42 else ("wind" if r < 0.56 else ("cloud" if r < 0.8 else "clear"))))
+	elif m in [6, 7, 8]:
+		temp = 19 + int(r * 14.0)
+		k = "heat" if r > 0.8 else ("rain" if r < 0.12 else ("cloud" if r < 0.3 else "clear"))
+	else:
+		temp = 8 + int(r * 11.0)
+		k = "heavy" if r < 0.09 else ("rain" if r < 0.3 else ("wind" if r < 0.42 else ("cloud" if r < 0.66 else "clear")))
+	var w = WX[k].duplicate()
+	w["k"] = k
+	w["temp"] = temp
+	return w
+
+
+func live_sync():
+	# Tactics opened during a match: carry what was changed on the club into the running match.
+	# A bench player moved into the XI is a substitution; two XI players swapped just change places.
+	if live == null:
+		return
+	var sim = live.sim
+	var us = int(live.us)
+	var t = sim.sd[us]
+	var c = uc()
+	for k in 11:
+		var nw = int(c.xi[k])
+		if nw == int(t.xi[k]):
+			continue
+		var k2 = t.xi.find(nw) if nw >= 0 else -1
+		if nw >= 0 and k2 >= 0:
+			sim.swap_slots(us, k, k2)
+		elif nw >= 0 and nw in t.bench:
+			if int(t.xi[k]) < 0:
+				UI.toast("That place was lost to a red card", UI.RED)
+			elif t.subs >= 5:
+				UI.toast("No substitutions left", UI.RED)
+			else:
+				sim.do_sub(us, k, nw)
+				UI.sfx("confirm", -10.0)
+	c.xi = t.xi.duplicate()
+	c.bench = t.bench.duplicate()
+	t.formation = c.formation
+	t.ment = c.ment
+	t.press = c.press
+	t.tempo = c.tempo
+	t.pk = c.pk
+	t.fk = c.fk
+	t.ck = c.ck
+	sim.set_shape(us, c.slots, c.roles, c.instr)
 
 
 func new_sim(f: Dictionary, detailed: bool):

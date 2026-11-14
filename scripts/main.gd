@@ -407,7 +407,7 @@ func _enter(scr: Control, dx := 26.0):
 
 
 func uses_chrome() -> bool:
-	return G.active and stack.size() > 0 and stack[-1].chrome
+	return G.active and G.live == null and stack.size() > 0 and stack[-1].chrome
 
 
 func set_title(title: String, sub := "", right: Control = null):

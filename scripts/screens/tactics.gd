@@ -23,7 +23,11 @@ func style_name(c: Dictionary) -> String:
 
 func build():
 	var c = G.uc()
-	G.fix_lineup()
+	var live = G.live
+	if live != null:
+		G.live_sync()
+	else:
+		G.fix_lineup()
 	var tr = G.team_ratings(c.id)
 	var chips = UI.hb(6)
 	for k in [["ATT", tr.att], ["MID", tr.mid], ["DEF", tr.def]]:
@@ -36,8 +40,19 @@ func build():
 		ch.add_child(b)
 		ch.custom_minimum_size = Vector2(46, 0)
 		chips.add_child(ch)
-	body.add_child(UI.topbar("Tactics", false, chips))
+	if live != null:
+		var lt = live.sim.sd[int(live.us)]
+		var lop = live.sim.sd[1 - int(live.us)]
+		var info = UI.hb(10)
+		info.add_child(UI.chip("LIVE %d'" % min(live.sim.minute, 120), Color(UI.RED, 0.2), UI.RED, 16))
+		info.add_child(UI.lbl("%d–%d v %s" % [lt.goals, lop.goals, lop.club.short], 20, UI.TEXT, "disp"))
+		info.add_child(UI.chip("SUBS %d/5" % lt.subs, Color(1, 1, 1, 0.07), UI.AMBER if lt.subs >= 5 else UI.TEXT, 16))
+		info.add_child(chips)
+		body.add_child(UI.topbar("Tactics", true, info))
+	else:
+		body.add_child(UI.topbar("Tactics", false, chips))
 	UI.main.t_sub = "%s · %s · %s" % [TABS[tab], c.formation, style_name(c)]
+	_verdict(c)
 	# the pitch takes the whole height on the left; tabs and buttons sit above the list on the right
 	var h = panes(12, 20)
 	var left = UI.vb(8)
@@ -96,10 +111,13 @@ func build():
 		for it in [["%s" % c.formation, _pick_formation], [G.TC.STYLES[G.TC.style_of(c)].s + " style", func():
 				tab = 1
 				refresh()], ["Best XI", func():
+				if G.live != null:
+					UI.toast("Not during a match", UI.MUTED)
+					return
 				G.auto_pick(c)
 				G.auto_roles(c)
 				sel = null
-				refresh()], ["Presets", _presets]]:
+				refresh()], ["Plans", func(): UI.main.open("plans")]]:
 			var bt = UI.btn(it[0], it[1], "secondary", "", 42)
 			bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			acts.add_child(bt)
@@ -125,6 +143,36 @@ func build():
 			for row in [["Penalties", "pk", 17], ["Free kicks", "fk", 16], ["Corners", "ck", 3]]:
 				_taker(v, c, row[0], row[1], row[2])
 			_captain(v, c)
+
+
+func _verdict(c: Dictionary):
+	# how the plan on screen meets the next (or current) opponent: updates with every change
+	var oid = -1
+	if G.live != null:
+		oid = int(G.live.sim.sd[1 - int(G.live.us)].cid)
+	else:
+		var nf = G.next_user_fixture()
+		if nf != null:
+			oid = int(nf.a) if int(nf.h) == c.id else int(nf.h)
+	if oid < 0:
+		return
+	var rep = G.TC.report(c.id, oid)
+	var why = ""
+	if rep.net >= 0.03 and rep.good.size() > 0:
+		why = str(rep.good[0][1])
+	elif rep.net <= -0.03 and rep.bad.size() > 0:
+		why = str(rep.bad[0][1])
+	var p = UI.panel(Color(rep.col, 0.12), 10, 12, 3, Color(rep.col, 0.35))
+	var h = UI.hb(8)
+	h.add_child(UI.caps("v %s" % G.s.clubs[oid].short, 14, UI.MUTED))
+	h.add_child(UI.lbl(rep.verdict, 17, rep.col, "bold"))
+	var wl = UI.lbl_fill(why, 15, UI.MUTED)
+	wl.clip_text = true
+	wl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	h.add_child(wl)
+	h.add_child(UI.caps("they play %s" % rep.style, 14, UI.AMBER if rep.changed else UI.DIM))
+	p.add_child(h)
+	body.add_child(UI.margin(p, 20, 0, 20, 2))
 
 
 func _head(v: Control, text: String, right := ""):
@@ -214,6 +262,9 @@ func _squad_list(v: Control, c: Dictionary):
 	_head(v, "Substitutes", "%d / 7" % c.bench.size())
 	for pid in c.bench:
 		v.add_child(_row(G.s.players[pid], "sub", -1, c))
+	if G.live != null:
+		v.add_child(UI.wrap("Tap a starter, then a substitute, to bring him on. Players taken off cannot come back.", 15, UI.MUTED))
+		return
 	var rest = []
 	for pid in c.players:
 		if not (pid in c.xi) and not (pid in c.bench) and not G.s.players[pid].get("youth", false):

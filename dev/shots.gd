@@ -325,6 +325,42 @@ func run(m):
 				main.stack[-1].zoom = 1.0
 				main.stack[-1].refresh()
 				await snap("city_sel")
+	if want.call("md"):
+		while G.user_fixture_today() == null:
+			G.advance()
+		G.settings["view"] = 1
+		main.root("match", {"fx": G.user_fixture_today()})
+		await snap("md_pre", 1.0)
+		var ms = main.stack[-1]
+		ms._kickoff()
+		await snap("md_live", 2.0)
+		ms._sim_to(30, false)
+		await snap("md_missed", 0.6)
+		main.close_sheet()
+		print("M3DRUN playing=", ms.view3d.playing() if ms.view3d != null else "none", " stage=", ms.stage)
+		ms._open_tactics()
+		print("M3DRUN stack=", main.stack.size(), " top=", main.stack[-1].sname, " vis=", main.stack[-1].visible, " holder=", main.holder.get_child_count())
+		await snap("md_tactics", 0.6)
+		var cc = G.uc()
+		var o1 = cc.xi[9]
+		cc.xi[9] = cc.bench[0]
+		main.stack[-1].refresh()
+		await snap("md_tactics_sub", 0.6)
+		main.back()
+		await snap("md_back", 0.6)
+		ms._team_sheet()
+		await snap("md_shouts", 0.6)
+		main.close_sheet()
+		ms._sim_sheet()
+		await snap("md_simsheet", 0.6)
+		main.close_sheet()
+		ms._sim_to(45, false)
+		main.close_sheet()
+		await snap("md_ht", 0.8)
+		ms._resume_ht(0)
+		ms._sim_to(999, false)
+		main.close_sheet()
+		await snap("md_ft", 0.8)
 	if want.call("m3d"):
 		for i in 8:
 			if G.user_fixture_today() != null:

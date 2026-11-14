@@ -334,6 +334,20 @@ func playing() -> bool:
 	return seq != null
 
 
+func cancel():
+	# drop a staged move that is no longer wanted (the match was simmed on, or Tactics was opened)
+	seq = null
+	for i in 2:
+		for k in 11:
+			figs[i][k].jump = 0.0
+			figs[i][k].dive = 0.0
+			figs[i][k].n.visible = sim.sd[i].xi[k] >= 0
+	_snap_shape()
+	carrier = Vector2i(-1, -1)
+	name_l.visible = false
+	_place(0.016)
+
+
 func _process(delta):
 	if sim == null or not is_visible_in_tree():
 		return

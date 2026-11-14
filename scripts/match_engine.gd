@@ -41,6 +41,11 @@ var shots: Array = []      # [side, x, y, goal, xg]
 var momentum: Array = []   # per minute, + home / - away
 var carrier := -1          # pid on the ball (for the 2D view)
 var last_pass := -1
+var agg := [0, 0]          # goals carried from the first leg, in this match's home/away order
+var et := false            # extra time is being played
+var et_at := 0             # the minute counter when extra time began
+var wx: Dictionary = {}    # the weather (G.weather): small effects on play
+var pen_log: Array = []    # shoot-out kicks: [side, pid, scored]
 
 
 func setup(f: Dictionary, lu_h: Dictionary, lu_a: Dictionary, det: bool):
@@ -51,6 +56,11 @@ func setup(f: Dictionary, lu_h: Dictionary, lu_a: Dictionary, det: bool):
 	pl = G.s.players
 	sd = [_side(lu_h, true), _side(lu_a, false)]
 	total = 90 + rng.randi_range(2, 6)
+	wx = G.weather(f)
+	if int(f.get("leg", 0)) == 2 and f.has("first") and int(f.first) < G.s.fixtures.size():
+		var f1 = G.s.fixtures[int(f.first)]
+		if f1.played:
+			agg = [int(f1.ag), int(f1.hg)]
 	_on_the_day()
 	recalc(0)
 	recalc(1)
@@ -284,6 +294,20 @@ func recalc(i: int):
 	t.att = max(20.0, a / max(0.01, wa) * pow(wa / REF[0], 0.35) * MENT[t.ment][0] * h * sa * md.att * G.TC.link_att(tc) * mu.att * (1.0 + 0.035 * star_att)) if wa > 0.0 else 20.0
 	t.mid = max(20.0, m / max(0.01, wm) * pow(wm / REF[1], 0.35) * PRESS_MID[t.press] * h * line_m * pass_m * md.mid * tc.sx.mid * mu.mid) if wm > 0.0 else 20.0
 	t.def = max(20.0, d / max(0.01, wd) * pow(wd / REF[2], 0.35) * MENT[t.ment][1] * h * sdf * line_d * (0.99 if ins.counter else 1.0) * md.def * tc.sx.def * mu.def * (1.0 + 0.025 * star_def)) if wd > 0.0 else 20.0
+	# weather: small nudges that reward the right plan for the day
+	var wk = str(wx.get("k", "clear"))
+	if wk == "rain":
+		t.mid *= [0.985, 1.0, 1.005][ins["pass"]]
+	elif wk == "heavy":
+		t.mid *= [0.965, 0.985, 1.0][ins["pass"]]
+		t.att *= 0.98 if t.tempo == 2 else 0.99
+	elif wk == "wind":
+		t.mid *= [1.0, 0.99, 0.965][ins["pass"]]
+		t.att *= 0.98 if int(ins.get("width", 1)) == 2 else 1.0
+	elif wk == "snow":
+		t.att *= 0.975
+		t.def *= 0.98 if ins.line == 2 else 1.0
+		t.mid *= [0.975, 0.99, 1.0][ins["pass"]]
 	t.midp = pow(t.mid, 2.4)
 	t.w0 = w0
 	t.w1 = w1
@@ -337,14 +361,16 @@ func step() -> Array:
 	if phase == 0:
 		phase = 1
 		if detailed:
-			out.append(ev("info", 0, "Kick-off at %s! %s get us under way." % [sd[0].club.stadium if sd[0].club.stadium != "" else "the home ground", sd[0].club.name]))
+			out.append(ev("info", 0, "Kick-off at %s! %s get us under way.%s" % [sd[0].club.stadium if sd[0].club.stadium != "" else "the home ground", sd[0].club.name, (" " + str(wx.line)) if wx.get("line", "") != "" else ""]))
 	if phase == 2:
 		phase = 3
 	minute += 1
 	if minute % tick == 0:
 		for i in 2:
 			var t = sd[i]
-			var dr = 0.27 * tick * PRESS_DRAIN[t.press] * TEMPO_DRAIN[t.tempo] * t.tc.m.drain
+			var dr = 0.27 * tick * PRESS_DRAIN[t.press] * TEMPO_DRAIN[t.tempo] * t.tc.m.drain * float(wx.get("drain", 1.0)) * (0.8 if et else 1.0)
+			if str(wx.get("k", "")) == "heat" and t.press == 2:
+				dr *= 1.1
 			for k in 11:
 				var pid = t.xi[k]
 				if pid >= 0:
@@ -400,7 +426,20 @@ func step() -> Array:
 		if detailed:
 			out.append(ev("ht", 0, "Half-time: %s" % score_text()))
 	elif minute >= total:
-		_finish(out)
+		if fx.ko and not et and sd[0].goals + agg[0] == sd[1].goals + agg[1]:
+			# level after ninety minutes of a knockout tie: thirty more
+			et = true
+			et_at = minute
+			total = minute + 30 + rng.randi_range(1, 3)
+			for i in 2:
+				for k in 11:
+					var pid = sd[i].xi[k]
+					if pid >= 0:
+						pm[pid].cond = max(15.0, pm[pid].cond - 3.0)
+			if detailed:
+				out.append(ev("info", 0, "Ninety minutes are up and nothing separates them%s. We go to extra time." % (" on aggregate" if int(fx.get("leg", 0)) == 2 else "")))
+		else:
+			_finish(out)
 	return out
 
 
@@ -804,13 +843,68 @@ func _ai_manage(i: int, out: Array):
 
 
 func winner() -> int:
-	if sd[0].goals > sd[1].goals:
+	if sd[0].goals + agg[0] > sd[1].goals + agg[1]:
 		return 0
-	if sd[1].goals > sd[0].goals:
+	if sd[1].goals + agg[1] > sd[0].goals + agg[0]:
 		return 1
 	if pens != null:
 		return 0 if pens[0] > pens[1] else 1
 	return -1
+
+
+func _shootout(out: Array):
+	# five kicks each, then sudden death; takers go in order of penalty-taking, the keeper's reflexes matter a little
+	var order = [[], []]
+	var gk = [70.0, 70.0]
+	for i in 2:
+		for k in 11:
+			var pid = sd[i].xi[k]
+			if pid < 0:
+				continue
+			if k == 0:
+				gk[i] = float(pl[pid].st[3]) if pl[pid].pos == "GK" else 50.0
+			else:
+				order[i].append(pid)
+		order[i].sort_custom(func(x, y): return pl[x].at[17] > pl[y].at[17])
+		if sd[i].pk >= 0 and sd[i].pk in order[i]:
+			order[i].erase(sd[i].pk)
+			order[i].push_front(sd[i].pk)
+		if order[i].is_empty():
+			order[i] = [sd[i].xi[0]]
+	var sc = [0, 0]
+	var n = 0
+	pen_log = []
+	if detailed:
+		out.append(ev("info", 0, "Still level after extra time. It will be settled from the penalty spot."))
+	while true:
+		for i in 2:
+			var pid = order[i][n % order[i].size()]
+			var pr = clampf(0.76 + (pl[pid].at[17] - 70.0) * 0.004 - (gk[1 - i] - 75.0) * 0.004, 0.55, 0.92)
+			var ok = rng.randf() < pr
+			if ok:
+				sc[i] += 1
+			pen_log.append([i, pid, ok])
+			if detailed:
+				var line = "%s scores." % nm(pid) if ok else ("%s sees it saved!" % nm(pid) if rng.randf() < 0.7 else "%s puts it over the bar!" % nm(pid))
+				out.append(ev("info", i, "Penalty %d for %s: %s (%d–%d)" % [n + 1, sd[i].club.short, line, sc[0], sc[1]], pid))
+			if n < 5:
+				# decided early when one side cannot be caught
+				var left0 = 5 - (n + 1)
+				var left1 = 5 - (n + 1 if i == 1 else n)
+				if sc[0] > sc[1] + left1 or sc[1] > sc[0] + left0:
+					break
+		n += 1
+		if n >= 5 and sc[0] != sc[1]:
+			break
+		if n < 5 and (sc[0] > sc[1] + (5 - n) or sc[1] > sc[0] + (5 - n)):
+			break
+		if n > 30:
+			sc[rng.randi() % 2] += 1
+			break
+	pens = sc
+	if detailed:
+		var w = 0 if sc[0] > sc[1] else 1
+		out.append(ev("info", w, "%s win the shoot-out %d–%d!" % [sd[w].club.name, max(sc[0], sc[1]), min(sc[0], sc[1])]))
 
 
 func _finish(out: Array):
@@ -818,18 +912,8 @@ func _finish(out: Array):
 	ball_state = ""
 	if detailed:
 		out.append(ev("ft", 0, "Full-time: %s" % score_text()))
-	if fx.ko and sd[0].goals == sd[1].goals:
-		var a = 0
-		var b = 0
-		for _k in 5:
-			if rng.randf() < 0.76: a += 1
-			if rng.randf() < 0.76: b += 1
-		while a == b:
-			if rng.randf() < 0.76: a += 1
-			if rng.randf() < 0.76: b += 1
-		pens = [a, b]
-		if detailed:
-			out.append(ev("info", 0 if a > b else 1, "PENALTY SHOOT-OUT: %s win %d–%d on penalties!" % [sd[0 if a > b else 1].club.name, max(a, b), min(a, b)]))
+	if fx.ko and sd[0].goals + agg[0] == sd[1].goals + agg[1]:
+		_shootout(out)
 	var tot = 0.0
 	var n = 0
 	for pid in pm:

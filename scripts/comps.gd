@@ -143,6 +143,18 @@ static func setup_season():
 			G.msg("%s draw" % ed[1], "You have been drawn in Group %s of the %s with %s." % ["ABCDEFGH"[gi], ed[1], ", ".join(names)], "board")
 
 
+static func _two_legs(comp: Dictionary, day: int, h: int, a: int, label: String):
+	# European knockout rounds before the final: away first, home second a week later, settled on aggregate
+	var s = G.s
+	var id1 = _add(comp, day, a, h, false, label + " · 1st leg")
+	s.fixtures[id1]["leg"] = 1
+	var id2 = _add(comp, day + 7, h, a, true, label + " · 2nd leg")
+	s.fixtures[id2]["leg"] = 2
+	s.fixtures[id2]["first"] = id1
+	comp.fx.append(id1)
+	comp.fx.append(id2)
+
+
 static func _draw_round(comp: Dictionary):
 	var s = G.s
 	var teams = comp.alive.duplicate()
@@ -159,16 +171,23 @@ static func _draw_round(comp: Dictionary):
 			var t = h
 			h = a
 			a = t
-		comp.fx.append(_add(comp, day, h, a, true, label))
+		var two = comp.kind == "euro" and teams.size() > 2
+		if two:
+			_two_legs(comp, day, h, a, label)
+		else:
+			comp.fx.append(_add(comp, day, h, a, true, label))
 		if s.user.has("club") and (h == s.user.club or a == s.user.club):
 			var opp = s.clubs[a if h == s.user.club else h]
-			G.msg("%s draw" % comp.name, "%s: you will play %s %s on %s." % [label, opp.name, "at home" if h == s.user.club else "away", G.fmt_date(day)], "board")
+			if two:
+				G.msg("%s draw" % comp.name, "%s: you will play %s over two legs, %s first on %s and the return a week later. Away goals do not count double; level on aggregate means extra time and penalties." % [label, opp.name, "away" if h == s.user.club else "at home", G.fmt_date(day)], "board")
+			else:
+				G.msg("%s draw" % comp.name, "%s: you will play %s %s on %s." % [label, opp.name, "at home" if h == s.user.club else "away", G.fmt_date(day)], "board")
 
 
 static func on_result(f: Dictionary):
 	# group tables for european group games
 	var comp = get_comp(f.comp)
-	if comp == null or f.ko:
+	if comp == null or f.ko or int(f.get("leg", 0)) > 0:
 		return
 	for i in 2:
 		var cid = f.h if i == 0 else f.a
@@ -221,9 +240,15 @@ static func daily():
 		var winners = []
 		for id in comp.fx:
 			var f = s.fixtures[id]
+			if int(f.get("leg", 0)) == 1:
+				continue
 			var w = G.LG.fx_winner(f)
 			winners.append(w)
-			res.append([f.h, f.a, f.hg, f.ag, f.get("pens", null)])
+			if int(f.get("leg", 0)) == 2 and f.has("first"):
+				var f1 = s.fixtures[int(f.first)]
+				res.append([f.h, f.a, int(f.hg) + int(f1.ag), int(f.ag) + int(f1.hg), f.get("pens", null)])
+			else:
+				res.append([f.h, f.a, f.hg, f.ag, f.get("pens", null)])
 			if comp.kind == "euro":
 				s.clubs[w].budget += int([6, 8, 10, 12][min(comp.round - 6, 3)] * 1000000 * comp.scale)
 		comp.rounds.append(res)
@@ -261,12 +286,12 @@ static func _start_knockout(comp: Dictionary):
 	comp.round = 6
 	comp.fx = []
 	for i in 8:
-		comp.fx.append(_add(comp, comp.dates[6], first[i], second[i], true, "Round of 16"))
+		_two_legs(comp, comp.dates[6], first[i], second[i], "Round of 16")
 		s.clubs[first[i]].budget += int(4000000 * comp.scale)
 		s.clubs[second[i]].budget += int(4000000 * comp.scale)
 		if first[i] == s.user.club or second[i] == s.user.club:
 			var opp = s.clubs[second[i] if first[i] == s.user.club else first[i]]
-			G.msg("%s knockout draw" % comp.name, "You are through to the last 16 and will face %s on %s." % [opp.name, G.fmt_date(comp.dates[6])], "board", null, true)
+			G.msg("%s knockout draw" % comp.name, "You are through to the last 16 and will face %s over two legs, starting on %s." % [opp.name, G.fmt_date(comp.dates[6])], "board", null, true)
 	if s.user.club in comp.gt and not (s.user.club in first) and not (s.user.club in second):
 		G.msg("%s exit" % comp.name, "Your %s campaign is over after the group stage." % comp.name, "board")
 

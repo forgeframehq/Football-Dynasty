@@ -1155,3 +1155,45 @@ static func arrow_text(v: int) -> String:
 
 static func arrow_col(v: int) -> Color:
 	return [Color("ff5d6c"), Color("f1a13a"), Color("c9d3de"), Color("9bdc5a"), Color("32d17e")][clampi(v, -2, 2) + 2]
+
+
+static func report(uid: int, oid: int) -> Dictionary:
+	# how the user's current plan meets this opponent: verdict, reasons for and against, their danger man and link-up
+	var s = G.s
+	var opp = s.clubs[oid]
+	var olu = G.lineup(oid, uid)
+	var ulu = G.lineup(uid, oid)
+	var mine = matchup(side_view(ulu), side_view(olu))
+	var theirs = matchup(side_view(olu), side_view(ulu))
+	var good = []
+	var bad = []
+	for nt in mine.notes:
+		var tx = str(nt[1]).replace("{A}", "Your").replace("{b}", "their")
+		if nt[0] > 0:
+			good.append([abs(nt[0]), tx])
+		else:
+			bad.append([abs(nt[0]), tx])
+	for nt in theirs.notes:
+		var tx2 = str(nt[1]).replace("{A}", "Their").replace("{b}", "your")
+		if nt[0] > 0:
+			bad.append([abs(nt[0]), tx2])
+		else:
+			good.append([abs(nt[0]), tx2])
+	good.sort_custom(func(x, y): return x[0] > y[0])
+	bad.sort_custom(func(x, y): return x[0] > y[0])
+	var net = mine.net - theirs.net
+	var verdict = "Even" if abs(net) < 0.03 else (("Strongly " if abs(net) >= 0.1 else "") + ("in your favour" if net > 0 else "against you")).capitalize()
+	var col = UI.MUTED if abs(net) < 0.03 else (UI.GREEN if net > 0 else UI.RED)
+	var ps = int(olu.get("pstyle", style_of(opp)))
+	var opos = []
+	for sl in olu.slots:
+		opos.append(sl[0])
+	var olk = ai_link(opp)
+	var opr = link_pair(olk, olu.xi, opos)
+	var stars = []
+	for pid in olu.xi:
+		if pid >= 0:
+			stars.append(s.players[pid])
+	stars.sort_custom(func(x, y): return x.ovr + x.form > y.ovr + y.form)
+	return {"net": net, "verdict": verdict, "col": col, "good": good, "bad": bad, "style": STYLES[ps].n, "changed": ps != style_of(opp), "usual": STYLES[style_of(opp)].n,
+		"link": LINKS[olk].n if LINKS.has(olk) else "", "pair": opr, "stars": stars, "olu": olu, "ulu": ulu}
