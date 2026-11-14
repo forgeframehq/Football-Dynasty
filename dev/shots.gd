@@ -157,8 +157,15 @@ func run(m):
 		G.uc()["kitp"] = 4
 		main.stack[-1].refresh()
 		await snap("kit_signed")
-		main.root("inbox")
-		await snap("kit_inbox")
+		G.OPS.spx_sign("back", G.OPS.spx_offers("back")[0])
+		G.OPS.spx_sign("sleeve", G.OPS.spx_offers("sleeve")[0])
+		main.stack[-1].facing_back = true
+		main.stack[-1].refresh()
+		await snap("kit_back", 0.8)
+		main.stack[-1].which = 1
+		main.stack[-1].facing_back = false
+		main.stack[-1].refresh()
+		await snap("kit_away", 0.8)
 	if want.call("rail"):
 		for k in ["club", "manager", "world", "search", "options"]:
 			main.root("home")

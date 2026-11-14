@@ -322,6 +322,7 @@ static func top_scorer(lg: int):
 
 
 static func rollover():
+	G.OPS.spx_rollover()
 	var s = G.s
 	var rng = G.rng
 	var u = s.user

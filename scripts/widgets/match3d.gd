@@ -31,6 +31,7 @@ static var lib: AnimationLibrary = null
 var fig_mat: Material = null
 var tiers: Array = []      # crowd sections, for the bounce when a goal goes in
 var bounce := 0.0
+var kits: Array = []       # set by the match screen before setup: what each side wears
 
 
 func setup(s, home_col: Color, away_col: Color, home_2: Color, away_2: Color):
@@ -310,10 +311,11 @@ func _figure(i: int, k: int) -> Dictionary:
 	var club = sd.club
 	var shirt = cols[i]
 	var shorts = cols2[i]
-	var shirt2 = Color(str(club.c2))
-	if abs(shirt2.r - shirt.r) + abs(shirt2.g - shirt.g) + abs(shirt2.b - shirt.b) < 0.25:
-		shirt2 = Color(str(club.c1))
-	var pat = int(club.get("kitp", 0))
+	var kt = kits[i] if kits.size() == 2 else G.OPS.kit(club)
+	var shirt2 = Color(str(kt.c2))
+	var pat = int(kt.p)
+	if pat == 0:
+		shirt2 = shirt
 	var socks = shirt
 	if gk:
 		shirt = Color("38d27a") if i == 0 else Color("b04ad8")

@@ -498,6 +498,7 @@ func _build_live():
 		pitch_host.custom_minimum_size = Vector2(0, 300)
 		pitch_host.clip_contents = true
 		view3d = VIEW3D.new()
+		view3d.kits = pitch.kits
 		view3d.setup(sim, pitch.cols[0], pitch.cols[1], _second(h.club, pitch.cols[0]), _second(a.club, pitch.cols[1]))
 		view3d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		pitch_host.add_child(view3d)

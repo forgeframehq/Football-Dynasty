@@ -5,6 +5,7 @@ var sim = null
 var dots: Array = [[], []]
 var cols: Array = [Color.WHITE, Color.RED]
 var rims: Array = [Color.BLACK, Color.WHITE]
+var kits: Array = []      # what each side is wearing: {c1, c2, p}
 var bpos := Vector2(0.5, 0.5)
 var bdest := Vector2(0.5, 0.5)
 var carrier := Vector2i(-1, -1)
@@ -15,19 +16,10 @@ var t := 0.0
 func setup(s):
 	sim = s
 	vertical = false
+	kits = G.OPS.match_kits(sim.sd[0].club, sim.sd[1].club)
 	for i in 2:
-		var c = sim.sd[i].club
-		var a = Color(c.c1)
-		var b = Color(c.c2)
-		cols[i] = a
-		rims[i] = b
-	# avoid kit clashes: the away side changes into its second colour, or a neutral dark kit
-	if _dist(cols[0], cols[1]) < 0.5:
-		var alt = rims[1]
-		if _dist(cols[0], alt) < 0.5:
-			alt = Color("1b2333") if cols[0].get_luminance() > 0.3 else Color("f6ad3c")
-		rims[1] = Color.WHITE if alt.get_luminance() < 0.5 else Color("10141f")
-		cols[1] = alt
+		cols[i] = Color(str(kits[i].c1))
+		rims[i] = Color(str(kits[i].c2))
 	for i in 2:
 		if _dist(cols[i], rims[i]) < 0.25:
 			rims[i] = Color.WHITE if cols[i].get_luminance() < 0.5 else Color("10141f")

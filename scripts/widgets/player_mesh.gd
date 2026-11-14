@@ -2,7 +2,7 @@ extends RefCounted
 # Builds a light, fully rigged footballer from tubes around the baked skeleton (assets/m3d/rig.scn).
 # About 1,300 vertices each, in kit colours with the club's shirt pattern, so 22 of them animate cheaply on a phone.
 
-const N = 10
+static var N := 10
 const P = "mixamorig_"
 
 

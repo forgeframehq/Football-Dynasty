@@ -499,6 +499,8 @@ static func week_money(c: Dictionary) -> Dictionary:
 	var sp = sponsor_now()
 	if sp != null and c.id == s.user.club:
 		sponsor += int(sp.weekly)
+	if c.id == s.user.club:
+		sponsor += spx_week()
 	var tv = int(c.wage_budget * 0.05)
 	var price = [46, 30, 20, 15][clampi(tier - 1, 0, 3)]
 	var fill = clamp(0.55 + (c.rep - 55.0) * 0.012 + (0.1 if c.form.count("W") >= 3 else 0.0), 0.35, 0.98)
@@ -856,3 +858,126 @@ static func mentor_mult(p: Dictionary) -> float:
 	var q = G.s.players[m]
 	var per = G.PS.personality(q)
 	return 1.12 + clampf((q.ovr - p.ovr) * 0.008, 0.0, 0.08) + (0.06 if per in ["Professional", "Model professional", "Leader", "Driven", "Determined"] else 0.0)
+
+
+# ---------------------------------------------------------------- kits and the smaller sponsor deals
+const KIT_NAMES = {"home": "Home", "away": "Away", "third": "Third", "gk": "Keeper"}
+const STRIPES = ["Newcastle", "Juventus", "Milan", "Inter", "Barcelona", "Atlético", "Sunderland", "Sheffield United", "Sheffield Wednesday", "Brentford", "Southampton", "Stoke", "West Brom",
+	"Brighton", "Crystal Palace", "Athletic", "Real Sociedad", "Espanyol", "Betis", "Atalanta", "Udinese", "Hertha", "Nice", "Huddersfield", "Lincoln", "Exeter", "Cheltenham", "Grimsby", "Notts County", "Barnsley"]
+const HOOPS = ["Queens Park Rangers", "Reading", "Celtic", "Sporting", "Greuther"]
+const HALVES = ["Blackburn", "Bristol Rovers", "Basel"]
+const SASH = ["Rayo", "River"]
+const SLEEVES = ["Arsenal", "Feyenoord", "Braga", "Charlton"]
+const SPX = [["back", "Back of shirt", 0.22, 1], ["sleeve", "Sleeve", 0.14, 1], ["training", "Training kit", 0.12, 1], ["stadium", "Stadium name", 0.38, 3]]
+
+
+static func default_pattern(c: Dictionary) -> int:
+	var nm = str(c.name)
+	for it in [[STRIPES, 1], [HOOPS, 2], [HALVES, 3], [SASH, 4], [SLEEVES, 5]]:
+		for k in it[0]:
+			if nm.contains(k):
+				return it[1]
+	return 0
+
+
+static func kit(c: Dictionary, which := "home") -> Dictionary:
+	# {c1, c2, p}: every club has a home kit; the user's club also keeps away, third and keeper kits
+	if not c.has("kitp"):
+		c["kitp"] = default_pattern(c)
+	if which == "home":
+		return {"c1": str(c.c1), "c2": str(c.c2), "p": int(c.kitp)}
+	if not c.has("kits"):
+		var c1 = Color(str(c.c1))
+		var light = c1.get_luminance() > 0.55
+		c["kits"] = {"away": {"c1": "1b2333" if light else "f4f4f4", "c2": str(c.c1), "p": 0},
+			"third": {"c1": "f6ad3c" if not light else "0b6e4f", "c2": "111111", "p": 5},
+			"gk": {"c1": "38d27a", "c2": "111111", "p": 5}}
+	return c.kits[which]
+
+
+static func _cd(a: Color, b: Color) -> float:
+	return abs(a.r - b.r) + abs(a.g - b.g) + abs(a.b - b.b)
+
+
+static func match_kits(home: Dictionary, away: Dictionary) -> Array:
+	# what each side wears: the home side its home kit, the away side whichever of its kits clashes least
+	var hk = kit(home)
+	var best = kit(away)
+	var hc = Color(hk.c1)
+	if _cd(hc, Color(best.c1)) < 0.5:
+		var opts = []
+		if away.has("kits") or away.id == G.s.user.club:
+			opts = [kit(away, "away"), kit(away, "third")]
+		else:
+			var alt = Color(str(away.c2))
+			if _cd(hc, alt) < 0.5:
+				alt = Color("1b2333") if hc.get_luminance() > 0.3 else Color("f6ad3c")
+			opts = [{"c1": alt.to_html(false), "c2": str(away.c1), "p": 0}]
+		for o in opts:
+			if _cd(hc, Color(o.c1)) > _cd(hc, Color(best.c1)):
+				best = o
+	return [hk, best]
+
+
+static func spx() -> Dictionary:
+	var u = G.s.user
+	if not u.has("spx"):
+		u["spx"] = {}
+	return u.spx
+
+
+static func spx_now(kind: String):
+	var d = spx().get(kind)
+	if d != null and int(d.until) >= G.s.season:
+		return d
+	return null
+
+
+static func spx_offers(kind: String) -> Array:
+	var s = G.s
+	var c = G.uc()
+	var all = sponsor_list()
+	var row = null
+	for r in SPX:
+		if r[0] == kind:
+			row = r
+	var rng = RandomNumberGenerator.new()
+	rng.seed = s.season * 613 + c.id * 29 + hash(kind) % 1000
+	var base = c.wage_budget * (0.06 + c.fac.commercial * 0.012) * float(row[2])
+	var out = []
+	var main = sponsor_now()
+	var used = [main.name if main != null else ""]
+	for t in [["Safe", 1.0, 0], ["Bigger, longer", 1.22, 1]]:
+		var i = rng.randi() % all.size()
+		while all[i][0] in used:
+			i = (i + 1) % all.size()
+		used.append(all[i][0])
+		out.append({"name": all[i][0], "sector": all[i][1], "weekly": G.nice(base * t[1] * rng.randf_range(0.9, 1.1)), "until": s.season + int(row[3]) - 1 + int(t[2]), "type": t[0]})
+	return out
+
+
+static func spx_sign(kind: String, deal: Dictionary):
+	var c = G.uc()
+	spx()[kind] = deal
+	if kind == "stadium":
+		if not c.has("stad0"):
+			c["stad0"] = str(c.stadium)
+		c.stadium = "%s %s" % [deal.name, ["Stadium", "Arena", "Park"][absi(hash(deal.name)) % 3]]
+
+
+static func spx_week() -> int:
+	var tot = 0
+	for r in SPX:
+		var d = spx_now(r[0])
+		if d != null:
+			tot += int(d.weekly)
+	return tot
+
+
+static func spx_rollover():
+	# naming rights run out: the ground gets its old name back
+	var c = G.uc()
+	var d = spx().get("stadium")
+	if c.has("stad0") and (d == null or int(d.until) <= G.s.season):
+		c.stadium = str(c.stad0)
+		c.erase("stad0")
