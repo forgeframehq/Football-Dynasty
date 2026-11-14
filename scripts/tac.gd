@@ -1197,3 +1197,91 @@ static func report(uid: int, oid: int) -> Dictionary:
 	stars.sort_custom(func(x, y): return x.ovr + x.form > y.ovr + y.form)
 	return {"net": net, "verdict": verdict, "col": col, "good": good, "bad": bad, "style": STYLES[ps].n, "changed": ps != style_of(opp), "usual": STYLES[style_of(opp)].n,
 		"link": LINKS[olk].n if LINKS.has(olk) else "", "pair": opr, "stars": stars, "olu": olu, "ulu": ulu}
+
+
+# ------------------------------------------------------------------ saved plans, team sheets, rotation
+const ROT_COND = 75
+
+
+static func plans_init(c: Dictionary):
+	if not c.has("plans"):
+		c["plans"] = []
+		for pr in c.get("presets", []):
+			if pr != null:
+				c.plans.append({"n": "%s %s" % [pr.formation, STYLES[int(pr.get("pstyle", 0))].s], "pr": pr})
+		c["plan"] = -1
+	if not c.has("sheets") or c.sheets.size() != 3:
+		c["sheets"] = [null, null, null]
+	if not c.has("trig"):
+		c["trig"] = {}
+
+
+static func plan_use(c: Dictionary, idx: int):
+	if idx < 0 or idx >= c.plans.size():
+		return
+	G.apply_preset(c, c.plans[idx].pr)
+	c["plan"] = idx
+	if G.live != null:
+		G.live_sync()
+
+
+static func plan_net(c: Dictionary, pr: Dictionary, oid: int) -> float:
+	# how a saved plan would meet this opponent, without changing anything for good
+	var keep = G.make_preset(c)
+	G.apply_preset(c, pr)
+	var olu = G.lineup(oid, c.id)
+	var ulu = G.lineup(c.id, oid)
+	var net = matchup(side_view(ulu), side_view(olu)).net - matchup(side_view(olu), side_view(ulu)).net
+	G.apply_preset(c, keep)
+	return net
+
+
+static func sheet_use(c: Dictionary, idx: int):
+	var sh = c.sheets[idx]
+	if sh == null:
+		return
+	var xi = []
+	for pid in sh.xi:
+		xi.append(int(pid) if int(pid) in c.players else -1)
+	c.xi = xi
+	c.bench = sh.bench.filter(func(pid): return pid in c.players and not (pid in xi))
+	G.fix_lineup()
+	for i in 11:
+		if c.xi[i] >= 0:
+			c.roles[i] = G.RL.valid(c.roles[i], c.slots[i][0])
+
+
+static func auto_rotate(c: Dictionary, force := false) -> Array:
+	# rest tired starters for the best fit player in the same position, if he is close enough in quality
+	var out = []
+	if not force and not c.get("autorot", false):
+		return out
+	var s = G.s
+	var line = int(c.get("rot_at", ROT_COND))
+	var slots = G.slots_of(c)
+	for k in 11:
+		var pid = int(c.xi[k])
+		if pid < 0:
+			continue
+		var p = s.players[pid]
+		if p.cond >= line:
+			continue
+		var best = null
+		var bs = 0.0
+		for q in c.players:
+			var r = s.players[q]
+			if q in c.xi or not G.available(r) or r.get("youth", false) or r.cond < line + 8:
+				continue
+			if (r.pos == "GK") != (slots[k][0] == "GK"):
+				continue
+			var sc = r.ovr * G.fit(r, slots[k][0])
+			if sc > bs:
+				bs = sc
+				best = r
+		if best != null and bs >= p.ovr * G.fit(p, slots[k][0]) - 7.0:
+			c.xi[k] = best.id
+			c.bench.erase(best.id)
+			if not (pid in c.bench) and c.bench.size() < 7:
+				c.bench.append(pid)
+			out.append("%s rested for %s" % [G.pname(p), G.pname(best)])
+	return out

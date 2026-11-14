@@ -119,6 +119,27 @@ func run(m):
 				break
 		main.root("player", {"pid": other, "page": 5})
 		await snap("manage_other")
+	if want.call("plans"):
+		var pc = G.uc()
+		G.TC.plans_init(pc)
+		pc.plans.append({"n": "Main 4-3-3", "pr": G.make_preset(pc)})
+		G.set_formation(pc, "4-2-3-1")
+		pc.ment = 3
+		pc.plans.append({"n": "Chase the game", "pr": G.make_preset(pc)})
+		G.set_formation(pc, "5-3-2")
+		pc.ment = 1
+		pc.plans.append({"n": "Shut up shop", "pr": G.make_preset(pc)})
+		G.TC.plan_use(pc, 0)
+		pc.sheets[0] = {"n": "First team", "xi": pc.xi.duplicate(), "bench": pc.bench.duplicate()}
+		main.root("plans")
+		await snap("plans")
+		for ti in [1, 2, 3]:
+			main.stack[-1].tab = ti
+			main.stack[-1].refresh()
+			await snap("plans_%d" % ti)
+		for ti in [2, 3]:
+			main.root("tactics", {"tab": ti})
+			await snap("tac_overlay_%d" % ti)
 	if want.call("cal"):
 		main.root("calendar")
 		await snap("calendar")

@@ -257,8 +257,8 @@ func recalc(i: int):
 					st2 *= 0.35
 				t0 -= w0[k]
 				t1 -= w1[k]
-				w0[k] *= 1.0 + 0.55 * st2
-				w1[k] *= 1.0 + 0.4 * st2
+				w0[k] *= 1.0 + 0.28 * st2
+				w1[k] *= 1.0 + 0.25 * st2
 				t0 += w0[k]
 				t1 += w1[k]
 				star_att = max(star_att, st2)
@@ -421,6 +421,10 @@ func step() -> Array:
 		for i in 2:
 			if sd[i].auto:
 				_ai_manage(i, out)
+	if minute >= 20:
+		for i in 2:
+			if sd[i].user:
+				_triggers(i, out)
 	if minute == 45:
 		phase = 2
 		if detailed:
@@ -840,6 +844,48 @@ func _ai_manage(i: int, out: Array):
 	var np = pl[cands[0]]
 	if np.ovr * G.fit(np, role) >= cur_e * 0.93:
 		do_sub(i, worst, cands[0], out)
+
+
+func _triggers(i: int, out: Array):
+	# the user's saved rules: switch to a chosen plan the first time a condition is met
+	var t = sd[i]
+	var c = t.club
+	var tr = c.get("trig", {})
+	if tr.is_empty() or not c.has("plans"):
+		return
+	var o = sd[1 - i]
+	var men = 0
+	for pid in t.xi:
+		if pid >= 0:
+			men += 1
+	var gd = t.goals + agg[i] - o.goals - agg[1 - i]
+	var hit = ""
+	if tr.has("red") and men < 11 and not t.has("tg_red"):
+		hit = "red"
+	elif tr.has("lead75") and minute >= 75 and gd > 0 and not t.has("tg_lead75"):
+		hit = "lead75"
+	elif tr.has("trail60") and minute >= 60 and gd < 0 and not t.has("tg_trail60"):
+		hit = "trail60"
+	elif tr.has("level80") and minute >= 80 and gd == 0 and not t.has("tg_level80"):
+		hit = "level80"
+	if hit == "":
+		return
+	t["tg_" + hit] = true
+	var idx = int(tr[hit])
+	if idx < 0 or idx >= c.plans.size():
+		return
+	var pr = c.plans[idx].pr
+	var rids = []
+	for k in 11:
+		rids.append(G.RL.valid(pr.roles[k], pr.slots[k][0]))
+	set_shape(i, pr.slots, rids, pr.instr)
+	t.formation = pr.formation
+	t.ment = pr.ment
+	t.press = pr.press
+	t.tempo = pr.tempo
+	recalc(i)
+	if detailed:
+		out.append(ev("info", i, "%s switch to their %s plan, as the manager planned." % [c.name, str(c.plans[idx].n)]))
 
 
 func winner() -> int:

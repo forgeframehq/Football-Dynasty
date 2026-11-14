@@ -5,6 +5,7 @@ extends Control
 const SCREENS = {
 	"menu": preload("res://scripts/screens/menu.gd"),
 	"calendar": preload("res://scripts/screens/calendar.gd"),
+	"plans": preload("res://scripts/screens/plans.gd"),
 	"new_career": preload("res://scripts/screens/new_career.gd"),
 	"intro": preload("res://scripts/screens/intro.gd"),
 	"home": preload("res://scripts/screens/home.gd"),
@@ -528,7 +529,7 @@ func _rail_key() -> String:
 		return ""
 	var nm = stack[0].sname
 	var groups = {"inbox": ["inbox"], "home": ["home"],
-		"club": ["squad", "tactics", "training", "fixtures", "calendar", "finances", "campus", "lists", "kit", "city3d"],
+		"club": ["squad", "tactics", "plans", "training", "fixtures", "calendar", "finances", "campus", "lists", "kit", "city3d"],
 		"manager": ["board", "trophies", "jobs", "life"], "world": ["table", "comps", "stats", "clubview"],
 		"search": ["search", "transfers", "scouting", "player", "nego", "compare"]}
 	if nm == "search" and stack[0].args.has("grp"):

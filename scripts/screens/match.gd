@@ -94,6 +94,9 @@ func _build_pre():
 	var ac = s.clubs[f.a]
 	var uid = s.user.club
 	var changes = G.fix_lineup()
+	if not args.get("_rot", false):
+		args["_rot"] = true
+		changes.append_array(G.TC.auto_rotate(G.uc()))
 	var opp = ac if f.h == uid else hc
 	var rep = G.TC.report(uid, opp.id)
 	var wx = G.weather(f)
@@ -1326,26 +1329,24 @@ func _team_sheet():
 			t.tempo = i
 			sim.recalc(us)
 			_team_sheet(), 20))
-		var have = false
-		for pr in c.presets:
-			if pr != null:
-				have = true
-		if have:
-			v.add_child(UI.caps("Switch to preset", 15, UI.MUTED))
-			var ph = UI.hb(8)
-			for i in 3:
-				var pr = c.presets[i]
-				if pr == null:
-					continue
-				var b = UI.btn("%d · %s" % [i + 1, pr.formation], func():
-					sim.set_shape(us, pr.slots, pr.roles, pr.instr)
+		G.TC.plans_init(c)
+		if c.plans.size() > 0:
+			v.add_child(UI.caps("Switch plan", 15, UI.MUTED))
+			var ph = UI.hb(6)
+			for i in min(4, c.plans.size()):
+				var idx = i
+				var b = UI.btn(str(c.plans[i].n), func():
+					var pr = c.plans[idx].pr
+					G.apply_preset(c, pr)
+					c["plan"] = idx
+					sim.set_shape(us, pr.slots, c.roles, pr.instr)
 					t.formation = pr.formation
 					t.ment = pr.ment
 					t.press = pr.press
 					t.tempo = pr.tempo
 					sim.recalc(us)
-					_add_event(sim.ev("info", us, "%s change shape to %s." % [t.club.name, pr.formation]))
-					_team_sheet(), "secondary", "", 60)
+					_add_event(sim.ev("info", us, "%s switch to their %s plan." % [t.club.name, str(c.plans[idx].n)]))
+					_team_sheet(), "secondary", "", 46)
 				b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				ph.add_child(b)
 			v.add_child(ph)

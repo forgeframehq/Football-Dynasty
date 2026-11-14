@@ -889,6 +889,11 @@ const WX = {
 
 func weather(f: Dictionary) -> Dictionary:
 	# the same fixture always gets the same weather, so the forecast and the match agree; no postponements
+	if not f.has("day") or not f.has("id"):
+		var w0 = WX["clear"].duplicate()
+		w0["k"] = "clear"
+		w0["temp"] = 15
+		return w0
 	var d = date(int(f.day))
 	var r = float(absi(hash(int(f.id) * 7919 + int(f.day) * 31 + int(f.h) * 131)) % 1000) / 1000.0
 	var m = int(d.month)

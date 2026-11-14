@@ -8,7 +8,7 @@ signal seq_done        # the staged move, including any celebration, is over
 
 const L := 105.0
 const W := 68.0
-const FIG := 2.5       # figures are drawn larger than life so they read on a phone
+const FIG := 2.9       # figures are drawn larger than life so they read on a phone
 
 var sim = null
 var vp: SubViewport
@@ -25,6 +25,12 @@ var name_l: Label3D
 var t := 0.0
 var seq = null
 var low := false
+const PM = preload("res://scripts/widgets/player_mesh.gd")
+const RIG = preload("res://assets/m3d/rig.scn")
+static var lib: AnimationLibrary = null
+var fig_mat: Material = null
+var tiers: Array = []      # crowd sections, for the bounce when a goal goes in
+var bounce := 0.0
 
 
 func setup(s, home_col: Color, away_col: Color, home_2: Color, away_2: Color):
@@ -84,15 +90,20 @@ func _build_world():
 	var env = WorldEnvironment.new()
 	var e = Environment.new()
 	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color("0c1220")
+	var wk = str(sim.wx.get("k", "clear"))
+	var dd = G.date(int(sim.fx.get("day", G.s.day)))
+	var night = dd.weekday in [2, 3] or dd.month in [11, 12, 1]
+	var dull = wk in ["rain", "heavy", "snow", "cloud", "wind"]
+	e.background_color = Color("0a0f1c") if night else (Color("6f7f95") if dull else Color("7fb0e8"))
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(1, 1, 1)
-	e.ambient_light_energy = 0.75
+	e.ambient_light_energy = 1.0 if not dull else 0.92
 	env.environment = e
 	vp.add_child(env)
 	var sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-58, 35, 0)
-	sun.light_energy = 0.8
+	sun.light_energy = 0.75 if dull or night else 1.05
+	sun.light_color = Color("eef2ff") if night else Color("fff6e4")
 	sun.shadow_enabled = false
 	vp.add_child(sun)
 	cam = Camera3D.new()
@@ -104,7 +115,14 @@ func _build_world():
 	var pl = PlaneMesh.new()
 	pl.size = Vector2(L + 14.0, W + 14.0)
 	pm.mesh = pl
-	pm.material_override = _mat(Color(0.8, 0.84, 0.8), load("res://assets/m3d/pitch.jpg"), true)
+	var ptint = Color(1.0, 1.0, 1.0)
+	if wk == "snow":
+		ptint = Color(1.25, 1.3, 1.35)
+	elif wk in ["rain", "heavy"]:
+		ptint = Color(0.9, 0.96, 0.92)
+	elif night:
+		ptint = Color(0.96, 1.0, 0.98)
+	pm.material_override = _mat(ptint, load("res://assets/m3d/pitch.jpg"), true)
 	vp.add_child(pm)
 	# surround
 	var apron = MeshInstance3D.new()
@@ -132,6 +150,22 @@ func _build_world():
 		tier.rotation_degrees.x = -52.0
 		tier.position = Vector3(0, 5.2, -2.0)
 		holder.add_child(tier)
+		tiers.append([tier, 5.2])
+		# upper tier, set back and steeper
+		var up = MeshInstance3D.new()
+		var uq = QuadMesh.new()
+		uq.size = Vector2(st[1] + 2.0, 10.0)
+		up.mesh = uq
+		var um = _mat(home_tint.darkened(0.12), crowd)
+		um.uv1_scale = Vector3((st[1] + 2.0) / 16.0, 0.8, 1.0)
+		up.material_override = um
+		up.rotation_degrees.x = -40.0
+		up.position = Vector3(0, 15.6, -12.4)
+		holder.add_child(up)
+		tiers.append([up, 15.6])
+		_box(Vector3(st[1] + 2.0, 1.0, 0.5), Vector3(0, 12.2, -8.9), _mat(cols[0].darkened(0.1)), holder)
+		_box(Vector3(st[1] + 4.0, 0.5, 10.0), Vector3(0, 20.6, -14.0), _mat(Color("30343f")), holder)
+		_box(Vector3(st[1] + 4.0, 21.0, 0.6), Vector3(0, 10.5, -18.4), _mat(Color("171a22")), holder)
 		_box(Vector3(st[1], 1.2, 0.4), Vector3(0, 0.6, 2.2), _mat(cols[0].darkened(0.25)), holder)
 		_box(Vector3(st[1] + 2.0, 0.5, 9.0), Vector3(0, 11.6, -5.2), _mat(Color("3a3f4b")), holder)
 		_box(Vector3(st[1] + 2.0, 11.6, 0.6), Vector3(0, 5.8, -9.4), _mat(Color("1b1e26")), holder)
@@ -151,36 +185,42 @@ func _build_world():
 	var netm = _mat(Color.WHITE, load("res://assets/m3d/net.png"), true)
 	netm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	netm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	netm.uv1_scale = Vector3(3, 2, 1)
+	netm.uv1_scale = Vector3(1, 1, 1)
+	netm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	var grey = _mat(Color("c9ccd2"), null, true)
 	for sg in [-1.0, 1.0]:
 		var gx = sg * L / 2
+		# frame: posts, bar, and the stanchions that hold the net back
 		for pz in [-3.66, 3.66]:
-			_box(Vector3(0.16, 2.44, 0.16), Vector3(gx, 1.22, pz), white)
-		_box(Vector3(0.16, 0.16, 7.48), Vector3(gx, 2.44, 0), white)
-		var back = MeshInstance3D.new()
-		var bq = QuadMesh.new()
-		bq.size = Vector2(7.32, 2.44)
-		back.mesh = bq
-		back.material_override = netm
-		back.position = Vector3(gx + sg * 2.0, 1.22, 0)
-		back.rotation_degrees.y = 90.0
-		vp.add_child(back)
-		var top = MeshInstance3D.new()
-		var tq = QuadMesh.new()
-		tq.size = Vector2(2.0, 7.32)
-		top.mesh = tq
-		top.material_override = netm
-		top.position = Vector3(gx + sg * 1.0, 2.44, 0)
-		top.rotation_degrees = Vector3(-90, 0, 0)
-		vp.add_child(top)
+			_box(Vector3(0.2, 2.44, 0.2), Vector3(gx, 1.22, pz), white)
+			_box(Vector3(0.09, 0.09, 0.09), Vector3(gx + sg * 2.3, 0.05, pz), grey)
+			var stn = _box(Vector3(1.5, 0.07, 0.07), Vector3(gx + sg * 0.72, 2.44, pz), grey)
+			var bk = _box(Vector3(0.07, 2.75, 0.07), Vector3(gx + sg * 1.9, 1.22, pz), grey)
+			bk.rotation.z = sg * 0.33
+		_box(Vector3(0.2, 0.2, 7.52), Vector3(gx, 2.44, 0), white)
+		_box(Vector3(0.07, 0.07, 7.32), Vector3(gx + sg * 1.45, 2.44, 0), grey)
+		_box(Vector3(0.07, 0.07, 7.32), Vector3(gx + sg * 2.3, 0.05, 0), grey)
+		# net: flat top, back sloping down to the ground, and two sides
+		var x0 = gx + sg * 0.05
+		var x1 = gx + sg * 1.45
+		var x2 = gx + sg * 2.3
+		_net([Vector3(x0, 2.44, -3.66), Vector3(x0, 2.44, 3.66), Vector3(x1, 2.44, 3.66), Vector3(x1, 2.44, -3.66)], netm)
+		_net([Vector3(x1, 2.44, -3.66), Vector3(x1, 2.44, 3.66), Vector3(x2, 0.0, 3.66), Vector3(x2, 0.0, -3.66)], netm)
 		for pz in [-3.66, 3.66]:
-			var sidep = MeshInstance3D.new()
-			var sq = QuadMesh.new()
-			sq.size = Vector2(2.0, 2.44)
-			sidep.mesh = sq
-			sidep.material_override = netm
-			sidep.position = Vector3(gx + sg * 1.0, 1.22, pz)
-			vp.add_child(sidep)
+			_net([Vector3(x0, 0.0, pz), Vector3(x0, 2.44, pz), Vector3(x1, 2.44, pz), Vector3(x2, 0.0, pz)], netm)
+	# corner flags and floodlights
+	var flagm = _mat(Color("f6c945"), null, true)
+	for cx in [-1.0, 1.0]:
+		for cz in [-1.0, 1.0]:
+			_box(Vector3(0.08, 1.6, 0.08), Vector3(cx * L / 2, 0.8, cz * W / 2), white)
+			_box(Vector3(0.5, 0.34, 0.04), Vector3(cx * L / 2 + 0.27, 1.42, cz * W / 2), flagm)
+		_box(Vector3(0.9, 30.0, 0.9), Vector3(cx * (L / 2 + 24.0), 15.0, -(W / 2 + 24.0)), _mat(Color("2a2e38")))
+		_box(Vector3(7.0, 3.6, 0.6), Vector3(cx * (L / 2 + 24.0), 31.0, -(W / 2 + 23.6)), _mat(Color("fffbe8") if night or dull else Color("9aa0ad"), null, true))
+	# dugouts on the far touchline
+	for dx in [-12.0, 12.0]:
+		_box(Vector3(9.0, 1.5, 1.6), Vector3(dx, 0.75, -(W / 2 + 2.6)), _mat(Color("20242e")))
+		_box(Vector3(9.2, 0.2, 2.2), Vector3(dx, 1.6, -(W / 2 + 2.4)), _mat(cols[0 if dx < 0 else 1].darkened(0.2)))
+	_weather(wk)
 	# ball and its shadow
 	ball = MeshInstance3D.new()
 	var sm = SphereMesh.new()
@@ -205,6 +245,52 @@ func _build_world():
 	vp.add_child(name_l)
 
 
+func _net(p: Array, mat: Material):
+	# one net panel from four corners; the texture repeats every 0.5 m so the mesh reads as a net from the stand
+	var arr = []
+	arr.resize(Mesh.ARRAY_MAX)
+	var du = p[0].distance_to(p[1]) / 0.5
+	var dv = p[1].distance_to(p[2]) / 0.5
+	arr[Mesh.ARRAY_VERTEX] = PackedVector3Array(p)
+	arr[Mesh.ARRAY_TEX_UV] = PackedVector2Array([Vector2(0, 0), Vector2(du, 0), Vector2(du, dv), Vector2(0, dv)])
+	var nrm = (p[1] - p[0]).cross(p[2] - p[0]).normalized()
+	arr[Mesh.ARRAY_NORMAL] = PackedVector3Array([nrm, nrm, nrm, nrm])
+	arr[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 0, 2, 3])
+	var m = ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	var mi = MeshInstance3D.new()
+	mi.mesh = m
+	mi.material_override = mat
+	vp.add_child(mi)
+
+
+func _weather(wk: String):
+	# rain and snow fall over the part of the pitch the camera sees; kept light for phones
+	if not (wk in ["rain", "heavy", "snow"]) or low:
+		return
+	var ps = CPUParticles3D.new()
+	ps.amount = 500 if wk == "heavy" else (260 if wk == "rain" else 320)
+	ps.lifetime = 1.1 if wk != "snow" else 5.0
+	ps.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	ps.emission_box_extents = Vector3(L * 0.62, 1.0, W * 0.75)
+	ps.position = Vector3(0, 26.0, 6.0)
+	ps.direction = Vector3(0.15, -1, 0.05)
+	ps.spread = 3.0 if wk != "snow" else 25.0
+	ps.gravity = Vector3(2.0, -30.0 if wk != "snow" else -2.2, 0)
+	ps.initial_velocity_min = 22.0 if wk != "snow" else 2.0
+	ps.initial_velocity_max = 28.0 if wk != "snow" else 4.0
+	var q = QuadMesh.new()
+	q.size = Vector2(0.07, 1.5) if wk != "snow" else Vector2(0.32, 0.32)
+	var m = StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color(0.82, 0.88, 1.0, 0.42) if wk != "snow" else Color(1, 1, 1, 0.9)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y if wk != "snow" else BaseMaterial3D.BILLBOARD_ENABLED
+	q.material = m
+	ps.mesh = q
+	vp.add_child(ps)
+
+
 func _blob(d: float) -> MeshInstance3D:
 	var mi = MeshInstance3D.new()
 	var q = PlaneMesh.new()
@@ -218,47 +304,54 @@ func _blob(d: float) -> MeshInstance3D:
 
 
 func _figure(i: int, k: int) -> Dictionary:
+	# a rigged, animated footballer: a light mesh built around the baked skeleton, in this side's kit
 	var sd = sim.sd[i]
 	var gk = k == 0
+	var club = sd.club
 	var shirt = cols[i]
 	var shorts = cols2[i]
+	var shirt2 = Color(str(club.c2))
+	if abs(shirt2.r - shirt.r) + abs(shirt2.g - shirt.g) + abs(shirt2.b - shirt.b) < 0.25:
+		shirt2 = Color(str(club.c1))
+	var pat = int(club.get("kitp", 0))
+	var socks = shirt
 	if gk:
 		shirt = Color("38d27a") if i == 0 else Color("b04ad8")
+		shirt2 = shirt.darkened(0.25)
 		shorts = Color("1c1c22")
+		socks = shirt
+		pat = 5
 	var pid = sd.xi[k]
-	var skin = Color("e0ac8c")
-	if pid >= 0:
-		skin = [Color("f1c9a5"), Color("e0ac8c"), Color("c68f65"), Color("8d5a3b"), Color("5e3a25")][pid % 5]
+	var hsh = absi(hash(pid * 2654435 + 17)) if pid >= 0 else k
+	var skin = [Color("f1c9a5"), Color("e0ac8c"), Color("c68f65"), Color("8d5a3b"), Color("5e3a25")][hsh % 5]
+	var hair = [Color("1a1410"), Color("2a1c12"), Color("4a2f1a"), Color("7a5a2e"), Color("c9a14a"), Color("101010")][(hsh / 7) % 6]
+	if hsh % 5 >= 3:
+		hair = Color("121010")
 	var n = Node3D.new()
 	n.scale = Vector3.ONE * FIG
 	vp.add_child(n)
-	var body = _box(Vector3(0.52, 0.62, 0.3), Vector3(0, 1.22, 0), _mat(shirt), n)
-	_box(Vector3(0.5, 0.26, 0.3), Vector3(0, 0.8, 0), _mat(shorts), n)
-	var head = MeshInstance3D.new()
-	var hm = SphereMesh.new()
-	hm.radius = 0.17
-	hm.height = 0.34
-	hm.radial_segments = 8
-	hm.rings = 4
-	head.mesh = hm
-	head.material_override = _mat(skin)
-	head.position = Vector3(0, 1.72, 0)
-	n.add_child(head)
-	var legs = []
-	var arms = []
-	for sx in [-1.0, 1.0]:
-		var hip = Node3D.new()
-		hip.position = Vector3(sx * 0.14, 0.7, 0)
-		n.add_child(hip)
-		_box(Vector3(0.17, 0.36, 0.19), Vector3(0, -0.18, 0), _mat(skin), hip)
-		_box(Vector3(0.17, 0.34, 0.19), Vector3(0, -0.52, 0), _mat(shirt if not gk else shorts), hip)
-		legs.append(hip)
-		var sh = Node3D.new()
-		sh.position = Vector3(sx * 0.34, 1.48, 0)
-		n.add_child(sh)
-		_box(Vector3(0.14, 0.26, 0.16), Vector3(0, -0.13, 0), _mat(shirt), sh)
-		_box(Vector3(0.12, 0.3, 0.14), Vector3(0, -0.4, 0), _mat(skin), sh)
-		arms.append(sh)
+	var rig = RIG.instantiate()
+	n.add_child(rig)
+	var skel: Skeleton3D = rig.get_node("Skeleton3D")
+	var mi = MeshInstance3D.new()
+	mi.mesh = PM.build(skel, {"shirt": shirt, "shirt2": shirt2, "shorts": shorts, "socks": socks, "skin": skin, "hair": hair,
+		"boots": [Color("16161a"), Color("e8e8e8"), Color("d8342c"), Color("2f6fe0"), Color("e0c020")][(hsh / 3) % 5], "pattern": pat, "gloves": gk, "long": gk})
+	skel.add_child(mi)
+	mi.skin = skel.create_skin_from_rest_transforms()
+	mi.skeleton = NodePath("..")
+	if fig_mat == null:
+		fig_mat = PM.material()
+	mi.material_override = fig_mat
+	mi.extra_cull_margin = 3.0
+	if lib == null:
+		lib = load("res://assets/m3d/soccer.res").duplicate()
+		lib.add_animation("cheer", PM.cheer(lib, skel))
+	var ap = AnimationPlayer.new()
+	rig.add_child(ap)
+	ap.add_animation_library("", lib)
+	var idle = "gk_idle" if gk else "idle"
+	ap.play(idle)
+	ap.seek(randf() * 4.0, true)
 	var sh2 = _blob(1.0)
 	sh2.scale = Vector3.ONE
 	n.add_child(sh2)
@@ -271,10 +364,41 @@ func _figure(i: int, k: int) -> Dictionary:
 	lb.outline_size = 10
 	lb.outline_modulate = Color(0, 0, 0, 0.9)
 	lb.no_depth_test = true
-	lb.position = Vector3(0, 2.3, 0)
+	lb.position = Vector3(0, 2.25, 0)
 	n.add_child(lb)
 	n.visible = pid >= 0
-	return {"n": n, "legs": legs, "arms": arms, "body": body, "pos": Vector2(0.5, 0.5), "ph": randf() * 6.0, "face": 0.0, "jump": 0.0, "dive": 0.0}
+	n.rotation.y = PI / 2 if i == 0 else -PI / 2
+	return {"n": n, "ap": ap, "idle": idle, "cur": idle, "act": 0.0, "cheer": false, "pos": Vector2(0.5, 0.5), "ph": randf() * 6.0, "face": PI / 2 if i == 0 else -PI / 2, "jump": 0.0, "dive": 0.0, "gk": gk, "hf": PI / 2 if i == 0 else -PI / 2}
+
+
+func _act(f: Dictionary, anim: String, from := 0.0, speed := 1.0, hold := -1.0):
+	# play a one-off action (kick, header, dive); normal running resumes when it is over
+	if not lib.has_animation(anim):
+		return
+	f.ap.play(anim, 0.1, speed)
+	if from > 0.0:
+		f.ap.seek(from, true)
+	f.cur = anim
+	f.act = hold if hold > 0.0 else (lib.get_animation(anim).length - from) / speed - 0.12
+
+
+func _animate(f: Dictionary, delta: float):
+	if f.act > 0.0:
+		f.act -= delta
+		return
+	var sp = float(f.get("sp", 0.0))
+	var want: String = f.idle
+	var rate = 1.0
+	if f.cheer:
+		want = "cheer"
+		rate = 1.25
+	elif sp > 1.3:
+		want = "jog"
+		rate = clamp(sp / 7.0, 0.6, 1.9)
+	if f.cur != want:
+		f.ap.play(want, 0.22)
+		f.cur = want
+	f.ap.speed_scale = rate
 
 
 # ---------------------------------------------------------------- coordinates
@@ -341,6 +465,8 @@ func cancel():
 		for k in 11:
 			figs[i][k].jump = 0.0
 			figs[i][k].dive = 0.0
+			figs[i][k].act = 0.0
+			figs[i][k].cheer = false
 			figs[i][k].n.visible = sim.sd[i].xi[k] >= 0
 	_snap_shape()
 	carrier = Vector2i(-1, -1)
@@ -372,8 +498,15 @@ func _move(f: Dictionary, target: Vector2, k1: float, delta: float):
 	var d = (f.pos - old) * Vector2(L, W)
 	var sp = d.length() / max(delta, 0.001)
 	f["sp"] = sp
-	if sp > 0.6:
+	if f.get("gk", false):
+		f.face = lerp_angle(f.face, f.hf, 1.0 - exp(-delta * 6.0))
+	elif sp > 1.3:
 		f.face = lerp_angle(f.face, atan2(d.x, d.y), 1.0 - exp(-delta * 10.0))
+	elif f.act <= 0.0:
+		# standing: watch the ball
+		var to = Vector2((bpos.x - f.pos.x) * L, (bpos.z - f.pos.y) * W)
+		if to.length() > 2.0:
+			f.face = lerp_angle(f.face, atan2(to.x, to.y), 1.0 - exp(-delta * 3.0))
 	f.ph += delta * clamp(sp, 0.0, 9.0) * 1.5
 
 
@@ -385,16 +518,12 @@ func _place(delta: float):
 				continue
 			f.n.position = _w(f.pos.x, f.pos.y, f.jump * FIG)
 			f.n.rotation.y = f.face
-			f.n.rotation.x = f.dive
-			var sw = sin(f.ph) * clamp(f.get("sp", 0.0) / 5.0, 0.0, 1.0)
-			f.legs[0].rotation.x = sw * 0.9
-			f.legs[1].rotation.x = -sw * 0.9
-			f.arms[0].rotation.x = -sw * 0.7
-			f.arms[1].rotation.x = sw * 0.7
-			if f.get("kick", 0.0) > 0.0:
-				f.kick = max(0.0, f.kick - delta * 3.0)
-				f.legs[1].rotation.x = -1.3 * sin(f.kick * PI)
+			_animate(f, delta)
 			f.jump = max(0.0, f.jump - delta * 2.4) if f.get("jv", 0.0) <= 0.0 else f.jump
+	if bounce > 0.0:
+		bounce = max(0.0, bounce - delta)
+		for tr in tiers:
+			tr[0].position.y = tr[1] + abs(sin(bounce * 9.0)) * 0.45 * min(1.0, bounce)
 	ball.position = _w(bpos.x, bpos.z, 0.42 + bpos.y)
 	ball_sh.position = _w(bpos.x, bpos.z, 0.03)
 	# camera: raised behind the near touchline, sliding along with the ball
@@ -507,6 +636,39 @@ func _seq_step(delta: float):
 	var Pw = _att(s, q.P.x, q.P.y)
 	var Sw = _att(s, q.S.x, q.S.y)
 	var Gw = _att(s, q.G.x, q.G.z)
+	# wind-ups start a little before the ball is struck, so foot and ball meet
+	if q.pass and tt >= q.T1 - 0.22 and not q.get("p1", false):
+		q["p1"] = true
+		_act(figs[s][q.ka], "pass" if q.hp <= 0.0 else "pass2")
+	var lead = 0.6 if q.kind == "pen" else (0.5 if q.hp > 0.0 else 0.48)
+	if tt >= q.T2 - lead and not q.get("p2", false):
+		q["p2"] = true
+		if q.kind == "pen":
+			_act(figs[s][q.ks], "pen")
+		elif q.hp > 0.0:
+			_act(figs[s][q.ks], "header", 0.1)
+		else:
+			_act(figs[s][q.ks], "shoot")
+	if tt >= q.T2 - 0.3 and not q.get("p3", false) and q.out != "block":
+		q["p3"] = true
+		var gkf = figs[o][0]
+		var gw = _w(gkf.pos.x, gkf.pos.y)
+		var tw3 = _w(Gw.x, Gw.y)
+		var leftv = Vector3(cos(gkf.face), 0, -sin(gkf.face))
+		var side_l = leftv.dot(tw3 - gw) > 0.0
+		var far = abs(q.G.z - q.gk.y) * W > 1.4
+		if q.out == "miss":
+			_act(gkf, "gk_step", 0.0, 1.0, 0.9)
+		elif far:
+			_act(gkf, "gk_dive" if side_l else "gk_dive2", 0.55, 1.0)
+		elif q.out == "save":
+			_act(gkf, "gk_catch" if q.G.y > 0.9 else "gk_block", 0.3, 1.3)
+		else:
+			_act(gkf, "gk_miss", 0.3, 1.2)
+	if q.out == "block" and tt >= q.T2 - 0.1 and not q.get("p4", false):
+		q["p4"] = true
+		if q.marks[0] >= 0:
+			_act(figs[o][q.marks[0]], "pass", 0.0, 1.0)
 	if tt < q.T1:
 		bu = Pw if q.pass else Sw
 	elif tt < q.T2:
@@ -516,7 +678,6 @@ func _seq_step(delta: float):
 			bh = q.hp * 4.0 * a * (1.0 - a) + (1.4 if q.hp > 0.0 else 0.0) * a
 			if not q.k1:
 				q.k1 = true
-				figs[s][q.ka]["kick"] = 1.0
 				UI.sfx("kick", -14.0)
 		else:
 			bu = Sw
@@ -527,10 +688,6 @@ func _seq_step(delta: float):
 		bh = lerp(h0, q.G.y, a2) + (2.2 if q.kind in ["long", "fk"] else 0.5) * 4.0 * a2 * (1.0 - a2) * (0.0 if q.hp > 0.0 else 1.0)
 		if not q.k2:
 			q.k2 = true
-			if q.hp > 0.0:
-				figs[s][q.ks].jump = 0.55
-			else:
-				figs[s][q.ks]["kick"] = 1.0
 			UI.sfx("kick", -9.0)
 	else:
 		var a3 = min(1.0, (tt - q.T3) / 0.6)
@@ -549,6 +706,8 @@ func _seq_step(delta: float):
 				bh = q.G.y
 		if not q.hit:
 			q.hit = true
+			if q.out == "goal":
+				bounce = 2.2
 			impact.emit()
 	bpos = Vector3(bu.x, bh, bu.y)
 	# the players
@@ -569,10 +728,8 @@ func _seq_step(delta: float):
 			elif i == o and k == 0:
 				tg = _att(s, q.gk.x, q.gk.y)
 				if tt >= q.T2 and q.out != "block":
-					var reach = 0.75 if q.out == "save" else (0.45 if q.out == "goal" else 0.2)
-					tg = _att(s, q.gk.x, lerp(q.gk.y, q.G.z, reach))
-					kk = fast
-					f.dive = lerp(f.dive, 0.9 * sign(q.G.z - q.gk.y) * (1.0 if s == 0 else -1.0) * (1.0 if q.out != "miss" else 0.3), 1.0 - exp(-delta * 8.0)) if tt < q.T3 + 0.5 else lerp(f.dive, 0.0, 1.0 - exp(-delta * 4.0))
+					# the dive itself is in the animation; he only shuffles a little on his line
+					tg = _att(s, q.gk.x, lerp(q.gk.y, q.G.z, 0.12))
 			elif i == o and k in q.marks:
 				var mi = q.marks.find(k)
 				if q.kind == "pen":
@@ -597,8 +754,9 @@ func _seq_step(delta: float):
 				var spot = _att(s, 0.93, 0.5 - q.sgn * 0.3)
 				tg = spot if k == q.ks else spot + Vector2(sin(k * 2.3) * 0.03, cos(k * 1.9) * 0.05)
 				kk = 1.0 - exp(-delta * (3.2 if k == q.ks else 1.6))
-				if k == q.ks or f.pos.distance_to(spot) < 0.07:
-					f.jump = abs(sin(tt * 7.0 + k)) * 0.35
+				f.cheer = k == q.ks or f.pos.distance_to(spot) < 0.09
+				if f.cheer and f.act > 0.0:
+					f.act = 0.0
 			_move(f, tg, kk, delta)
 	_name(s, q.ks)
 	if tt >= q.end:
@@ -606,6 +764,7 @@ func _seq_step(delta: float):
 			for k in 11:
 				figs[i][k].jump = 0.0
 				figs[i][k].dive = 0.0
+				figs[i][k].cheer = false
 		seq = null
 		name_l.visible = false
 		seq_done.emit()

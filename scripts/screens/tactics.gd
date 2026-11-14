@@ -23,6 +23,9 @@ func style_name(c: Dictionary) -> String:
 
 func build():
 	var c = G.uc()
+	if args.has("tab"):
+		tab = int(args.tab)
+		args.erase("tab")
 	var live = G.live
 	if live != null:
 		G.live_sync()
