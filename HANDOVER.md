@@ -1,5 +1,32 @@
 # Football Dynasty 26 — Handover (14 Nov 2026, v1.0.0 on `main`)
 
+## Start here (new chat, written 14 Nov 2026 midday)
+State: `main` = `dev` = v1.0.0 (commit 2689c0a), APK published (134 MB) at https://github.com/forgeframehq/Football-Dynasty/releases/download/latest/FootballDynasty.apk. Sudhi has installed it and is giving feedback. He is collecting a new list and has said "lock it in, don't make the game yet": do not build until he says go.
+
+How Sudhi works:
+- He is on his phone: answer first, short, no preamble. He wants a direct recommendation, not options.
+- He dislikes scrolling, empty space and tiny text; he wants dense, premium screens and compares everything with FM Mobile 26 and EA FC.
+- He likes to agree a list, then say "build it all" and leave it overnight. When he does, finish everything, and say plainly what was not done.
+- Commit and push to `dev` freely. Push to `main` (builds the APK) only when he asks for an APK or says to complete the game.
+- He sends free asset packs when asked (Kenney kits, Mixamo, Meshy, Suno songs, ChatGPT/Kling art). Tell him exactly which file to download.
+
+New list (locked in, not built):
+1. Full-screen backdrops. On screens without the side rail (title, new career, intro, pre-match, live match, full time) the background stops at the camera safe margin and leaves a bare purple band on the left. Run the background edge to edge under the cut-out; keep only the logo, buttons and panels inside the safe area. In main.gd the `safe` MarginContainer holds everything; the backdrop needs to sit outside it.
+2. A FIFA-style intro film, about 25 s: tunnel walk-out, aerial stadium at night, fast cuts on the beat, slow-motion strike, logo slam, into the menu. Kling-type clips for crowd, tunnel and slow motion (16:9, no faces, no real crests); the stadium flythrough, kit shots and logo reveal rendered from the game's own 3D; a 30 s Suno track; cut with ffmpeg. Full version on first launch, a short one after, tap to skip, existing intro setting turns it off.
+3. He offered a Kie (kie.ai) API key with 1,000 credits to generate the clips. api.kie.ai is reachable from the workspace. Agreed plan: with the key, first read the balance and per-model cost and report; then one cheap test clip; only then the rest. Use the key from the shell only, never in the repo, and ask him to regenerate it afterwards.
+
+Open points from v1.0.0 to raise when relevant:
+- Nothing was tried on a real phone. Ask about speed and heat with 22 animated players, the 3D home, and the rail beside his camera.
+- He reported the goalkeeper bigger than the net; goals were rescaled (`GS` in match3d.gd) in the final v1.0.0 build. Confirm it looks right.
+- Top scorers still run high for the very best strikers (Haaland 63 in all competitions in one simulated season).
+- Not built: world system (more nations, generated players), victory films (waiting for his clips), sprint and celebration animations (Mixamo "Fast Run" and a "Victory").
+- The ElevenLabs key was pasted in chat twice and used for sounds and the commentary voice; he should regenerate it.
+
+Workspace notes (the cloud workspace may be new in a new chat):
+- Clone `forgeframehq/Football-Dynasty`, download Godot 4.7.2 (see Build, test and ship).
+- The Mixamo source files and the bake script (`bake.gd`: reduces the skeleton to 23 bones and builds `soccer.res`) were in a scratch project outside the repo. Only the baked `assets/m3d/rig.scn` and `assets/m3d/soccer.res` are in the repo. To add animations, ask him for the Mixamo FBX again and rewrite the bake from the v1.0.0 notes.
+- Unused asset packs he sent are not in the repo: 11 more stadium models, the rest of the Kenney car kit, city kits, two usdz supercars, the Meshy shirt was never uploaded.
+
 ## Where things stand
 - `main`, `dev` and the published APK are v1.0.0, built overnight 14 Nov at Sudhi's request from the list he drew up after playing v0.9.0 (see the v1.0.0 section at the end). Work on `dev`; push to `main` only when he asks for an APK.
 - Awaiting from Sudhi: phone feedback on v1.0.0 (speed and heat with 22 animated players, the 3D home, the rail beside his camera), Kling victory films, and optionally a sprint and a celebration animation from Mixamo.
