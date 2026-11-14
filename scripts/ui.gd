@@ -215,6 +215,39 @@ func music_duck(on: bool):
 		_fade_to(vol_db("vol_music", -17.0), 2.2)
 
 
+var first_song := true
+
+
+func _launch_song(tr: Array):
+	# each launch opens on a different song: the one after last launch's opener (or a random other one on shuffle)
+	first_song = false
+	var live = []
+	for i in tr.size():
+		if song_on(tr[i].id):
+			live.append(i)
+	if live.is_empty():
+		return
+	var last = str(G.settings.get("last_song", ""))
+	var li = -1
+	for i in tr.size():
+		if tr[i].id == last:
+			li = i
+	var nxt = live[0]
+	if G.settings.get("shuffle", false) and live.size() > 1:
+		nxt = live[randi() % live.size()]
+		while nxt == li:
+			nxt = live[randi() % live.size()]
+	elif li >= 0:
+		for k in range(1, tr.size() + 1):
+			var j = posmod(li + k, tr.size())
+			if j in live:
+				nxt = j
+				break
+	music_i = nxt
+	G.settings["last_song"] = tr[nxt].id
+	G.save_settings()
+
+
 func music(on: bool):
 	var tr = songs()
 	if tr.is_empty():
@@ -222,6 +255,8 @@ func music(on: bool):
 	var pl = _music_pl()
 	if on and music_on():
 		if not pl.playing:
+			if first_song:
+				_launch_song(tr)
 			music_i = posmod(music_i, tr.size())
 			if not song_on(tr[music_i].id):
 				music_step(1)

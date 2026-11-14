@@ -154,6 +154,7 @@ static func daily():
 		G.TC.on_badge()
 		u.rep = min(100.0, u.rep + 5.0)
 		G.msg("Coaching badge earned", "Congratulations — you now hold the %s licence. You have 3 new attribute points to spend in the board room." % BADGES[u.badge], "board", null, true)
+	market_day(life())
 	if G.cur.weekday == 1:
 		weekly()
 		G.TC.weekly()
@@ -345,6 +346,8 @@ static func life_ledger(lf: Dictionary) -> Array:
 	for cid in lf.stakes:
 		div += int(G.s.clubs[int(cid)].wage_budget * 0.06 * float(lf.stakes[cid]) / 100.0)
 	if div > 0: rows.append(["Club dividends", div])
+	var dv = dividends(lf)
+	if dv > 0: rows.append(["Share dividends", dv])
 	if lf.media: rows.append(["Media work", 8000])
 	if lf.agent: rows.append(["Personal agent", -2000])
 	if lf.study != "": rows.append(["Language lessons", -400])
@@ -416,8 +419,7 @@ static func invest_week(lf: Dictionary):
 		pr.value = int(pr.value * G.rng.randf_range(0.996, 1.007))
 	while lf.px.size() < 16:
 		lf.px.append(float(G.rng.randi_range(20, 180)))
-	for i in lf.px.size():
-		lf.px[i] = clamp(lf.px[i] * G.rng.randf_range(0.93, 1.085), 2.0, 5000.0)
+	lf.cash += dividends(lf)
 	for cid in lf.stakes:
 		var c = s.clubs[int(cid)]
 		lf.cash += int(c.wage_budget * 0.06 * float(lf.stakes[cid]) / 100.0)
@@ -1019,3 +1021,183 @@ static func car_node(idx: int) -> Node3D:
 				m2.albedo_color = tint.lerp(Color.WHITE, 0.25)
 				mi.set_surface_override_material(si, m2)
 	return n
+
+
+# ---------------------------------------------------------------- stock market
+# Sixteen listed companies (the sponsor names). Prices move every day: a market-wide swing, a swing for the
+# sector, the company's own noise and now and then company news. While the Investments screen is open the
+# price also ticks a little every second or two. Every share pays a weekly dividend at its sector's yield.
+# Data on the manager's life record: px (price now), ph (daily closes, newest last), cost (average price paid),
+# mnews (headlines), trades (recent orders).
+
+const TICK = ["AERO", "SKYL", "HZTR", "PNBK", "NOVA", "PLSD", "HLXS", "APXM", "TRBF", "WAVC", "SGPL", "LMVT", "TRSP", "FZVT", "AQBT", "AEGS"]
+# sector: [daily volatility, yearly dividend yield]
+const SECTOR = {"Airline": [0.022, 0.010], "Bank": [0.015, 0.035], "Tech": [0.026, 0.004], "Car maker": [0.020, 0.015],
+	"Telecom": [0.011, 0.042], "Energy": [0.019, 0.026], "Drinks": [0.010, 0.030], "Insurance": [0.010, 0.036]}
+const HIST = 260
+const FEE = 0.002
+
+
+static func sector(i: int) -> String:
+	return sponsor_list()[i][1]
+
+
+static func vol(i: int) -> float:
+	return float(SECTOR.get(sector(i), [0.015, 0.02])[0])
+
+
+static func yld(i: int) -> float:
+	return float(SECTOR.get(sector(i), [0.015, 0.02])[1])
+
+
+static func market_init(lf: Dictionary):
+	invest_init(lf)
+	if not lf.has("ph") or lf.ph.size() < lf.px.size():
+		# a year of made-up history that ends at today's price
+		lf["ph"] = []
+		for i in lf.px.size():
+			var h = []
+			var p = float(lf.px[i])
+			for d in HIST:
+				h.push_front(snappedf(p, 0.01))
+				p = clamp(p / exp(randfn_g(0.0003, vol(i))), 2.0, 5000.0)
+			lf.ph.append(h)
+	if not lf.has("cost"):
+		lf["cost"] = {}
+	for k in lf.shares:
+		if not lf.cost.has(k):
+			lf.cost[k] = float(lf.px[int(k)])
+	if not lf.has("mnews"):
+		lf["mnews"] = []
+	if not lf.has("trades"):
+		lf["trades"] = []
+
+
+static func randfn_g(mean: float, sd: float) -> float:
+	return G.rng.randfn(mean, sd)
+
+
+static func prev_close(lf: Dictionary, i: int) -> float:
+	var h = lf.ph[i]
+	return float(h[h.size() - 2]) if h.size() >= 2 else float(lf.px[i])
+
+
+static func day_change(lf: Dictionary, i: int) -> float:
+	var pc = prev_close(lf, i)
+	return (float(lf.px[i]) / pc - 1.0) if pc > 0 else 0.0
+
+
+static func market_day(lf: Dictionary):
+	# close yesterday, open today: one daily move for every company
+	if not lf.has("savings"):
+		return
+	market_init(lf)
+	if G.cur.weekday == 0 or G.cur.weekday == 6:
+		return     # no trading at the weekend
+	var mkt = G.rng.randfn(0.0002, 0.007)
+	var sec = {}
+	for k in SECTOR:
+		sec[k] = G.rng.randfn(0.0, 0.006)
+	var sp = sponsor_now()
+	for i in lf.px.size():
+		var r = mkt + sec.get(sector(i), 0.0) + G.rng.randfn(0.00025, vol(i))
+		# the club's shirt sponsor gets a little lift from the exposure
+		if sp != null and str(sp.get("name", "")) == sponsor_list()[i][0]:
+			r += 0.0004
+		if G.rng.randf() < 0.012:
+			var good = G.rng.randf() < 0.53
+			var mv = G.rng.randf_range(0.04, 0.12) * (1.0 if good else -1.15)
+			r += mv
+			_headline(lf, i, mv)
+		lf.px[i] = clamp(float(lf.px[i]) * exp(r), 2.0, 5000.0)
+		var h = lf.ph[i]
+		h.append(snappedf(lf.px[i], 0.01))
+		while h.size() > HIST:
+			h.remove_at(0)
+
+
+const GOOD = ["%s beats profit forecasts", "%s wins a major contract", "Analysts upgrade %s to buy", "%s raises its outlook for the year", "%s unveils a new product line"]
+const BAD = ["%s misses profit forecasts", "%s chief executive steps down", "%s hit by a product recall", "Analysts cut %s to sell", "%s warns on profits"]
+
+
+static func _headline(lf: Dictionary, i: int, mv: float):
+	var nm = sponsor_list()[i][0]
+	var t = (GOOD if mv > 0 else BAD)[G.rng.randi() % 5] % nm
+	lf.mnews.push_front({"d": G.s.day, "i": i, "t": t, "mv": mv})
+	while lf.mnews.size() > 30:
+		lf.mnews.pop_back()
+	if int(lf.shares.get(i, 0)) > 0 and absf(mv) >= 0.07:
+		G.msg("%s %s %d%%" % [TICK[i], "up" if mv > 0 else "down", int(round(absf(mv) * 100))], "%s. You hold %s shares, now worth %s." % [t, _n(int(lf.shares[i])), G.money(int(float(lf.px[i]) * exp(mv) * int(lf.shares[i])))], "info")
+
+
+static func _n(v: int) -> String:
+	var s = str(v)
+	var out = ""
+	while s.length() > 3:
+		out = "," + s.substr(s.length() - 3) + out
+		s = s.substr(0, s.length() - 3)
+	return s + out
+
+
+static func market_tick(lf: Dictionary):
+	# a small live move while the market screen is open
+	for i in lf.px.size():
+		lf.px[i] = clamp(float(lf.px[i]) * exp(G.rng.randfn(0.0, vol(i) * 0.07)), 2.0, 5000.0)
+		lf.ph[i][lf.ph[i].size() - 1] = snappedf(lf.px[i], 0.01)
+
+
+static func dividends(lf: Dictionary) -> int:
+	var t = 0.0
+	for k in lf.get("shares", {}):
+		var i = int(k)
+		if i < lf.px.size():
+			t += float(lf.shares[k]) * float(lf.px[i]) * yld(i) / 52.0
+	return int(t)
+
+
+static func trade(lf: Dictionary, i: int, qty: int) -> String:
+	# qty > 0 buys, qty < 0 sells; returns "" when done, or why not
+	market_init(lf)
+	var px = float(lf.px[i])
+	var held = int(lf.shares.get(i, 0))
+	if qty > 0:
+		var cost = int(ceil(px * qty * (1.0 + FEE)))
+		if cost > lf.cash:
+			return "You need %s; you have %s" % [G.money(cost), G.money(lf.cash)]
+		lf.cash -= cost
+		lf.cost[i] = (float(lf.cost.get(i, px)) * held + px * qty) / float(held + qty)
+		lf.shares[i] = held + qty
+	else:
+		var q = min(-qty, held)
+		if q <= 0:
+			return "You hold no %s shares" % TICK[i]
+		lf.cash += int(px * q * (1.0 - FEE))
+		if held - q <= 0:
+			lf.shares.erase(i)
+			lf.cost.erase(i)
+		else:
+			lf.shares[i] = held - q
+		qty = -q
+	lf.trades.push_front({"d": G.s.day, "i": i, "q": qty, "p": snappedf(px, 0.01)})
+	while lf.trades.size() > 20:
+		lf.trades.pop_back()
+	return ""
+
+
+static func max_buy(lf: Dictionary, i: int) -> int:
+	return int(floor(float(lf.cash) / (float(lf.px[i]) * (1.0 + FEE))))
+
+
+static func portfolio(lf: Dictionary) -> Dictionary:
+	# value, what it cost, and how it moved today
+	market_init(lf)
+	var val = 0.0
+	var cost = 0.0
+	var today = 0.0
+	for k in lf.shares:
+		var i = int(k)
+		var q = float(lf.shares[k])
+		val += q * float(lf.px[i])
+		cost += q * float(lf.cost.get(k, lf.px[i]))
+		today += q * (float(lf.px[i]) - prev_close(lf, i))
+	return {"value": val, "cost": cost, "pl": val - cost, "today": today}

@@ -34,7 +34,7 @@ var q := ""
 func build():
 	var kind = str(args.get("kind", "status"))
 	body.add_child(UI.topbar(TITLES.get(kind, "Club")))
-	if kind in ["manual", "request", "philosophy", "editor", "status"]:
+	if kind in ["request", "philosophy"]:
 		max_w = 900
 		cols = 1
 	if kind == "press":
@@ -570,6 +570,8 @@ func _life(v: Control):
 
 
 func _invest(v: Control):
+	UI.main.root.call_deferred("invest", {"grp": "manager"})
+	return
 	var lf = G.OPS.life()
 	if not lf.has("savings"):
 		G.OPS.invest_week(lf)

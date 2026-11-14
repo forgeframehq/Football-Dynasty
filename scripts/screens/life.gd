@@ -296,7 +296,7 @@ func _business(h: Control, lf: Dictionary):
 	var v2 = c[1]
 	v2.add_child(UI.caps("More ways to invest", 15, UI.accent))
 	v2.add_child(UI.wrap("Savings, rental property, shares and stakes in football clubs are on the Investments page.", 16, UI.MUTED))
-	v2.add_child(UI.btn("Investments", func(): UI.main.root("hub", {"kind": "invest", "grp": "manager"}), "secondary", "trending-up", 48))
+	v2.add_child(UI.btn("Investments", func(): UI.main.root("invest", {"grp": "manager"}), "secondary", "trending-up", 48))
 	v2.add_child(UI.btn("Club ownership", func(): UI.main.root("hub", {"kind": "owner", "grp": "manager"}), "secondary", "landmark", 48))
 	v2.add_child(UI.kv("Business income", "%s/wk" % G.money(lf.income), UI.GREEN))
 

@@ -250,6 +250,27 @@ func run(m):
 		print("posts ", G.SOC.data().posts.size(), " ", G.SOC.post("Proud of the lads, great win. Haaland was superb"))
 		main.root("hub", {"kind": "social", "grp": "manager"})
 		await snap("social")
+	if want.call("invest"):
+		var lfi = G.OPS.life()
+		lfi.cash = max(lfi.cash, 3000000)
+		G.OPS.invest_week(lfi)
+		G.OPS.market_init(lfi)
+		G.OPS.trade(lfi, 4, 2000)
+		G.OPS.trade(lfi, 9, 5000)
+		G.OPS.trade(lfi, 13, 3000)
+		for d in 25:
+			G.advance_day()
+		main.root("invest", {"grp": "manager"})
+		await snap("invest", 2.0)
+		var iv = main.stack[-1]
+		iv.side = 1
+		iv.refresh()
+		await snap("invest_news")
+		iv.side = 3
+		iv.rng_i = 4
+		iv.sel = 9
+		iv.refresh()
+		await snap("invest_prop")
 	if want.call("hub"):
 		for k in ["press", "doc", "invest", "owner", "life", "contract", "dressing", "fans", "sponsors", "request", "report", "identity", "analysis", "timeline", "philosophy", "tcentre", "awards", "scores", "standards", "findclub", "rolefinder", "status", "manual", "achieve", "fame", "editor"]:
 			main.root("hub", {"kind": k, "grp": "club"})
@@ -483,6 +504,10 @@ func run(m):
 		ms.speed = 2
 		await main.get_tree().create_timer(6.0).timeout
 		await snap("match_live")
+		ms._open_tactics()
+		await snap("match_live_tactics", 0.6)
+		main.back()
+		await main.get_tree().process_frame
 		for tb in [1, 2, 3]:
 			ms.tab = tb
 			ms._build_tabs()

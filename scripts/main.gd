@@ -5,6 +5,7 @@ extends Control
 const SCREENS = {
 	"menu": preload("res://scripts/screens/menu.gd"),
 	"calendar": preload("res://scripts/screens/calendar.gd"),
+	"invest": preload("res://scripts/screens/invest.gd"),
 	"home3d": preload("res://scripts/screens/home3d.gd"),
 	"plans": preload("res://scripts/screens/plans.gd"),
 	"new_career": preload("res://scripts/screens/new_career.gd"),
@@ -45,6 +46,7 @@ const RAIL_ICON = {"inbox": "mail", "home": "house", "club": "", "manager": "use
 const RAIL = [["inbox", "mail"], ["home", "house"], ["club", ""], ["manager", "user"], ["world", "globe"], ["search", "search"], ["options", "settings"]]
 const RAIL_W = 84
 var hole := Vector2(-1, -1)   # top and bottom of the camera cut-out on the left edge, in rail units (-1 = none known)
+var hole_x := Vector2(-1, -1) # left and right of that cut-out, in viewport units
 var notch_l := 0            # width of the camera cut-out strip on the left, in viewport units
 const TOP_H = 70
 const NATIONS = ["England", "Spain", "Italy", "Germany", "France"]
@@ -328,19 +330,25 @@ func _safe_area():
 		t = max(0.0, sa.position.y * k)
 		b = max(0.0, (win.y - sa.end.y) * k)
 	hole = Vector2(-1, -1)
+	hole_x = Vector2(-1, -1)
 	if l > 16 and win.y > 0:
 		var k2 = size.y / float(win.y)
 		for rc in DisplayServer.get_display_cutouts():
 			if rc.position.x < win.x * 0.2 and rc.size.y > 0:
 				hole = Vector2(rc.position.y * k2 - t - 8, rc.end.y * k2 - t + 8)
+				hole_x = Vector2(rc.position.x * k2, rc.end.x * k2)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("notch="):
 			l = float(arg.substr(6))      # dev: pretend there is a camera cut-out on the left
 			if hole.x < 0:
 				hole = Vector2(272, 348)
+			hole_x = Vector2(l * 0.34, l * 0.72)
+			_dev_hole()
 		if arg.begins_with("hole="):
 			var hp = arg.substr(5).split("-")
 			hole = Vector2(float(hp[0]), float(hp[1]))
+			hole_x = Vector2(l * 0.34, l * 0.72)
+			_dev_hole()
 	# with the rail showing, its background runs under the camera cut-out and only the icons stay clear of it
 	notch_l = int(l)
 	_apply_left()
@@ -353,6 +361,29 @@ func rail_wide() -> bool:
 	# a long notch (or a cut-out we cannot locate) leaves no room for icons beside it: they sit to its right.
 	# A small camera hole does: the icons use the whole strip and simply skip the hole.
 	return notch_l > 16 and (hole.x < 0 or hole.y - hole.x > 190)
+
+
+func left_inset() -> int:
+	# screens without the rail: a small camera hole no longer costs the whole strip beside it. The page runs to the
+	# edge of the glass (a corner of a panel may sit behind the hole); only a long notch still pushes everything right.
+	return notch_l if rail_wide() else 0
+
+
+func _dev_hole():
+	# dev: draw the pretend camera hole so screenshots show what it would cover
+	if has_node("devhole"):
+		get_node("devhole").queue_free()
+	var d = Panel.new()
+	d.name = "devhole"
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = Color.BLACK
+	sb.set_corner_radius_all(40)
+	d.add_theme_stylebox_override("panel", sb)
+	d.position = Vector2(hole_x.x, hole.x + 8)
+	d.size = Vector2(hole_x.y - hole_x.x, hole.y - hole.x - 16)
+	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	d.z_index = 100
+	add_child.call_deferred(d)
 
 
 func rail_col() -> int:
@@ -368,7 +399,7 @@ func rail_w() -> int:
 func _apply_left():
 	if safe == null or rail == null:
 		return
-	safe.add_theme_constant_override("margin_left", 0 if rail.visible else notch_l)
+	safe.add_theme_constant_override("margin_left", 0 if rail.visible else left_inset())
 	if int(rail.custom_minimum_size.x) != rail_w():
 		rail.custom_minimum_size = Vector2(rail_w(), 0)
 		if rail.visible and uses_chrome():
@@ -938,7 +969,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("megaphone", "Social", "%s followers" % G.OPS._thousands(G.SOC.data().followers), func(): root("hub", {"kind": "social", "grp": "manager"})))
 		a.append(_row("house", "Lifestyle", "%s in the bank" % G.money(G.OPS.life().cash), func(): root("life")))
 		a.append(_row("sofa", "My Home", "Walk round it in 3D", func(): root("home3d" if not G.settings.get("lowgfx", false) else "life")))
-		a.append(_row("trending-up", "Investments", "Savings, property, shares", func(): root("hub", {"kind": "invest", "grp": "manager"})))
+		a.append(_row("trending-up", "Investments", "Savings, property, shares", func(): root("invest", {"grp": "manager"})))
 		a.append(_row("landmark", "Club Ownership", "Buy shares in clubs", func(): root("hub", {"kind": "owner", "grp": "manager"})))
 		a.append(_row("file-text", "My Contract", "%s a week" % G.money(G.OPS.salary()), func(): root("hub", {"kind": "contract", "grp": "manager"})))
 		a.append(_row("scroll-text", "Career Timeline", "%d season%s" % [s.history.size(), "" if s.history.size() == 1 else "s"], func(): root("hub", {"kind": "timeline", "grp": "manager"})))

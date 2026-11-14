@@ -40,24 +40,67 @@ func _layout_paged():
 		inner = max_w
 	var x_in = (page_w - inner) / 2.0
 	var n = cols if cols > 0 else clampi(int(inner / min_col), 1, 3)
+	var r = _place(n, inner, x_in)
+	# automatic pages that fit on one page in fewer columns get fewer, wider columns: no empty third of the screen
+	if cols == 0 and r.pages == 1 and r.used < n:
+		n = max(1, r.used)
+		r = _place(n, inner, x_in)
+	for pl in r.list:
+		fit_child_in_rect(pl[0], pl[1])
+	# the last card in each column runs to the bottom of the page, so a page never ends in a bare strip
+	if cols == 0:
+		for k in r.last:
+			var pl = r.last[k]
+			var c: Control = pl[0]
+			var rc: Rect2 = pl[1]
+			var bottom = page_h
+			if c.get_combined_minimum_size().y >= 100 and bottom > rc.end.y + 4:
+				fit_child_in_rect(c, Rect2(rc.position, Vector2(rc.size.x, bottom - rc.position.y)))
+	var np = r.pages
+	var nw = np * page_w
+	var nh = max(page_h, r.maxb)
+	if np != pages or absf(nw - _w) > 0.5 or absf(nh - _h) > 0.5:
+		pages = np
+		_w = nw
+		_h = nh
+		update_minimum_size()
+
+
+func _place(n: int, inner: float, x_in: float) -> Dictionary:
+	# works out where every child goes for n columns per page, without moving anything
 	var cw = (inner - gap * (n - 1)) / n
 	var col = 0
 	var y = 0.0
 	var tops = {}
 	var maxb = 0.0
 	var cur: Array = []
+	var out: Array = []
+	var last = {}
+	var used = 0
+	var pbot = {}          # lowest point used on each page so far
 	for c in get_children():
 		if not (c is Control) or not c.visible:
 			continue
 		if c.has_meta("span"):
-			if y > tops.get(col / n, 0.0) or col % n != 0:
-				col = (col / n + 1) * n
-			var pg = col / n
 			c.size = Vector2(inner, 0)
 			var h = c.get_combined_minimum_size().y
-			fit_child_in_rect(c, Rect2(pg * page_w + x_in, tops.get(pg, 0.0), inner, h))
-			tops[pg] = tops.get(pg, 0.0) + h + sep
+			var pg = col / n
+			var below = pbot.get(pg, tops.get(pg, 0.0))
+			if below > tops.get(pg, 0.0) and below + h > page_h:
+				# no room under this page's columns: start the next page
+				col = (pg + 1) * n
+				pg = col / n
+				below = tops.get(pg, 0.0)
+			else:
+				col = pg * n
+			out.append([c, Rect2(pg * page_w + x_in, below, inner, h)])
+			tops[pg] = below + h + sep
+			pbot[pg] = tops[pg]
 			y = tops[pg]
+			# cards above a full-width note must not be stretched down through it
+			for k in last.keys():
+				if k / n == pg:
+					last.erase(k)
 			continue
 		cur.append(c)
 		if c.has_meta("glue"):
@@ -73,18 +116,15 @@ func _layout_paged():
 			y = tops.get(col / n, 0.0)
 		for k in cur:
 			var kh = k.get_combined_minimum_size().y
-			fit_child_in_rect(k, Rect2((col / n) * page_w + x_in + (col % n) * (cw + gap), y, cw, kh))
+			var rc = Rect2((col / n) * page_w + x_in + (col % n) * (cw + gap), y, cw, kh)
+			out.append([k, rc])
+			last[col] = [k, rc]
 			y += kh + sep
+			pbot[col / n] = max(pbot.get(col / n, 0.0), y)
+		used = max(used, col % n + 1) if col < n else n
 		maxb = max(maxb, y - sep)
 		cur = []
-	var np = col / n + 1
-	var nw = np * page_w
-	var nh = max(page_h, maxb)
-	if np != pages or absf(nw - _w) > 0.5 or absf(nh - _h) > 0.5:
-		pages = np
-		_w = nw
-		_h = nh
-		update_minimum_size()
+	return {"list": out, "last": last, "pages": col / n + 1, "used": used, "maxb": maxb}
 
 
 func _layout():
