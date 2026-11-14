@@ -140,6 +140,17 @@ func run(m):
 		for ti in [2, 3]:
 			main.root("tactics", {"tab": ti})
 			await snap("tac_overlay_%d" % ti)
+	if want.call("home3d"):
+		main.root("home3d")
+		await snap("home3d", 1.0)
+		for ri in [0, 1, 2, 3, 4]:
+			main.stack[-1].room = ri
+			main.stack[-1].refresh()
+			await snap("home3d_room%d" % ri, 0.6)
+		G.OPS.life().home = 4
+		main.stack[-1].room = -1
+		main.stack[-1].refresh()
+		await snap("home3d_mansion", 0.8)
 	if want.call("cal"):
 		main.root("calendar")
 		await snap("calendar")

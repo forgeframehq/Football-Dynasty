@@ -120,6 +120,9 @@ func _build_pre():
 		var sv = STADIUM.new()
 		var d0 = G.date(int(f.day))
 		sv.night = d0.weekday in [2, 3] or d0.month in [11, 12, 1]
+		var sm = G.OPS.stadium_model(G.OPS.stadium_level(hc))
+		sv.model = sm[0]
+		sv.ground = sm[1]
 		sv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		layer.add_child(sv)
 	var shade = ColorRect.new()

@@ -80,7 +80,7 @@ static func start_upgrade(key: String) -> String:
 	if cost > c.budget:
 		return "You need %s in the budget for this." % G.money(cost)
 	c.budget -= cost
-	c.build = {"key": key, "done": G.s.day + upgrade_days(c, key), "cost": cost}
+	c.build = {"key": key, "done": G.s.day + upgrade_days(c, key), "cost": cost, "days": upgrade_days(c, key)}
 	return ""
 
 
@@ -981,3 +981,41 @@ static func spx_rollover():
 	if c.has("stad0") and (d == null or int(d.until) <= G.s.season):
 		c.stadium = str(c.stad0)
 		c.erase("stad0")
+
+
+# ---------------------------------------------------------------- 3D models shared by the city, the match-day card and the home
+const STADIA = [["FSt_Fra_003", 0.86], ["Fst_Eng_003", 0.6953], ["Fst_Eng_001", 0.66375], ["Fst_Eng_002", 0.7575], ["FSt_Ita_001", 0.693]]
+const CAR_MODEL = ["sedan", "sedan", "sedan-sports", "race", "hatchback-sports", "hatchback-sports", "hatchback-sports", "suv", "sedan", "suv-luxury", "sedan-sports", "sedan-sports", "race", "race-future"]
+const CAR_TINT = ["ffffff", "30343c", "d8342c", "f2c019", "8b1a1a", "6cabdd", "2f6fe0", "9aa3ad", "16161a", "1c2a22", "e8e8e8", "0a1a5c", "ff6f00", "7a2fd0"]
+
+
+static func stadium_model(level: int) -> Array:
+	# [scene path, how far up the model's bounding box the ground sits]
+	var e = STADIA[clampi(level - 1, 0, STADIA.size() - 1)]
+	return ["res://assets/city3d/stadium/%s.FBX" % e[0], float(e[1])]
+
+
+static func stadium_level(c: Dictionary) -> int:
+	if c.has("fac"):
+		return int(c.fac.stadium)
+	return clampi(int((float(c.rep) - 40.0) / 9.0), 1, 5)
+
+
+static func car_node(idx: int) -> Node3D:
+	# the Kenney car that stands for one of the 14 cars in the garage, tinted so each looks its own
+	idx = clampi(idx, 0, CAR_MODEL.size() - 1)
+	var path = "res://assets/cars3d/%s.glb" % CAR_MODEL[idx]
+	if not ResourceLoader.exists(path):
+		return null
+	var n: Node3D = load(path).instantiate()
+	var tint = Color(CAR_TINT[idx])
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		if str(mi.name).to_lower().contains("wheel"):
+			continue
+		for si in mi.mesh.get_surface_count():
+			var m = mi.mesh.surface_get_material(si)
+			if m is StandardMaterial3D:
+				var m2 = m.duplicate()
+				m2.albedo_color = tint.lerp(Color.WHITE, 0.25)
+				mi.set_surface_override_material(si, m2)
+	return n

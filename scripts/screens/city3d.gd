@@ -38,6 +38,9 @@ var pinch0 := 0.0
 var dist0 := 17.0
 var moved := 0.0
 var overlay: Control
+var tod := -1                      # 0 day, 1 dusk, 2 night (-1 = pick from the calendar)
+var traffic: Array = []            # [node, loop index, distance along it, speed]
+const LOOPS = [[Vector2(0, 0), Vector2(12, 0), Vector2(12, 12), Vector2(0, 12)], [Vector2(4, 4), Vector2(8, 4), Vector2(8, 8), Vector2(4, 8)], [Vector2(0, 4), Vector2(12, 4), Vector2(12, 8), Vector2(0, 8)]]
 
 
 func build():
@@ -78,11 +81,28 @@ func build():
 	info.add_child(iv)
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.add_child(info)
+	var bar = UI.hb(6)
+	bar.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	bar.position = Vector2(14, -46)
+	var tchip = UI.chip(["DAY", "DUSK", "NIGHT"][tod], Color(UI.BG, 0.82), UI.GOLD, 15, 80)
+	UI.tap(tchip, func():
+		tod = (tod + 1) % 3
+		refresh(), true)
+	bar.add_child(tchip)
+	var hchip = UI.chip("MY HOME", Color(UI.BG, 0.82), UI.TEXT, 15, 100)
+	UI.tap(hchip, func(): UI.main.root("home3d", {"grp": "manager"}), true)
+	bar.add_child(hchip)
 	var classic = UI.chip("CLASSIC VIEW", Color(UI.BG, 0.82), UI.TEXT, 15, 130)
-	classic.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	classic.position = Vector2(14, -44)
 	UI.tap(classic, func(): UI.main.root("campus"), true)
-	holder.add_child(classic)
+	bar.add_child(classic)
+	holder.add_child(bar)
+	var f0 = G.user_fixture_today()
+	if f0 != null and f0.h == c.id:
+		var md = UI.chip("MATCH DAY · FLOODLIGHTS ON", Color(UI.accent, 0.85), UI.on_color(UI.accent), 15)
+		md.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		md.position.y = 10
+		md.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(md)
 	if sel != "":
 		holder.add_child(_detail(c, sel))
 
@@ -145,18 +165,24 @@ func _tag(key: String, at: Vector3, lvl: int):
 
 func _world(c: Dictionary):
 	tags.clear()
+	traffic = []
+	var fx0 = G.user_fixture_today()
+	var matchday = fx0 != null and fx0.h == c.id
+	if tod < 0:
+		tod = 1 if matchday else 0
 	var env = WorldEnvironment.new()
 	var e = Environment.new()
 	e.background_mode = Environment.BG_COLOR
-	e.background_color = UI.BG.lerp(Color("203050"), 0.5)
+	e.background_color = [Color("7fb4ea"), Color("e08a5a").lerp(Color("2a2f5a"), 0.5), Color("070b18")][tod]
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color.WHITE
-	e.ambient_light_energy = 0.6
+	e.ambient_light_color = [Color.WHITE, Color("ffd9c0"), Color("8696d8")][tod]
+	e.ambient_light_energy = [0.6, 0.5, 0.32][tod]
 	env.environment = e
 	vp.add_child(env)
 	var sun = DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-50, -60, 0)
-	sun.light_energy = 1.05
+	sun.rotation_degrees = [Vector3(-50, -60, 0), Vector3(-18, -75, 0), Vector3(-55, 40, 0)][tod]
+	sun.light_color = [Color("fff6e4"), Color("ffb070"), Color("9fb4ff")][tod]
+	sun.light_energy = [1.05, 0.8, 0.28][tod]
 	sun.shadow_enabled = not G.settings.get("lowgfx", false)
 	sun.directional_shadow_max_distance = 40.0
 	vp.add_child(sun)
@@ -194,13 +220,73 @@ func _world(c: Dictionary):
 			_put(R + "road-straight.glb", x, z, 0.0 if ew else 90.0)
 	# the stadium, larger with every level
 	var sl = int(c.fac.stadium)
-	var st = _put("res://assets/city3d/stadium/Fst_Eng_001.FBX", 6, 6)
+	var smod = G.OPS.stadium_model(sl)
+	var st = _put(smod[0], 6, 6)
 	if st != null:
 		var bb = _aabb(st)
 		var k = (2.3 + 0.16 * sl) / max(1.0, bb.size.x) * 1.25
 		st.scale = Vector3.ONE * k
-		st.position.y = 0.02 - (bb.position.y + 0.66375 * bb.size.y) * k
+		st.position.y = 0.02 - (bb.position.y + float(smod[1]) * bb.size.y) * k
 	_tag("stadium", Vector3(6, 2.3, 6), sl)
+	# club colours: flags around the ground
+	var c1 = Color(str(c.c1))
+	var c2 = Color(str(c.c2))
+	for i in 12:
+		var a = TAU * i / 12.0
+		var fp = Vector3(6 + cos(a) * 2.05, 0, 6 + sin(a) * 2.05)
+		_boxm(Vector3(0.03, 0.9, 0.03), fp + Vector3(0, 0.45, 0), Color("d8dce4"))
+		_boxm(Vector3(0.26, 0.16, 0.02), fp + Vector3(0.14, 0.8, 0), c1 if i % 2 == 0 else c2, true)
+	# floodlights: on at dusk, at night and on match days
+	var lit = tod > 0 or matchday
+	for cx in [-1.0, 1.0]:
+		for cz in [-1.0, 1.0]:
+			var lp = Vector3(6 + cx * 1.75, 0, 6 + cz * 1.75)
+			_boxm(Vector3(0.06, 1.9, 0.06), lp + Vector3(0, 0.95, 0), Color("3a3f4b"))
+			_boxm(Vector3(0.34, 0.2, 0.08), lp + Vector3(0, 1.95, 0), Color("fffbe0") if lit else Color("8a8f9a"), lit)
+			if lit and not G.settings.get("lowgfx", false):
+				var ol = OmniLight3D.new()
+				ol.position = lp + Vector3(-cx * 0.5, 2.0, -cz * 0.5)
+				ol.omni_range = 5.5
+				ol.light_energy = 2.4 if tod == 2 else 1.3
+				ol.light_color = Color("fff6dc")
+				vp.add_child(ol)
+	if tod == 2:
+		# street lighting: a warm glow at the main junctions
+		for jp in [Vector2(4, 4), Vector2(8, 4), Vector2(4, 8), Vector2(8, 8), Vector2(0, 0), Vector2(12, 0), Vector2(0, 12), Vector2(12, 12)]:
+			var sl2 = OmniLight3D.new()
+			sl2.position = Vector3(jp.x, 1.2, jp.y)
+			sl2.omni_range = 4.0
+			sl2.light_energy = 1.1
+			sl2.light_color = Color("ffcf8a")
+			vp.add_child(sl2)
+	# traffic on the ring road and the avenues, and the manager's own car outside the ground
+	var crng = RandomNumberGenerator.new()
+	crng.seed = c.id * 31 + G.s.day
+	var kinds = ["sedan", "taxi", "van", "suv", "hatchback-sports", "delivery", "truck", "police", "sedan-sports"]
+	var ncar = 0 if G.settings.get("lowgfx", false) else (11 if matchday else 7)
+	for i in ncar:
+		var cn = _put("res://assets/cars3d/%s.glb" % kinds[crng.randi() % kinds.size()], 0, 0, 0.0, 0.16)
+		if cn != null:
+			traffic.append([cn, i % LOOPS.size(), crng.randf_range(0.0, 40.0), crng.randf_range(0.9, 1.5) * (1.0 if i % 2 == 0 else -1.0)])
+	var lf = G.s.user.get("life", {})
+	var mine = G.OPS.car_node(int(lf.get("car", 0)))
+	if mine != null:
+		mine.scale = Vector3.ONE * 0.19
+		mine.position = Vector3(6.0, 0.03, 8.35)
+		mine.rotation_degrees.y = 90
+		vp.add_child(mine)
+		var cl = Label3D.new()
+		cl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		cl.text = "YOUR CAR"
+		cl.font = UI.fonts["semi"]
+		cl.font_size = 30
+		cl.fixed_size = true
+		cl.pixel_size = 0.00055
+		cl.outline_size = 10
+		cl.modulate = UI.GOLD
+		cl.no_depth_test = true
+		cl.position = Vector3(6.0, 0.55, 8.35)
+		vp.add_child(cl)
 	# the other facilities: one more building per level; training and academy also get pitches
 	var grass: Texture2D = load("res://assets/m3d/pitch.jpg")
 	for key in BUILD:
@@ -223,16 +309,7 @@ func _world(c: Dictionary):
 					px = at.x - 1.3
 			_put(C + names[i] + ".glb", px, pz, 90.0 if key in ["commercial", "training"] else 0.0, 0.62)
 		if c.build != null and c.build.key == key:
-			var sc = MeshInstance3D.new()
-			var bm = BoxMesh.new()
-			bm.size = Vector3(0.9, 1.0, 0.9)
-			sc.mesh = bm
-			var m = StandardMaterial3D.new()
-			m.albedo_color = Color(1.0, 0.78, 0.2, 0.55)
-			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			sc.material_override = m
-			sc.position = Vector3(at.x, 0.5, at.y - 0.2)
-			vp.add_child(sc)
+			_site(Vector3(at.x + 0.9, 0, at.y - 0.95), c)
 		_tag(key, Vector3(at.x, 1.9, at.y), lvl)
 	# the town: houses and trees on the outer blocks, thicker as the club's commercial side grows
 	var rng = RandomNumberGenerator.new()
@@ -255,6 +332,82 @@ func _world(c: Dictionary):
 			elif r < dens * 0.7 + 0.25:
 				_put(S + ("tree-large.glb" if rng.randf() < 0.6 else "tree-small.glb"), x + rng.randf_range(-0.2, 0.2), z + rng.randf_range(-0.2, 0.2), 0.0, 1.0)
 	_aim()
+
+
+func _boxm(size: Vector3, at: Vector3, col: Color, glow := false) -> MeshInstance3D:
+	var mi = MeshInstance3D.new()
+	var bm = BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	var m = StandardMaterial3D.new()
+	m.albedo_color = col
+	if glow:
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mi.material_override = m
+	mi.position = at
+	vp.add_child(mi)
+	return mi
+
+
+func _site(at: Vector3, c: Dictionary):
+	# a building going up: floors appear as the work goes on, inside scaffolding, with a crane alongside
+	var total = max(1, int(c.build.get("days", G.OPS.upgrade_days(c, c.build.key))))
+	var left = max(0, int(c.build.done) - G.s.day)
+	var prog = clampf(1.0 - float(left) / float(total), 0.05, 1.0)
+	var floors = 5
+	var done = int(ceil(prog * floors))
+	for i in done:
+		_boxm(Vector3(0.7, 0.2, 0.7), at + Vector3(0, 0.11 + i * 0.24, 0), Color("b9bdc6") if i < done - 1 else Color("e2c26a"))
+	var scaf = Color("f0a020")
+	for sx in [-0.42, 0.42]:
+		for sz in [-0.42, 0.42]:
+			_boxm(Vector3(0.03, floors * 0.24 + 0.2, 0.03), at + Vector3(sx, (floors * 0.24 + 0.2) / 2.0, sz), scaf)
+	for i in floors + 1:
+		for sz in [-0.42, 0.42]:
+			_boxm(Vector3(0.87, 0.02, 0.02), at + Vector3(0, 0.02 + i * 0.24, sz), scaf)
+		for sx in [-0.42, 0.42]:
+			_boxm(Vector3(0.02, 0.02, 0.87), at + Vector3(sx, 0.02 + i * 0.24, 0), scaf)
+	var cb = at + Vector3(0.75, 0, 0.1)
+	_boxm(Vector3(0.07, 2.1, 0.07), cb + Vector3(0, 1.05, 0), Color("f2c019"))
+	var arm = _boxm(Vector3(1.5, 0.05, 0.05), cb + Vector3(-0.45, 2.1, 0), Color("f2c019"))
+	arm.set_meta("crane", true)
+	_boxm(Vector3(0.02, 0.6, 0.02), cb + Vector3(-1.0, 1.8, 0), Color("30343c"))
+	_boxm(Vector3(0.16, 0.1, 0.16), cb + Vector3(-1.0, 1.48, 0), Color("8a8f9a"))
+	var lb = Label3D.new()
+	lb.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lb.text = "BUILDING · %d%%" % int(prog * 100.0)
+	lb.font = UI.fonts["semi"]
+	lb.font_size = 30
+	lb.fixed_size = true
+	lb.pixel_size = 0.00055
+	lb.outline_size = 10
+	lb.modulate = UI.AMBER
+	lb.no_depth_test = true
+	lb.position = at + Vector3(0, 2.5, 0)
+	vp.add_child(lb)
+
+
+func _process(delta):
+	# traffic follows its loop of road; each car keeps to its own side
+	for t in traffic:
+		var loop: Array = LOOPS[t[1]]
+		var per = 0.0
+		for i in loop.size():
+			per += loop[i].distance_to(loop[(i + 1) % loop.size()])
+		t[2] = fposmod(t[2] + delta * t[3], per)
+		var d = t[2]
+		for i in loop.size():
+			var a: Vector2 = loop[i]
+			var b: Vector2 = loop[(i + 1) % loop.size()]
+			var seg = a.distance_to(b)
+			if d <= seg:
+				var dirv = (b - a).normalized() * (1.0 if t[3] > 0 else -1.0)
+				var p = a.lerp(b, d / seg)
+				var side = Vector2(-dirv.y, dirv.x) * 0.14
+				t[0].position = Vector3(p.x + side.x, 0.03, p.y + side.y)
+				t[0].rotation.y = atan2(dirv.x, dirv.y)
+				break
+			d -= seg
 
 
 func _aabb(n: Node, xf := Transform3D()) -> AABB:

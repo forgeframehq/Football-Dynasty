@@ -5,6 +5,7 @@ extends Control
 const SCREENS = {
 	"menu": preload("res://scripts/screens/menu.gd"),
 	"calendar": preload("res://scripts/screens/calendar.gd"),
+	"home3d": preload("res://scripts/screens/home3d.gd"),
 	"plans": preload("res://scripts/screens/plans.gd"),
 	"new_career": preload("res://scripts/screens/new_career.gd"),
 	"intro": preload("res://scripts/screens/intro.gd"),
@@ -530,7 +531,7 @@ func _rail_key() -> String:
 	var nm = stack[0].sname
 	var groups = {"inbox": ["inbox"], "home": ["home"],
 		"club": ["squad", "tactics", "plans", "training", "fixtures", "calendar", "finances", "campus", "lists", "kit", "city3d"],
-		"manager": ["board", "trophies", "jobs", "life"], "world": ["table", "comps", "stats", "clubview"],
+		"manager": ["board", "trophies", "jobs", "life", "home3d"], "world": ["table", "comps", "stats", "clubview"],
 		"search": ["search", "transfers", "scouting", "player", "nego", "compare"]}
 	if nm == "search" and stack[0].args.has("grp"):
 		return str(stack[0].args.grp)
@@ -917,7 +918,9 @@ func menu_items(key: String) -> Array:
 		a.append(_row("stethoscope", "Medical Centre", "%d injured" % inj if inj > 0 else "All fit", func(): root("lists", {"kind": "medical", "grp": "club"})))
 		a.append(_row("file-text", "Contracts", "%d expiring" % expiring if expiring > 0 else "None expiring", func(): root("lists", {"kind": "contracts", "grp": "club"})))
 		a.append(_row("repeat", "Loan Watch", "%d out on loan" % loaned, func(): root("squad", {"tab": 2})))
+		a.append(_row("calendar-days", "Calendar", "Month view, sim to a date", func(): root("calendar")))
 		a.append(_row("calendar", "Fixtures", "Next: %s" % s.clubs[f.a if f.h == c.id else f.h].short if f != null else "Season over", func(): root("fixtures")))
+		a.append(_row("layers", "Tactical Plans", "Saved plans, team sheets, triggers", func(): root("plans")))
 		a.append(_row("wallet", "Finances", "%s budget" % G.money(c.budget), func(): root("finances")))
 		a.append(_row("clipboard-list", "Team Report", "Strengths and gaps", func(): root("hub", {"kind": "report", "grp": "club"})))
 		a.append(_row("users", "Dressing Room", "Hierarchy and morale", func(): root("hub", {"kind": "dressing", "grp": "club"})))
@@ -934,6 +937,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("briefcase", "Jobs", "%d club%s interested" % [s.user.jobs.size(), "" if s.user.jobs.size() == 1 else "s"], func(): root("jobs")))
 		a.append(_row("megaphone", "Social", "%s followers" % G.OPS._thousands(G.SOC.data().followers), func(): root("hub", {"kind": "social", "grp": "manager"})))
 		a.append(_row("house", "Lifestyle", "%s in the bank" % G.money(G.OPS.life().cash), func(): root("life")))
+		a.append(_row("sofa", "My Home", "Walk round it in 3D", func(): root("home3d" if not G.settings.get("lowgfx", false) else "life")))
 		a.append(_row("trending-up", "Investments", "Savings, property, shares", func(): root("hub", {"kind": "invest", "grp": "manager"})))
 		a.append(_row("landmark", "Club Ownership", "Buy shares in clubs", func(): root("hub", {"kind": "owner", "grp": "manager"})))
 		a.append(_row("file-text", "My Contract", "%s a week" % G.money(G.OPS.salary()), func(): root("hub", {"kind": "contract", "grp": "manager"})))
@@ -991,9 +995,9 @@ func menu_items(key: String) -> Array:
 # Menu layout: headings with the rows under them, "|" starts the second column. Rows not named land in the last group.
 const MENU_GROUPS = {
 	"club": [["Squad", ["First Team", "Youth & Reserves", "Tactics", "Loan Watch"]], ["Players", ["Development Hub", "Medical Centre", "Contracts", "Dressing Room"]], "|",
-		["Club", ["Kit & Sponsors", "Finances", "Club City", "Fans", "Club Records"]], ["Season", ["Fixtures", "Team Report", "Match Analysis"]]],
+		["Club", ["Kit & Sponsors", "Finances", "Club City", "Fans", "Club Records"]], ["Season", ["Calendar", "Fixtures", "Tactical Plans", "Team Report", "Match Analysis"]]],
 	"manager": [["Job", ["Manager Profile", "Board Confidence", "My Contract", "Board Request", "Jobs", "Philosophy"]], "|",
-		["Money and life", ["Lifestyle", "Investments", "Club Ownership", "Social"]], ["Career", ["Trophy Cabinet", "Career Timeline", "Game Status"]]],
+		["Money and life", ["Lifestyle", "My Home", "Investments", "Club Ownership", "Social"]], ["Career", ["Trophy Cabinet", "Career Timeline", "Game Status"]]],
 	"world": [["Competitions", ["Club Division", "Cups & Continental"]], ["Leagues", []], "|",
 		["News", ["Live Scores", "Transfer Centre", "League Standards"]], ["Best players", ["Player Stats", "Team of the Week", "Awards", "Top 50 Players", "Wonderkids"]]],
 	"search": [["Find", ["Player Search", "Role Finder", "Find Club", "Scouting"]], ["Deals", ["Transfer Market", "Jobs"]], "|",
