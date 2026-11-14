@@ -8,7 +8,8 @@ signal seq_done        # the staged move, including any celebration, is over
 
 const L := 105.0
 const W := 68.0
-const FIG := 2.9       # figures are drawn larger than life so they read on a phone
+const GS := 2.05      # goals are drawn larger too, so a keeper stands under the bar as he should
+const FIG := 2.4       # figures are drawn larger than life so they read on a phone
 
 var sim = null
 var vp: SubViewport
@@ -189,26 +190,27 @@ func _build_world():
 	netm.uv1_scale = Vector3(1, 1, 1)
 	netm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	var grey = _mat(Color("c9ccd2"), null, true)
+	var gh = 2.44 * GS          # bar height
+	var gw = 3.66 * GS          # half the width
 	for sg in [-1.0, 1.0]:
 		var gx = sg * L / 2
 		# frame: posts, bar, and the stanchions that hold the net back
-		for pz in [-3.66, 3.66]:
-			_box(Vector3(0.2, 2.44, 0.2), Vector3(gx, 1.22, pz), white)
-			_box(Vector3(0.09, 0.09, 0.09), Vector3(gx + sg * 2.3, 0.05, pz), grey)
-			var stn = _box(Vector3(1.5, 0.07, 0.07), Vector3(gx + sg * 0.72, 2.44, pz), grey)
-			var bk = _box(Vector3(0.07, 2.75, 0.07), Vector3(gx + sg * 1.9, 1.22, pz), grey)
-			bk.rotation.z = sg * 0.33
-		_box(Vector3(0.2, 0.2, 7.52), Vector3(gx, 2.44, 0), white)
-		_box(Vector3(0.07, 0.07, 7.32), Vector3(gx + sg * 1.45, 2.44, 0), grey)
-		_box(Vector3(0.07, 0.07, 7.32), Vector3(gx + sg * 2.3, 0.05, 0), grey)
+		for pz in [-gw, gw]:
+			_box(Vector3(0.28, gh, 0.28), Vector3(gx, gh / 2, pz), white)
+			_box(Vector3(2.0, 0.1, 0.1), Vector3(gx + sg * 1.0, gh, pz), grey)
+			var bk = _box(Vector3(0.1, gh * 1.1, 0.1), Vector3(gx + sg * 3.0, gh / 2, pz), grey)
+			bk.rotation.z = sg * 0.36
+		_box(Vector3(0.28, 0.28, gw * 2 + 0.28), Vector3(gx, gh, 0), white)
+		_box(Vector3(0.1, 0.1, gw * 2), Vector3(gx + sg * 2.0, gh, 0), grey)
+		_box(Vector3(0.1, 0.1, gw * 2), Vector3(gx + sg * 3.9, 0.06, 0), grey)
 		# net: flat top, back sloping down to the ground, and two sides
 		var x0 = gx + sg * 0.05
-		var x1 = gx + sg * 1.45
-		var x2 = gx + sg * 2.3
-		_net([Vector3(x0, 2.44, -3.66), Vector3(x0, 2.44, 3.66), Vector3(x1, 2.44, 3.66), Vector3(x1, 2.44, -3.66)], netm)
-		_net([Vector3(x1, 2.44, -3.66), Vector3(x1, 2.44, 3.66), Vector3(x2, 0.0, 3.66), Vector3(x2, 0.0, -3.66)], netm)
-		for pz in [-3.66, 3.66]:
-			_net([Vector3(x0, 0.0, pz), Vector3(x0, 2.44, pz), Vector3(x1, 2.44, pz), Vector3(x2, 0.0, pz)], netm)
+		var x1 = gx + sg * 2.0
+		var x2 = gx + sg * 3.9
+		_net([Vector3(x0, gh, -gw), Vector3(x0, gh, gw), Vector3(x1, gh, gw), Vector3(x1, gh, -gw)], netm)
+		_net([Vector3(x1, gh, -gw), Vector3(x1, gh, gw), Vector3(x2, 0.0, gw), Vector3(x2, 0.0, -gw)], netm)
+		for pz in [-gw, gw]:
+			_net([Vector3(x0, 0.0, pz), Vector3(x0, gh, pz), Vector3(x1, gh, pz), Vector3(x2, 0.0, pz)], netm)
 	# corner flags and floodlights
 	var flagm = _mat(Color("f6c945"), null, true)
 	for cx in [-1.0, 1.0]:
@@ -250,8 +252,8 @@ func _net(p: Array, mat: Material):
 	# one net panel from four corners; the texture repeats every 0.5 m so the mesh reads as a net from the stand
 	var arr = []
 	arr.resize(Mesh.ARRAY_MAX)
-	var du = p[0].distance_to(p[1]) / 0.5
-	var dv = p[1].distance_to(p[2]) / 0.5
+	var du = p[0].distance_to(p[1]) / 0.9
+	var dv = p[1].distance_to(p[2]) / 0.9
 	arr[Mesh.ARRAY_VERTEX] = PackedVector3Array(p)
 	arr[Mesh.ARRAY_TEX_UV] = PackedVector2Array([Vector2(0, 0), Vector2(du, 0), Vector2(du, dv), Vector2(0, dv)])
 	var nrm = (p[1] - p[0]).cross(p[2] - p[0]).normalized()
@@ -606,9 +608,9 @@ func play(e: Dictionary):
 	var out: String = e.t if not e.get("blk", false) else "block"
 	var G2 := Vector3(1.0, 1.0, 0.5 + randf_range(-0.04, 0.04))      # where the ball ends up: u, height, v
 	match out:
-		"goal": G2 = Vector3(1.012, randf_range(0.3, 1.9), 0.5 + randf_range(-0.045, 0.045))
-		"save": G2 = Vector3(0.992, randf_range(0.4, 1.6), 0.5 + randf_range(-0.035, 0.035))
-		"miss": G2 = Vector3(1.03, randf_range(0.5, 4.5), 0.5 + (1.0 if randf() < 0.5 else -1.0) * randf_range(0.07, 0.12))
+		"goal": G2 = Vector3(1.014, randf_range(0.4, 4.2), 0.5 + randf_range(-0.095, 0.095))
+		"save": G2 = Vector3(0.992, randf_range(0.6, 3.6), 0.5 + randf_range(-0.07, 0.07))
+		"miss": G2 = Vector3(1.035, randf_range(0.8, 8.5), 0.5 + (1.0 if randf() < 0.5 else -1.0) * randf_range(0.135, 0.2))
 		"block": G2 = Vector3(S.x + 0.03, 0.4, S.y + randf_range(-0.01, 0.01))
 	var gk_at = Vector2(0.988, 0.5 + (S.y - 0.5) * 0.35)
 	seq = {"t": 0.0, "s": s, "o": o, "ks": ks, "ka": ka, "P": P, "S0": S0, "S": S, "hp": hp, "pass": has_pass, "out": out, "G": G2, "gk": gk_at,
@@ -658,13 +660,13 @@ func _seq_step(delta: float):
 		var tw3 = _w(Gw.x, Gw.y)
 		var leftv = Vector3(cos(gkf.face), 0, -sin(gkf.face))
 		var side_l = leftv.dot(tw3 - gw) > 0.0
-		var far = abs(q.G.z - q.gk.y) * W > 1.4
+		var far = abs(q.G.z - q.gk.y) * W > 2.4
 		if q.out == "miss":
 			_act(gkf, "gk_step", 0.0, 1.0, 0.9)
 		elif far:
 			_act(gkf, "gk_dive" if side_l else "gk_dive2", 0.55, 1.0)
 		elif q.out == "save":
-			_act(gkf, "gk_catch" if q.G.y > 0.9 else "gk_block", 0.3, 1.3)
+			_act(gkf, "gk_catch" if q.G.y > 1.8 else "gk_block", 0.3, 1.3)
 		else:
 			_act(gkf, "gk_miss", 0.3, 1.2)
 	if q.out == "block" and tt >= q.T2 - 0.1 and not q.get("p4", false):

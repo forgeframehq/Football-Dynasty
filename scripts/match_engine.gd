@@ -308,6 +308,12 @@ func recalc(i: int):
 		t.att *= 0.975
 		t.def *= 0.98 if ins.line == 2 else 1.0
 		t.mid *= [0.975, 0.99, 1.0][ins["pass"]]
+	# no one player takes more than about a third of his side's shots, however good he is
+	for k in w0.size():
+		if t0 > 0.0 and w0[k] > 0.34 * t0:
+			var cut = w0[k] - 0.34 * t0
+			w0[k] -= cut
+			t0 -= cut
 	t.midp = pow(t.mid, 2.4)
 	t.w0 = w0
 	t.w1 = w1

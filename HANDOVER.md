@@ -1,8 +1,8 @@
-# Football Dynasty 26 — Handover (14 Nov 2026, v0.9.0 on `main`)
+# Football Dynasty 26 — Handover (14 Nov 2026, v1.0.0 on `main`)
 
 ## Where things stand
-- `main`, `dev` and the published APK are v0.9.0, built overnight 13-14 Nov at Sudhi's request. Work on `dev`; push to `main` only when he asks for an APK.
-- Awaiting from Sudhi: Kenney Furniture Kit and Car Kit zips (for the 3D manager's home and cars), phone feedback on speed and heat in the 3D views.
+- `main`, `dev` and the published APK are v1.0.0, built overnight 14 Nov at Sudhi's request from the list he drew up after playing v0.9.0 (see the v1.0.0 section at the end). Work on `dev`; push to `main` only when he asks for an APK.
+- Awaiting from Sudhi: phone feedback on v1.0.0 (speed and heat with 22 animated players, the 3D home, the rail beside his camera), Kling victory films, and optionally a sprint and a celebration animation from Mixamo.
 - v0.7.0 adds the tactics system, the transfer system, the Football Dynasty 26 branding (icon, wordmark, purple and gold scheme) and the intro film. See ROADMAP.md for the ticked list.
 - Personal football manager for Android (not for publishing): FIFA/PES career feel with Football Manager Mobile depth.
 - Godot 4.7.2, GDScript, GL Compatibility, all UI built in code. Landscape, base viewport 1100×620, immersive and edge-to-edge.
@@ -23,7 +23,7 @@ Standing rules:
 - Godot is not preinstalled: download `Godot_v4.7.2-stable_linux.x86_64.zip` from the godotengine/godot GitHub releases.
 - Build check: `gh run list -R forgeframehq/Football-Dynasty --limit 1`; APK: `gh api repos/forgeframehq/Football-Dynasty/releases/tags/latest -q '.assets[]'`.
 - Commits: author `Claude <noreply@anthropic.com>`; end messages with the Co-Authored-By and Claude-Session lines the session supplies.
-- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 0.9.0, code 12).
+- Bump `config/version` in `project.godot` and `version/code` + `version/name` in `export_presets.cfg` together (now 1.0.0, code 13).
 
 ## Code map
 - Autoloads: `DB` (data), `UI` (`scripts/ui.gd`), `G` (`scripts/game.gd`). Save is `G.s`, binary, integer keys survive.
@@ -67,7 +67,7 @@ Standing rules:
 - A plain `UI.lbl` with a long sentence sets a huge minimum width and pushes the whole screen off the right edge on notched phones (this was the tactics hint line). Use `UI.lbl_fill` or `UI.wrap` for anything longer than a few words, and check screens with `notch=70`.
 - Tactics agreed with Sudhi so far (12 Nov, build only after he says go): manager-owned link-up plays as in eFootball (pick one at career start, more per coaching badge, two slots that fitting players activate, bronze/silver/gold with minutes together), team playstyles with manager proficiency, extra Defence/Attack options, generated player skills. Tactics page is extended, not rebuilt.
 - Inside a lambda in `ui.gd`, a bare `wrap(...)` calls Godot's built-in maths `wrap()`, not the label helper. Write `self.wrap(...)`. This is what broke every `UI.confirm` pop-up up to v0.6.0.
-- `G.advance()` runs to the next stop (match day, important message), not one day.
+- `G.advance()` runs to the next stop (match day, important message), not one day; the game itself now uses `G.advance_day()` through `main._go()`.
 - Left cut-out: `main.gd` keeps `notch_l`; with the rail showing, the safe margin is 0 and the rail is `rail_w()` wide with its icons pushed right of the cut-out. Screens without the rail still get the full left margin.
 - `G.OPS.week_money(c)` is the single source for weekly club income and costs; `weekly()` and the Finances screen both use it.
 - The ElevenLabs API key was pasted in chat; it should be regenerated and must never go in the repo.
@@ -116,3 +116,28 @@ Standing rules:
 - Club City 3D: `scripts/screens/city3d.gd`, models in `assets/city3d/` (Kenney roads, suburban, commercial kits, CC0; stadium `Fst_Eng_001.FBX`, which sits on a modelling pedestal sunk by a fixed ratio). The Club menu opens it unless `lowgfx` is on; "Classic view" opens the old `campus` screen.
 - Game check: `GODOT=... dev/audit.sh days=120 notch=70` visits every menu page, tactics tabs, player pages, lifestyle tabs and a match, then plays on; reports errors, slow pages, pages that scroll, off-screen and tiny text, and data problems to /tmp/audit.txt. First run found and fixed a crash on Investments in a new career.
 - Not done: manager's home in 3D (needs the Kenney Furniture Kit), voice commentary, extra time and shoot-outs, the tactics pitch overlay for the new instructions. The stadium in the match view is built from boxes, not the stadium model.
+
+## v1.0.0 (14 Nov 2026): the play-session list, built overnight
+Everything Sudhi asked for after playing v0.9.0. Screens and code, in the order of his list.
+- Time: Continue moves ONE day (`G.advance_day()`, `main._go(mode, target)`). The arrow beside it opens `main.travel_menu()`: next match, one week, pick a date. Fast travel stops for a match, an important message and whatever is ticked in `G.settings.stops` (`G.travel_stop`, `G.travel_mark`). Long-press Continue still runs to the next match. `G.advance()` (multi-day) is kept for the dev tools only.
+- Home: the To Do card is now "Today"; `home.gd todo_items()` / `todo_count()` are static and the Continue button shows the count.
+- Calendar: `scripts/screens/calendar.gd` (month grid, fixtures, key dates, "Sim to this day"); opened from the date in the top bar and the Club menu. Fixtures is its second tab.
+- Rail: `_build_rail()` is eight equal cells down the full height, full-width highlight, dividers, no labels; a small camera hole is ignored (a button may sit partly behind it), a long notch still pushes the icons right.
+- Screen titles: `screen.gd` resets and pushes `title`/`subtitle`, so a page can no longer show the last page's header (the "NEWS" on Kit bug).
+- Search: `search.gd` rewritten. Filters live in `G.ui.srch` (`blank()`); quick lists (bargains, free, listed, expiring, top50, wonderkids, similar, role, pos) are presets of the same table with a "Why" column (`_rank`). `lists.gd` redirects those kinds. Customise page: General / Positions / Attributes, templates (`_template(p)`, a role in my tactics), saved searches in `s.user.searches`.
+- Player > Manage: three panes (`player.gd _manage`). Conversations `OPS.TALKS`, `OPS.talk()`, promises checked by `OPS.talks_daily()`; mentor (`p.mentor`, `OPS.mentor_mult` in `develop_all`); duties; shirt number picker. No bottom bar on that page.
+- Match day (`match.gd`): `_build_pre()` is one page (fixture card with a still 3D stadium `widgets/stadium_view.gd`, strength bars, match-up verdict, Your advantage / Their threat / Key man, kick-off block, both line-ups). `G.TC.report(uid, oid)` is the shared match-up report; Tactics shows it as a strip that updates with every change (`tactics.gd _verdict`).
+- Tactics during a match: `match._open_tactics()` sets `G.live = {sim, us}` and opens the normal Tactics screen with no chrome. `G.live_sync()` turns XI changes into substitutions (bench player into the XI) or position swaps and pushes shape, roles and instructions into the sim. The club's pre-match tactics are snapshotted at kick-off and restored at full time (`_snapshot`, `_restore`).
+- Live screen: pitch about 72% wide, narrower feed, half-time panel over the pitch (`_show_ht`: numbers, ratings, assistant's read `_read()`, team talk). Controls: pause, speed, Tactics, Shouts, Sim.
+- Sim ahead: `_sim_sheet`, `_sim_to(target, until_event)`, `_missed()` ("What you missed", with goal replays through `view3d.play`), rules in `G.settings` (`ss_goal`, `ss_behind`, `ss_red`, `ss_inj`, `auto_fr`). Full time is one page (`_show_ft`).
+- Engine: extra time (`et`, `et_at`) and kick-by-kick shoot-outs (`_shootout`, `pen_log`); two-legged European knockout ties (`comps.gd _two_legs`, fixture keys `leg`, `first`; `ME.agg`; `LG.fx_winner` uses the aggregate); weather (`G.weather(f)`, `G.WX`, `ME.wx`: small effects in `recalc` and on tiring, shown pre-match, on Home, in commentary and as rain/snow in 3D); plan triggers (`ME._triggers`). Star share of shots trimmed (0.28 / 0.25).
+- Tactical plans: `scripts/screens/plans.gd` (carousel of pitch cards `widgets/mini_pitch.gd`, team sheets, assignments, triggers). Data on the club: `c.plans`, `c.plan`, `c.sheets`, `c.trig`, `c.autorot`, `c.rot_at`. Helpers in tac.gd: `plans_init`, `plan_use`, `plan_net` (scout's pick), `sheet_use`, `auto_rotate`. Old `c.presets` are migrated on first open.
+- Pitch overlay: `tac_overlay.gd` draws line of engagement, compactness, offside trap, marking, tackling, build-up, final third, crossing, overlaps and time-wasting.
+- 3D players: Mixamo "Soccer Game Pack" baked (scratch project, not in the repo) into `assets/m3d/rig.scn` (23-bone skeleton) and `assets/m3d/soccer.res` (30 animations, hips drift stripped except dives and tackles). `widgets/player_mesh.gd` builds a ~1,300-vertex rigged footballer in kit colours and pattern; `match3d._figure`, `_act`, `_animate`. Proper goals and nets (`_net`), second crowd tier that bounces on goals, corner flags, floodlights, dugouts, weather particles. `match3d.cancel()` drops a staged move.
+- Kit & Sponsors: `kit.gd` + `widgets/kit_view.gd` (a footballer in the kit you can turn; front sponsor, name, number, back and sleeve sponsors). Kits: `OPS.kit(c, which)` (home on `c.c1/c2/kitp`, others in `c.kits`), `OPS.default_pattern`, `OPS.match_kits(home, away)` picks the least-clashing kit. Extra deals: `OPS.SPX`, `spx_offers`, `spx_sign`, `spx_week` (added in `week_money`); a stadium-name deal renames the ground until it ends.
+- Club City 3D: stadium model by level (`OPS.STADIA`, `OPS.stadium_model`), flags in club colours, floodlights, day / dusk / night, traffic (`traffic`, `LOOPS`), the manager's car, scaffolding and crane that rise with the build (`_site`).
+- My Home: `scripts/screens/home3d.gd` (Kenney Furniture Kit in `assets/home3d`, cars in `assets/cars3d`). Dollhouse orbit, five walk-in views, tappable things (`_spot`): TV, scrapbook, fridge, bed (moves on a day), wardrobe (kit), computer (inbox), trophies, car. Grows with `lf.home` (pool at 3, pitch at 4).
+- Sound: soundtrack fades (`UI._fade_to`, `_start_song`) and ducks out at kick-off (`UI.music_duck`); the newspaper sting is off; 29 spoken commentary clips in one voice (`vo_*`, ElevenLabs TTS, "Daniel"), with a Commentary voice setting.
+- Text: `UI.lbl` never goes below 14 px.
+- Game check: `dev/audit.gd` now also reports overlapping buttons (anything registered with `UI.tap`) and covers the new pages. Last run: 107 pages, no overlaps, no off-screen text; the only error (stadium view variable clash) is fixed. Pages that still scroll are lists (squad, fixtures, tables, wage bill, feeds).
+- Not done: the world system (more nations, generated players), victory films (waiting for Sudhi's Kling clips), a sprint and a celebration animation from Mixamo (the jog is sped up and the celebration is made in code). Nothing here has been tried on a real phone: 22 animated players and the 3D home are the things to check for speed and heat.

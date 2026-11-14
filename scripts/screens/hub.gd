@@ -1175,7 +1175,7 @@ func _status(v: Control):
 
 
 func _manual(v: Control):
-	for sec in [["Getting around", "The rail on the left opens every part of the game: News, Home, Club, Manager, World, Search and Options. The arrow at the top goes back. Continue in the top bar moves time on; hold it to run straight to your next match."],
+	for sec in [["Getting around", "The rail on the left opens every part of the game: News, Home, Club, Manager, World, Search and Options. The arrow at the top goes back. Continue in the top bar moves on one day. The arrows beside it move further: to the next match, a week, or a date you pick on the calendar (tap the date to open it). Moving further always stops for a match and for anything urgent."],
 			["Picking a team", "In Tactics, tap two players to swap them or drag a name onto the pitch. Drag a shirt to move a position and build your own shape. Tap a role badge to change what a player does. The tabs set how the team plays, and the pitch shows the effect."],
 			["Matches", "Choose a speed, make changes from Team, and give a team talk at half time. Key speed skips to the important moments."],
 			["Money", "Gate money, sponsors and TV come in weekly; wages and upkeep go out. The rest goes into your transfer budget. Upgrade buildings in Club City; one project runs at a time."],
