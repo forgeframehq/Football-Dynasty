@@ -121,11 +121,11 @@ func build():
 				G.auto_roles(c)
 				sel = null
 				refresh()], ["Plans", func(): UI.main.open("plans")]]:
-			var bt = UI.btn(it[0], it[1], "secondary", "", 42)
+			var bt = UI.btn(it[0], it[1], "secondary", "", 38)
 			bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			acts.add_child(bt)
 		right.add_child(acts)
-	var rp = pane(0, 6)
+	var rp = pane(0, 2 if tab == 0 else 6)
 	rp[0].size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(rp[0])
 	var v = rp[1]
@@ -179,12 +179,12 @@ func _verdict(c: Dictionary):
 
 
 func _head(v: Control, text: String, right := ""):
-	var hp = UI.panel(Color(UI.accent, 0.22), 8, 12, 4)
+	var hp = UI.panel(Color(UI.accent, 0.22), 8, 12, 2)
 	var hh = UI.hb(8)
-	hh.add_child(UI.caps(text, 20, UI.TEXT))
+	hh.add_child(UI.caps(text, 17, UI.TEXT))
 	hh.add_child(UI.sp())
 	if right != "":
-		hh.add_child(UI.caps(right, 17, UI.accent))
+		hh.add_child(UI.caps(right, 15, UI.accent))
 	hp.add_child(hh)
 	v.add_child(hp)
 
@@ -279,43 +279,50 @@ func _squad_list(v: Control, c: Dictionary):
 
 
 func _row(p: Dictionary, kind: String, slot: int, c: Dictionary) -> Control:
+	# one line per player so the whole XI fits without scrolling: position, fitness ring, name, other positions
+	# and fitness in small type, form arrow, rating, role
 	var key = slot if kind == "xi" else p.id
 	var on = sel != null and sel.k == kind and sel.i == key
-	var r = UI.panel(Color(UI.accent, 0.16) if on else Color(1, 1, 1, 0.03), 10, 10, 4, UI.accent if on else Color(0, 0, 0, 0))
-	var h = UI.hb(10)
+	var r = UI.panel(Color(UI.accent, 0.16) if on else Color(1, 1, 1, 0.03), 8, 8, 1, UI.accent if on else Color(0, 0, 0, 0))
+	var h = UI.hb(8)
 	var tag = c.slots[slot][0] if kind == "xi" else ("SUB" if kind == "sub" else "RES")
 	var lc = UI.LINE_COL[G.LINE.get(tag, 2)] if kind == "xi" else UI.MUTED
-	h.add_child(UI.chip(tag, Color(lc, 0.16), lc, 17, 54))
+	h.add_child(UI.chip(tag, Color(lc, 0.16), lc, 14, 46))
 	var okc = UI.GREEN if G.available(p) else UI.RED
-	var dot = UI.panel(Color(0, 0, 0, 0), 9, 0, 0, okc)
+	var dot = UI.panel(Color(0, 0, 0, 0), 7, 0, 0, okc)
 	dot.get_theme_stylebox("panel").set_border_width_all(3)
-	dot.custom_minimum_size = Vector2(18, 18)
+	dot.custom_minimum_size = Vector2(14, 14)
 	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(dot)
-	var nv = UI.vb(-5)
-	nv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	nv.add_child(UI.lbl_fill(G.pname(p), 21, UI.TEXT if G.available(p) else UI.DIM, "semi"))
+	var nm = UI.lbl(G.pname(p), 17, UI.TEXT if G.available(p) else UI.DIM, "semi")
+	nm.clip_text = true
+	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nm.custom_minimum_size = Vector2(60, 0)
+	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nm.size_flags_stretch_ratio = 1.3
+	h.add_child(nm)
 	var alt = p.pos
 	var al = p.get("alt", [])
 	if typeof(al) == TYPE_ARRAY and al.size() > 0:
 		alt += " / " + " / ".join(al)
 	elif typeof(al) == TYPE_STRING and al != "":
 		alt += " / " + al
-	var state = "injured" if p.inj > 0 else ("suspended" if p.susp > 0 else "%d%% fit" % int(p.cond))
-	nv.add_child(UI.lbl_fill("%s · %s" % [alt, state], 15, UI.RED if not G.available(p) else UI.MUTED))
-	h.add_child(nv)
+	var state = "injured" if p.inj > 0 else ("suspended" if p.susp > 0 else "%d%%" % int(p.cond))
+	var info = UI.lbl_fill("%s · %s" % [state, alt], 14, UI.RED if not G.available(p) else UI.MUTED)
+	info.size_flags_stretch_ratio = 1.0
+	h.add_child(info)
 	var av = G.TC.arrow(p)
-	h.add_child(UI.icon(G.TC.arrow_icon(av), 20, G.TC.arrow_col(av)))
-	h.add_child(UI.ovr(p.ovr, 19))
+	h.add_child(UI.icon(G.TC.arrow_icon(av), 18, G.TC.arrow_col(av)))
+	h.add_child(UI.ovr(p.ovr, 15))
 	if kind == "xi":
 		var rid = c.roles[slot]
 		var stars = G.RL.stars(p, rid)
 		var col = UI.GREEN if stars >= 4 else (UI.AMBER if stars == 3 else UI.RED)
-		var rc = UI.chip(str(rid).to_upper(), Color(col, 0.16), col, 17, 58)
+		var rc = UI.chip(str(rid).to_upper(), Color(col, 0.16), col, 14, 52)
 		UI.tap(rc, func(): _pick_role(slot), true)
 		h.add_child(rc)
 	else:
-		h.add_child(UI.sp(58, 0))
+		h.add_child(UI.sp(52, 0))
 	r.add_child(h)
 	r.mouse_filter = Control.MOUSE_FILTER_PASS
 	r.gui_input.connect(func(e): _row_input(e, kind, key, G.pname(p)))

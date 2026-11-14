@@ -26,11 +26,16 @@ func build():
 	var t = G.LG.table(lg)
 	UI.main.t_sub = "%s · tier %d · %d clubs" % [l.country, l.tier, t.size()]
 	var h = panes(12, 20)
-	var a = pane(0, 2)
+	# row size follows the number of clubs, so a whole division fits on one screen (24 clubs at 15 px text)
+	var n = t.size()
+	var fs = 17 if n <= 18 else (16 if n <= 20 else 15)
+	var rp = 1 if n <= 20 else 0
+	var bs = 22 if n <= 18 else (19 if n <= 20 else 16)
+	var a = pane(0, 0 if n > 18 else 2)
 	a[0].size_flags_stretch_ratio = 2.2
 	h.add_child(a[0])
 	var v = a[1]
-	v.add_child(UI.trow(["", "#", "", "Club", "P", "W", "D", "L", "GF", "GA", "GD", "Pts", "Form"], W, {"head": true}))
+	v.add_child(UI.trow(["", "#", "", "Club", "P", "W", "D", "L", "GF", "GA", "GD", "Pts", "Form"], W, {"head": true, "size": fs + 2, "pad": 0}))
 	var seen = []
 	var goals = 0
 	var games = 0
@@ -42,13 +47,13 @@ func build():
 			seen.append(z)
 		var zb = ColorRect.new()
 		zb.color = ZONE_COL[z]
-		zb.custom_minimum_size = Vector2(6, 24)
+		zb.custom_minimum_size = Vector2(6, bs)
 		goals += c.t.gf
 		games += c.t.p
 		var cid = c.id
-		v.add_child(UI.trow([zb, str(i + 1), UI.badge(c, 24), c.name, c.t.p, c.t.w, c.t.d, c.t.l, c.t.gf, c.t.ga, "%+d" % (c.t.gf - c.t.ga), c.t.pts, UI.form_dots(c.form.slice(-5), 12)], W,
-			{"hi": me, "alt": i % 2 == 0, "bold": 3, "cols": {11: UI.TEXT, 1: UI.MUTED}, "pad": 3, "tap": func(): UI.main.open("clubview", {"cid": cid})}))
-	var b = pane(0, 4)
+		v.add_child(UI.trow([zb, str(i + 1), UI.badge(c, bs), c.name, c.t.p, c.t.w, c.t.d, c.t.l, c.t.gf, c.t.ga, "%+d" % (c.t.gf - c.t.ga), c.t.pts, UI.form_dots(c.form.slice(-5), 10 if n > 20 else 12)], W,
+			{"hi": me, "alt": i % 2 == 0, "bold": 3, "cols": {11: UI.TEXT, 1: UI.MUTED}, "pad": rp, "size": fs, "tap": func(): UI.main.open("clubview", {"cid": cid})}))
+	var b = pane(0, 1)
 	h.add_child(b[0])
 	v = b[1]
 	v.add_child(UI.caps("Zones", 15, UI.accent))
@@ -73,7 +78,7 @@ func build():
 	for i in min(5, sc.size()):
 		var p = sc[i]
 		var pid2 = p.id
-		v.add_child(UI.trow([G.pname(p), s.clubs[p.club].short, p.ss.g], [0, 44, -28], {"size": 18, "alt": i % 2 == 0, "cols": {1: UI.MUTED}, "tap": func(): UI.main.open("player", {"pid": pid2})}))
+		v.add_child(UI.trow([G.pname(p), s.clubs[p.club].short, p.ss.g], [0, 44, -28], {"size": 16, "pad": 1, "alt": i % 2 == 0, "cols": {1: UI.MUTED}, "tap": func(): UI.main.open("player", {"pid": pid2})}))
 	v.add_child(UI.caps("Next round", 15, UI.accent))
 	var shown = 0
 	var up = []
@@ -85,7 +90,7 @@ func build():
 		if f.day > up[0].day + 3 or shown >= 10:
 			break
 		var mine = f.h == s.user.club or f.a == s.user.club
-		v.add_child(UI.trow([s.clubs[f.h].short, "v", s.clubs[f.a].short, G.fmt_date(f.day)], [52, 16, 52, 0], {"size": 18, "hi": mine, "cols": {1: UI.DIM, 3: UI.MUTED}}))
+		v.add_child(UI.trow([s.clubs[f.h].short, "v", s.clubs[f.a].short, G.fmt_date(f.day)], [52, 16, 52, 0], {"size": 16, "pad": 1, "hi": mine, "cols": {1: UI.DIM, 3: UI.MUTED}}))
 		shown += 1
 	if shown == 0:
 		v.add_child(UI.lbl("No league matches left", 17, UI.DIM))

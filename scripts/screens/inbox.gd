@@ -1,4 +1,6 @@
 extends "res://scripts/screens/screen.gd"
+
+const HOME = preload("res://scripts/screens/home.gd")
 # News and messages: list on the left, story in the middle, subject card on the right.
 
 const ICONS = {"info": "mail", "board": "landmark", "offer": "handshake", "contract": "file-text", "result": "flag", "deal": "handshake"}
@@ -18,7 +20,7 @@ func build():
 	body.add_child(UI.topbar("News", true, right))
 	UI.main.t_sub = "%d unread item%s" % [n, "" if n == 1 else "s"]
 	var h = panes()
-	var lp = pane(430, 6)
+	var lp = pane(430, 2)
 	h.add_child(lp[0])
 	if s.inbox.size() == 0:
 		lp[1].add_child(UI.wrap("No messages yet.", 22, UI.MUTED))
@@ -33,14 +35,12 @@ func build():
 	for i in s.inbox.size():
 		var m = s.inbox[i]
 		var on = i == sel
-		var r = UI.panel(Color(UI.accent, 0.16) if on else Color(0, 0, 0, 0), 12, 10, 8, Color(UI.accent, 0.55) if on else Color(0, 0, 0, 0))
+		# one line per message (icon, title, date) so twice as many fit before the list scrolls
+		var r = UI.panel(Color(UI.accent, 0.16) if on else Color(0, 0, 0, 0), 10, 10, 4, Color(UI.accent, 0.55) if on else Color(0, 0, 0, 0))
 		var rh = UI.hb(10)
-		rh.add_child(UI.icon(ICONS.get(m.kind, "mail"), 24, UI.accent if not m.read or on else UI.DIM))
-		var tv = UI.vb(-3)
-		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tv.add_child(UI.lbl_fill(m.title, 22, UI.TEXT if (not m.read or on) else UI.MUTED, "semi"))
-		tv.add_child(UI.lbl_fill(G.fmt_date(m.day), 16, UI.DIM))
-		rh.add_child(tv)
+		rh.add_child(UI.icon(ICONS.get(m.kind, "mail"), 20, UI.accent if not m.read or on else UI.DIM))
+		rh.add_child(UI.lbl_fill(m.title, 18, UI.TEXT if (not m.read or on) else UI.MUTED, "semi"))
+		rh.add_child(UI.lbl(G.fmt_date(m.day), 14, UI.DIM))
 		if not m.read:
 			var dot = UI.panel(UI.accent, 6, 0, 0)
 			dot.custom_minimum_size = Vector2(12, 12)
@@ -53,6 +53,7 @@ func build():
 			refresh())
 		lp[1].add_child(r)
 	var m = s.inbox[sel]
+	var c = G.uc()
 	var mp = pane(0, 12)
 	h.add_child(mp[0])
 	var v = mp[1]
@@ -101,6 +102,24 @@ func build():
 		acts.add_child(_act("Pick team", "layout-grid", func(): UI.main.root("tactics")))
 	if acts.get_child_count() > 0:
 		v.add_child(acts)
+	# the rest of the pane shows what needs doing today, instead of empty space
+	var todo = []
+	for it in HOME.todo_items(c):
+		if it[0] != "mail":
+			todo.append(it)
+	if not todo.is_empty():
+		var tp = UI.panel(Color(1, 1, 1, 0.035), 12, 14, 10, UI.LINE)
+		var tv2 = UI.vb(4)
+		tv2.add_child(UI.caps("Today · %d to look at" % todo.size(), 15, UI.accent))
+		for it in todo.slice(0, 5):
+			var tr = UI.hb(8)
+			tr.add_child(UI.icon(it[0], 18, it[2]))
+			tr.add_child(UI.lbl_fill(it[1], 17, UI.TEXT))
+			tr.add_child(UI.icon("chevron-right", 16, UI.DIM))
+			UI.tap(tr, it[3])
+			tv2.add_child(tr)
+		tp.add_child(tv2)
+		v.add_child(tp)
 	var nav = UI.hb(10)
 	nav.add_child(UI.sp())
 	if sel > 0:
@@ -118,7 +137,6 @@ func build():
 	cp.custom_minimum_size = Vector2(300, 0)
 	cp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var cv = UI.vb(0)
-	var c = G.uc()
 	var hero = UI.panel(Color(UI.accent, 0.12), 0, 16, 18)
 	var hv = UI.vb(8)
 	if subj != null:

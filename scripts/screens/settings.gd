@@ -59,9 +59,13 @@ func _vol(v: Control, label: String, key: String):
 	v.add_child(sl)
 
 
+var left_v: VBoxContainer
+
+
 func _audio(row: Control):
-	var pn = pane(300, 4)
+	var pn = pane(300, 2)
 	var v = pn[1]
+	left_v = v
 	row.add_child(pn[0])
 	_head(v, "Volume")
 	_vol(v, "Music", "vol_music")
@@ -84,7 +88,7 @@ func _audio(row: Control):
 # ---------------------------------------------------------------- soundtrack
 
 func _soundtrack(row: Control):
-	var pn = pane(0, 4)
+	var pn = pane(0, 2)
 	var v = pn[1]
 	row.add_child(pn[0])
 	songs_box = UI.vb(4)
@@ -129,7 +133,9 @@ func _soundtrack(row: Control):
 		var b = UI.chip("VIEW", UI.CARD2, UI.TEXT, 16, 64)
 		UI.tap(b, _show_errors, true)
 		dg.add_child(b)
-	v.add_child(dg)
+	# diagnostics sit in the left pane, which has room, so the middle pane needs no scroll
+	left_v.add_child(UI.sp(0, 6))
+	left_v.add_child(dg)
 
 
 func _fill_songs():
@@ -193,7 +199,7 @@ func _toggle_song(id: String):
 # ---------------------------------------------------------------- look and game
 
 func _look(row: Control):
-	var pn = pane(330, 4)
+	var pn = pane(330, 2)
 	var v = pn[1]
 	row.add_child(pn[0])
 	_head(v, "Skin")

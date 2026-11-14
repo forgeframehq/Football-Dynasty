@@ -61,12 +61,11 @@ func build():
 	var log = c.get("bank_log", [])
 	if log.size() > 0:
 		v.add_child(UI.caps("Weekly balance · last %d weeks" % log.size(), 15, UI.accent))
-		var top = 1
-		for x in log:
-			top = max(top, abs(x))
-		for i in log.size():
-			var x = log[i]
-			v.add_child(UI.trow(["%d wk ago" % (i + 1), UI.bar(abs(x) / float(top), UI.GREEN if x >= 0 else UI.RED, 8), G.money(x)], [74, 0, -84], {"size": 16, "pad": 2, "cols": {0: UI.MUTED, 2: UI.GREEN if x >= 0 else UI.RED}}))
+		# one small chart instead of a twelve-row list
+		var bc = preload("res://scripts/widgets/bars.gd").new()
+		bc.custom_minimum_size = Vector2(0, 96)
+		bc.set_values(log)
+		v.add_child(bc)
 	var mine = []
 	for x in s.tx_log:
 		if x.user:

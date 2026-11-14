@@ -213,7 +213,7 @@ func _page(p: Dictionary, own: bool, free: bool):
 			grid.add_child(gv)
 		col.add_child(grid)
 	elif page == 1:
-		var a = pane(0, 8)
+		var a = pane(0, 3)
 		h.add_child(a[0])
 		var v = a[1]
 		v.add_child(UI.kv("Date of birth", "%d/%d/%d (%d)" % [p.bd, p.bm, p.by, G.age(p)]))
@@ -268,9 +268,10 @@ func _page(p: Dictionary, own: bool, free: bool):
 			r.add_child(UI.lbl_fill(ln[1], 20, UI.GREEN if ln[0] else UI.TEXT))
 			v.add_child(r)
 	elif page == 2:
-		var a = pane(0, 6)
+		var a = pane(0, 2)
 		h.add_child(a[0])
 		var v = a[1]
+		var va = v      # the roles pane also takes playstyle and link-up fit, so the skills pane needs no scroll
 		v.add_child(UI.caps("Position", 17, UI.accent))
 		v.add_child(UI.lbl("%s · natural" % p.pos, 24, UI.TEXT, "bold"))
 		if p.alt.size() > 0:
@@ -284,7 +285,7 @@ func _page(p: Dictionary, own: bool, free: bool):
 				rh.add_child(UI.chip("FITS YOUR STYLE", Color(UI.GREEN, 0.14), UI.GREEN, 12))
 			rh.add_child(UI.stars(40 + G.RL.stars(p, r[1]) * 12, 15))
 			v.add_child(rh)
-			v.add_child(UI.lbl_fill(rd.d, 15, UI.MUTED))
+			v.add_child(UI.lbl_fill(rd.d, 14, UI.MUTED))
 		var b = pane(0, 4)
 		h.add_child(b[0])
 		v = b[1]
@@ -302,13 +303,13 @@ func _page(p: Dictionary, own: bool, free: bool):
 			elif G.TC.learnable(p).size() > 0:
 				v.add_child(UI.btn("Teach him a skill", func(): _learn(p), "secondary", "graduation-cap", 44))
 			var fam = int(p.get("fam", 50))
-			v.add_child(UI.divider())
-			v.add_child(UI.kv("Knows your playstyle", "%d%%" % fam, UI.cond_color(fam + 10), 17))
+			va.add_child(UI.divider())
+			va.add_child(UI.kv("Knows your playstyle", "%d%%" % fam, UI.cond_color(fam + 10), 17))
 			if fam < 100:
-				v.add_child(UI.lbl_fill("About %d more matches to settle fully." % G.TC.settle_matches(p), 14, UI.DIM))
+				va.add_child(UI.lbl_fill("About %d more matches to settle fully." % G.TC.settle_matches(p), 14, UI.DIM))
 		else:
-			v.add_child(UI.divider())
-			v.add_child(UI.wrap(G.TC.fit_text(p), 16, UI.MUTED))
+			va.add_child(UI.divider())
+			va.add_child(UI.wrap(G.TC.fit_text(p), 16, UI.MUTED))
 		var mine = []
 		for lid in s.user.links:
 			if G.TC.LINKS.has(lid):
@@ -319,7 +320,7 @@ func _page(p: Dictionary, own: bool, free: bool):
 					if can and G.TC.fits_slot(sl, p):
 						mine.append("%s (%s)" % [G.TC.LINKS[lid].n, sl.t.to_lower()])
 		if mine.size() > 0:
-			v.add_child(UI.wrap("Fits your link-up: " + ", ".join(mine), 16, UI.GREEN))
+			va.add_child(UI.wrap("Fits your link-up: " + ", ".join(mine), 16, UI.GREEN))
 		var pm = PosMap.new()
 		pm.p = p
 		pm.xy = POS_XY
