@@ -343,6 +343,14 @@ func run(m):
 				print("M3DRUN  ", e.m, " ", e.x)
 		print("M3DRUN errlog ", G.errlog.snapshot())
 		mr._skip()
+	if want.call("city3d"):
+		main.root("city3d")
+		await snap("city3d", 1.0)
+		main.stack[-1].sel = "training"
+		main.stack[-1].yaw = 2.4
+		main.stack[-1].dist = 12.0
+		main.stack[-1].refresh()
+		await snap("city3d_sel", 1.0)
 	if want.call("scout"):
 		for i in 8:
 			if G.user_fixture_today() != null:

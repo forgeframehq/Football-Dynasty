@@ -33,6 +33,7 @@ const SCREENS = {
 	"deadline": preload("res://scripts/screens/deadline.gd"),
 	"settings": preload("res://scripts/screens/settings.gd"),
 	"kit": preload("res://scripts/screens/kit.gd"),
+	"city3d": preload("res://scripts/screens/city3d.gd"),
 	"lists": preload("res://scripts/screens/lists.gd"),
 	"hub": preload("res://scripts/screens/hub.gd"),
 	"search": preload("res://scripts/screens/search.gd"),
@@ -517,7 +518,7 @@ func _rail_key() -> String:
 		return ""
 	var nm = stack[0].sname
 	var groups = {"inbox": ["inbox"], "home": ["home"],
-		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists", "kit"],
+		"club": ["squad", "tactics", "training", "fixtures", "finances", "campus", "lists", "kit", "city3d"],
 		"manager": ["board", "trophies", "jobs", "life"], "world": ["table", "comps", "stats", "clubview"],
 		"search": ["search", "transfers", "scouting", "player", "nego", "compare"]}
 	if nm == "lists" or nm == "hub" or nm == "settings":
@@ -794,7 +795,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("shirt", "Kit & Sponsors", str(spn.name) if spn != null else "Choose a shirt sponsor", func(): root("kit")))
 		a.append(_row("chart-bar", "Match Analysis", "Goals, home and away", func(): root("hub", {"kind": "analysis", "grp": "club"})))
 		a.append(_row("shield", "Club Records", "Your record and top scorers", func(): root("hub", {"kind": "identity", "grp": "club"})))
-		a.append(_row("building", "Club City", "Stadium %s" % G.OPS._thousands(G.OPS.capacity(c)), func(): root("campus")))
+		a.append(_row("building", "Club City", "Stadium %s" % G.OPS._thousands(G.OPS.capacity(c)), func(): root("campus" if G.settings.get("lowgfx", false) else "city3d")))
 	elif key == "manager":
 		a.append(_row("user", "Manager Profile", s.user.name, func(): root("board")))
 		a.append(_row("target", "Board Confidence", "%d%% · %s" % [int(s.user.conf), s.user.obj.text], func(): root("board")))
