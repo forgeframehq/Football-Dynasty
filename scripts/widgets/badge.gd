@@ -21,7 +21,10 @@ static var _tex := {}
 const PREMIUM_MIN = 72
 const PMETA = [[0.496, 0.506, 0.664], [0.496, 0.498, 0.695], [0.498, 0.496, 0.801], [0.498, 0.484, 0.707], [0.498, 0.5, 0.801], [0.494, 0.586, 0.621], [0.498, 0.504, 0.684], [0.498, 0.545, 0.637], [0.498, 0.5, 0.762], [0.498, 0.498, 0.574], [0.498, 0.514, 0.746], [0.498, 0.516, 0.637], [0.498, 0.496, 0.789], [0.494, 0.547, 0.734], [0.5, 0.5, 0.609], [0.5, 0.547, 0.641]]
 # the flat badge's shape -> the gold frames that look like it (the club keeps its silhouette)
-const PFRAMES = [[0, 10, 12], [1, 15], [3, 11, 9], [2, 11], [4, 8], [5, 15, 13], [7, 14], [6, 8]]
+# one frame per shape, so a club's crest is the same everywhere (Sudhi, 15 Nov): pointed shield, rounded shield,
+# circle (laurel ring), double ring, diamond, flat-top shield (crown), curved crest (laurels + star), hexagon
+const PFRAMES = [0, 1, 3, 2, 4, 5, 7, 6]
+const GOLD_RIM = Color("d9a63e")
 const PSHIELD = [0, 1, 5, 6, 7, 10, 12, 14, 15]
 var pf := 0
 
@@ -66,8 +69,7 @@ func setup(c: Dictionary, sz: int):
 	sh = pk[0]
 	em = pk[1]
 	lay = pk[2]
-	var opts = PFRAMES[sh]
-	pf = opts[((key.hash() & 0x7fffffff) / 7919) % opts.size()]
+	pf = PFRAMES[sh]
 	# two near-identical colours would hide the layout: use white as the second colour
 	if absf(c1.get_luminance() - c2.get_luminance()) < 0.12 and c1.is_equal_approx(c2):
 		c2 = Color.WHITE
@@ -100,7 +102,7 @@ func _draw():
 	var rim = max(1.5, w * 0.06)
 	var inner = full.grow(-rim)
 	# white rim, then the club's colours
-	draw_texture_rect(st, full, false, Color(1, 1, 1, 0.95))
+	draw_texture_rect(st, full, false, GOLD_RIM)
 	var field = c1
 	match lay:
 		0:
@@ -141,9 +143,13 @@ func _draw_premium(w: float, h: float):
 		2:
 			draw_texture_rect(ft, full, false, c2)
 			field = c2
+	if sh == RING:
+		# the flat badge's inner ring, in the same colour
+		var rs = m[2] * w * 0.9
+		draw_texture_rect(tex("sh_%d" % RING), Rect2(Vector2(m[0] * w - rs / 2.0, m[1] * h - rs / 2.0), Vector2(rs, rs)), false, Color(_ink(field, c1 if field == c2 else c2), 0.9))
 	var et = tex("em_%02d" % em)
 	if et != null:
-		var es = m[2] * w * (0.6 if pf in PSHIELD else 0.66)
+		var es = m[2] * w * ((0.6 if pf in PSHIELD else 0.66) if sh != RING else 0.54)
 		var cy = m[1] * h - (h * 0.03 if pf in PSHIELD else 0.0)
 		var er = Rect2(Vector2(m[0] * w - es / 2.0, cy - es / 2.0), Vector2(es, es))
 		var ink = _ink(field, c2 if field == c1 else c1)

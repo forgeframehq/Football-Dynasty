@@ -33,6 +33,18 @@ var winfo: Array = []
 var playable: Array = ["England", "Spain", "Italy", "Germany", "France"]
 
 
+var _view_key := ""
+
+
+func refresh():
+	# keep the grid's scroll position only while the same nation / league is shown (e.g. picking a club)
+	var k = "%s|%d|%d|%s|%d" % [nat, lg, wl, cont, step]
+	if k != _view_key:
+		sc = null
+	_view_key = k
+	super.refresh()
+
+
 func _load_info():
 	if info.size() > 0:
 		return
@@ -221,6 +233,7 @@ func _picker():
 	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var gs = UI.scroll(grid)
 	h.add_child(gs)
+	sc = gs   # screen.refresh() keeps this scroll position, so picking a club lower down no longer jumps to the top
 	gs.resized.connect(func(): _fit_tiles(grid, gs))
 	_fit_tiles.call_deferred(grid, gs)
 	if nat == "" and wl < 0:

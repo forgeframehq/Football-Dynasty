@@ -40,6 +40,26 @@ func run(m):
 		main.open("settings")
 		await snap("settings_title")
 		main.back()
+	if want.call("badges") and not only.is_empty():
+		# small (flat) and big (premium) badge side by side for the first 24 database clubs
+		var raw = DB.load_db()
+		var cv = ColorRect.new()
+		cv.color = Color("1a1530")
+		cv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		main.add_child(cv)
+		var g = GridContainer.new()
+		g.columns = 8
+		g.position = Vector2(20, 10)
+		cv.add_child(g)
+		for i in 24:
+			var c = raw.clubs[i]
+			var d = {"c1": c.c1, "c2": c.c2, "short": c.short, "id": i, "name": c.name}
+			var hb = HBoxContainer.new()
+			hb.add_child(UI.badge(d, 48))
+			hb.add_child(UI.badge(d, 110))
+			g.add_child(hb)
+		await snap("badges", 0.5)
+		cv.queue_free()
 	if want.call("new"):
 		main.open("new_career", {"slot": 0})
 		await snap("new_0")
