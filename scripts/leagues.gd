@@ -467,9 +467,10 @@ static func rollover():
 		var p = s.players[pid]
 		var a = G.age(p)
 		var limit = 37 if p.pos == "GK" else 34
-		if a >= limit and rng.randf() < (a - limit + 1) * 0.28 + (0.3 if p.club < 0 else 0.0):
+		if a >= limit and not p.get("noret", false) and rng.randf() < (a - limit + 1) * 0.28 + (0.3 if p.club < 0 else 0.0):
 			if p.club == ucl.id:
 				retired.append(G.pname(p))
+			G.SF.on_retire(p, p.club == ucl.id)
 			remove_player(p)
 			continue
 		if p.has("prec") and p.club >= 0 and p.cend <= s.season:
@@ -494,10 +495,11 @@ static func rollover():
 		var country = s.leagues[c.lg].country
 		var mine = c.id == ucl.id
 		var acad = c.fac.academy if mine and c.has("fac") else 3
-		for k in (2 + (1 if c.rep > 76 else 0) + (1 if mine and acad >= 4 else 0)):
+		var yb = G.SF.youth_bonus() if mine else [0, 0, 0]
+		for k in (2 + (1 if c.rep > 76 else 0) + (1 if mine and acad >= 4 else 0) + yb[2] + (1 if mine and G.perk("Developer") else 0)):
 			var nat = country if rng.randf() < 0.75 else s.leagues[rng.randi() % s.leagues.size()].country
-			var o = clampi(int(c.rep) - 22 + rng.randi_range(-5, 6) + (acad - 3 if mine else 0), 40, 70)
-			var pot = clampi(o + rng.randi_range(8, 22) + (rng.randi_range(0, 8) if rng.randf() < 0.15 else 0) + (acad - 3) * 3, o + 4, 94)
+			var o = clampi(int(c.rep) - 22 + rng.randi_range(-5, 6) + (acad - 3 if mine else 0) + yb[0], 40, 70)
+			var pot = clampi(o + rng.randi_range(8, 22) + (rng.randi_range(0, 8) if rng.randf() < 0.15 else 0) + (acad - 3) * 3 + yb[1], o + 4, 94)
 			var pos_opts = ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST", "ST"]
 			var yp = G.gen_player(c.id, pos_opts[rng.randi() % pos_opts.size()], rng.randi_range(16, 18), o, pot, nat)
 			if c.id == ucl.id:
@@ -546,6 +548,9 @@ static func rollover():
 	s.deals = {}
 	s.offers = []
 	G.MK.after_rollover()
+	G.SF.season_end()
+	for pid2 in s.players:
+		s.players[pid2].erase("noret")
 	G.OPS.sponsor_call()
 	generate_fixtures()
 	u.obj = objective(ucl)

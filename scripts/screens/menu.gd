@@ -224,6 +224,10 @@ func _slot_row(i: int, meta: Dictionary, cb: Callable, can_delete: bool) -> Cont
 	cv.add_child(UI.lbl_fill(meta.club, 26, UI.TEXT, "disp"))
 	cv.add_child(UI.lbl_fill("%s · %s" % [meta.manager, meta.date], 18, UI.MUTED))
 	h.add_child(cv)
+	if G.backups(i).size() > 0:
+		var bk = UI.chip("BACKUPS", Color(1, 1, 1, 0.06), UI.TEXT, 15)
+		UI.tap(bk, func(): backups_sheet(i), true)
+		h.add_child(bk)
 	if can_delete:
 		var del = UI.panel(Color(1, 1, 1, 0.06), 12, 10, 10)
 		del.add_child(UI.icon("x", 22, UI.MUTED))
@@ -239,5 +243,35 @@ func _slot_row(i: int, meta: Dictionary, cb: Callable, can_delete: bool) -> Cont
 func _continue(i: int):
 	if G.load_game(i):
 		UI.main.root("home")
+	elif G.backups(i).size() > 0:
+		UI.toast("That save could not be read. Pick a backup to restore.", UI.RED)
+		backups_sheet(i)
 	else:
 		UI.toast("Could not load the save file", UI.RED)
+
+
+static func backups_sheet(i: int, after := Callable()):
+	# the weekly backups of one career: tap one to put it back as the career's save
+	var build = func(v):
+		v.add_child(UI.wrap("A copy is made every week of game time; the newest %d are kept. Restoring replaces the career's current save." % G.BK_KEEP, 16, UI.MUTED))
+		for b in G.backups(i):
+			var md = b.meta
+			var r = UI.panel(UI.CARD, 12, 14, 8, UI.LINE)
+			var h = UI.hb(10)
+			h.add_child(UI.icon("save", 22, UI.accent))
+			var tv = UI.vb(-3)
+			tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tv.add_child(UI.lbl_fill("%s · %s" % [md.get("date", "Day %d" % b.day), md.get("club", "")], 19, UI.TEXT, "semi"))
+			tv.add_child(UI.lbl_fill("%s · saved %s" % [md.get("season", ""), str(md.get("made", "")).replace("T", " ").substr(0, 16)], 15, UI.DIM))
+			h.add_child(tv)
+			h.add_child(UI.chip("RESTORE", UI.accent, UI.on_color(UI.accent), 15))
+			r.add_child(h)
+			var base = b.base
+			UI.tap(r, func(): UI.confirm("Restore this backup?", "Career %d goes back to %s. Anything played since is lost." % [i + 1, md.get("date", "")], "Restore", func():
+				if G.restore(base, i) and G.load_game(i):
+					UI.toast("Backup restored", UI.GREEN)
+					UI.main.root("home")
+				else:
+					UI.toast("That backup could not be restored", UI.RED), true))
+			v.add_child(r)
+	UI.sheet("Backups · career %d" % (i + 1), build)

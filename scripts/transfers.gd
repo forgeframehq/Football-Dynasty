@@ -27,6 +27,8 @@ static func asking_price(p: Dictionary) -> int:
 	if p.cend - G.s.season <= 1:
 		m *= 0.85
 	m *= 1.0 - (G.s.user.attr.neg - 10) * 0.01
+	if G.perk("Negotiator"):
+		m *= 0.95
 	return G.nice(v * m)
 
 
@@ -86,7 +88,7 @@ static func wage_demand(p: Dictionary) -> int:
 	var base = float(G.wage_for(p.ovr, G.age(p)))
 	if p.club == uc.id:
 		return G.nice(max(base, p.wage * 1.08))
-	var m = 1.12 * (1.0 - (G.s.user.attr.neg - 10) * 0.008)
+	var m = 1.12 * (1.0 - (G.s.user.attr.neg - 10) * 0.008) * (0.95 if G.perk("Negotiator") else 1.0)
 	if p.club >= 0:
 		m += clamp((G.s.clubs[p.club].rep - uc.rep) * 0.02, 0.0, 0.3)
 		base = max(base, p.wage * 1.05)

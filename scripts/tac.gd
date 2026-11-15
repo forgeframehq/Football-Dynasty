@@ -375,7 +375,7 @@ static func weekly():
 	for pid in c.players:
 		var p = s.players[pid]
 		ensure_fam(p)
-		p.fam = min(100.0, float(p.fam) + 1.2)
+		p.fam = min(100.0, float(p.fam) + 1.2 * (1.5 if G.perk("Tactician") else 1.0))
 		var l = p.get("lsk", null)
 		if l != null:
 			l[1] = int(l[1]) - (2 if c.fac.training >= 5 and G.rng.randf() < 0.35 else 1)
@@ -628,7 +628,7 @@ static func after_match(sim, ui: int):
 			continue
 		ensure_fam(p)
 		var mins = (q.tout if q.tout >= 0 else sim.total) - q.tin
-		p.fam = min(100.0, float(p.fam) + settle_rate(p) * clamp(mins / 90.0, 0.2, 1.0))
+		p.fam = min(100.0, float(p.fam) + settle_rate(p) * clamp(mins / 90.0, 0.2, 1.0) * (1.5 if G.perk("Tactician") else 1.0))
 
 
 static func on_badge():

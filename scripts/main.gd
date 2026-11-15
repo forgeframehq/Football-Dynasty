@@ -6,6 +6,9 @@ const SCREENS = {
 	"menu": preload("res://scripts/screens/menu.gd"),
 	"calendar": preload("res://scripts/screens/calendar.gd"),
 	"invest": preload("res://scripts/screens/invest.gd"),
+	"staff": preload("res://scripts/screens/staff.gd"),
+	"social": preload("res://scripts/screens/social.gd"),
+	"managers": preload("res://scripts/screens/managers.gd"),
 	"home3d": preload("res://scripts/screens/home3d.gd"),
 	"plans": preload("res://scripts/screens/plans.gd"),
 	"new_career": preload("res://scripts/screens/new_career.gd"),
@@ -366,7 +369,10 @@ func rail_wide() -> bool:
 func left_inset() -> int:
 	# screens without the rail: a small camera hole no longer costs the whole strip beside it. The page runs to the
 	# edge of the glass (a corner of a panel may sit behind the hole); only a long notch still pushes everything right.
-	return notch_l if rail_wide() else 0
+	if rail_wide():
+		return notch_l
+	# panels may start under the hole, but their text (16 px in) starts just clear of it
+	return max(0, int(hole_x.y) - 16) if hole_x.y > 0 else 0
 
 
 func _dev_hole():
@@ -955,6 +961,9 @@ func menu_items(key: String) -> Array:
 		a.append(_row("wallet", "Finances", "%s budget" % G.money(c.budget), func(): root("finances")))
 		a.append(_row("clipboard-list", "Team Report", "Strengths and gaps", func(): root("hub", {"kind": "report", "grp": "club"})))
 		a.append(_row("users", "Dressing Room", "Hierarchy and morale", func(): root("hub", {"kind": "dressing", "grp": "club"})))
+		G.SF.ensure()
+		var vac = 8 - c.get("staff", {}).size()
+		a.append(_row("clipboard-list", "Staff", ("%d job%s vacant" % [vac, "" if vac == 1 else "s"]) if vac > 0 else "Assistant, coaches, physio, scouts", func(): root("staff", {"grp": "club"})))
 		a.append(_row("megaphone", "Fans", "%d%% confidence" % int(s.user.get("fans", 55.0)), func(): root("hub", {"kind": "fans", "grp": "club"})))
 		var spn = G.OPS.sponsor_now()
 		a.append(_row("shirt", "Kit & Sponsors", str(spn.name) if spn != null else "Choose a shirt sponsor", func(): root("kit")))
@@ -966,7 +975,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("target", "Board Confidence", "%d%% · %s" % [int(s.user.conf), s.user.obj.text], func(): root("board")))
 		a.append(_row("trophy", "Trophy Cabinet", "%d won" % s.user.trophies.size(), func(): root("trophies")))
 		a.append(_row("briefcase", "Jobs", "%d club%s interested" % [s.user.jobs.size(), "" if s.user.jobs.size() == 1 else "s"], func(): root("jobs")))
-		a.append(_row("megaphone", "Social", "%s followers" % G.OPS._thousands(G.SOC.data().followers), func(): root("hub", {"kind": "social", "grp": "manager"})))
+		a.append(_row("megaphone", "Social", "%s followers" % G.OPS._thousands(G.SOC.data().followers), func(): root("social", {"grp": "manager"})))
 		a.append(_row("house", "Lifestyle", "%s in the bank" % G.money(G.OPS.life().cash), func(): root("life")))
 		a.append(_row("sofa", "My Home", "Walk round it in 3D", func(): root("home3d" if not G.settings.get("lowgfx", false) else "life")))
 		a.append(_row("trending-up", "Investments", "Savings, property, shares", func(): root("invest", {"grp": "manager"})))
@@ -989,6 +998,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("arrow-left-right", "Transfer Centre", "%d deals this season" % s.tx_log.size(), func(): root("hub", {"kind": "tcentre", "grp": "world"})))
 		a.append(_row("award", "Awards", "Golden boot and more", func(): root("hub", {"kind": "awards", "grp": "world"})))
 		a.append(_row("goal", "Live Scores", "Latest league results", func(): root("hub", {"kind": "scores", "grp": "world"})))
+		a.append(_row("swords", "Manager Watch", "Hot seats, rivals, sackings", func(): root("managers", {"grp": "world"})))
 		a.append(_row("list", "League Standards", "Leagues ranked", func(): root("hub", {"kind": "standards", "grp": "world"})))
 		a.append(_row("chart-bar", "Player Stats", "Scorers, assists, ratings", func(): root("stats", {"lg": c.lg})))
 		a.append(_row("award", "Team of the Week", "The best eleven of the last seven days", func(): root("lists", {"kind": "totw", "grp": "world"})))
@@ -1025,12 +1035,12 @@ func menu_items(key: String) -> Array:
 
 # Menu layout: headings with the rows under them, "|" starts the second column. Rows not named land in the last group.
 const MENU_GROUPS = {
-	"club": [["Squad", ["First Team", "Youth & Reserves", "Tactics", "Loan Watch"]], ["Players", ["Development Hub", "Medical Centre", "Contracts", "Dressing Room"]], "|",
+	"club": [["Squad", ["First Team", "Youth & Reserves", "Tactics", "Loan Watch"]], ["Players", ["Development Hub", "Medical Centre", "Contracts", "Dressing Room", "Staff"]], "|",
 		["Club", ["Kit & Sponsors", "Finances", "Club City", "Fans", "Club Records"]], ["Season", ["Calendar", "Fixtures", "Tactical Plans", "Team Report", "Match Analysis"]]],
 	"manager": [["Job", ["Manager Profile", "Board Confidence", "My Contract", "Board Request", "Jobs", "Philosophy"]], "|",
 		["Money and life", ["Lifestyle", "My Home", "Investments", "Club Ownership", "Social"]], ["Career", ["Trophy Cabinet", "Career Timeline", "Game Status"]]],
 	"world": [["Competitions", ["Club Division", "Cups & Continental"]], ["Leagues", []], "|",
-		["News", ["Live Scores", "Transfer Centre", "League Standards"]], ["Best players", ["Player Stats", "Team of the Week", "Awards", "Top 50 Players", "Wonderkids"]]],
+		["News", ["Live Scores", "Transfer Centre", "Manager Watch", "League Standards"]], ["Best players", ["Player Stats", "Team of the Week", "Awards", "Top 50 Players", "Wonderkids"]]],
 	"search": [["Find", ["Player Search", "Role Finder", "Find Club", "Scouting"]], ["Deals", ["Transfer Market", "Jobs"]], "|",
 		["Quick lists", ["Bargains", "Free Agents", "Transfer Listed", "Expiring Contracts"]]],
 	"options": [["Game", ["Save Game", "Settings", "Manual", "Editor", "Exit to Menu"]], "|", ["Your story", ["Achievements", "Season Documentary", "Hall of Fame"]]],

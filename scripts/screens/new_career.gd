@@ -2,9 +2,11 @@ extends "res://scripts/screens/screen.gd"
 # New career: Nation > League > Club picker with a club panel, then the manager profile.
 
 const NATIONS = ["England", "Spain", "Italy", "Germany", "France"]
-const STYLES = [["Balanced", [.25, .25, .25, .25], "A bit of everything."], ["Tactician", [.46, .18, .18, .18], "Your teams control matches."],
-	["Motivator", [.18, .46, .18, .18], "Stronger team talks and morale."], ["Developer", [.18, .18, .46, .18], "Young players improve faster."],
-	["Negotiator", [.18, .18, .18, .46], "Cheaper fees and wages."]]
+# each style has a perk the points cannot buy; Balanced has none but gets BAL_BONUS extra points
+const STYLES = [["Balanced", [.25, .25, .25, .25], "Perk: 4 extra points to spend."], ["Tactician", [.46, .18, .18, .18], "Perk: players learn your playstyle 50% faster, and your side gets a small edge in every match."],
+	["Motivator", [.18, .46, .18, .18], "Perk: team talks land more often and harder, and squad morale never drops below 45."], ["Developer", [.18, .18, .46, .18], "Perk: an extra academy prospect every season, and players 21 and under grow 8% faster."],
+	["Negotiator", [.18, .18, .18, .46], "Perk: transfer fees and wage demands 5% lower on top of your points."]]
+const BAL_BONUS = 4
 const NAT_LIST = ["England", "Spain", "Italy", "Germany", "France", "Scotland", "Wales", "Northern Ireland", "Republic of Ireland", "Portugal", "Holland", "Belgium",
 	"Brazil", "Argentina", "United States", "Canada", "Mexico", "Denmark", "Norway", "Sweden", "Switzerland", "Austria", "Poland", "Croatia", "Serbia",
 	"Turkey", "Greece", "Morocco", "Nigeria", "Ghana", "Senegal", "Japan", "Australia", "Jamaica", "Uruguay", "Colombia"]
@@ -12,6 +14,7 @@ const NAT_LIST = ["England", "Spain", "Italy", "Germany", "France", "Scotland", 
 var step := 0
 var fn := ""
 var ln := ""
+var sh := ""
 var age := 38
 var style := 0
 var prof: Dictionary = {}
@@ -300,11 +303,11 @@ func _left() -> int:
 	var used = 0
 	for k in prof.attr:
 		used += prof.attr[k] - 5
-	return G.OPS.points_for(prof.badge, prof.bg) - used
+	return G.OPS.points_for(prof.badge, prof.bg) + (BAL_BONUS if style == 0 else 0) - used
 
 
 func _apply_style():
-	var pts = G.OPS.points_for(prof.badge, prof.bg)
+	var pts = G.OPS.points_for(prof.badge, prof.bg) + (BAL_BONUS if style == 0 else 0)
 	var keys = ["tac", "mot", "you", "neg"]
 	var w = STYLES[style][1]
 	var used = 0
@@ -332,11 +335,14 @@ func _manager():
 	var v = a[1]
 	v.add_child(UI.caps("Identity", 20, UI.GOLD))
 	var f1 = UI.input(fn, "First name", func(t): fn = t)
-	f1.custom_minimum_size = Vector2(0, 58)
+	f1.custom_minimum_size = Vector2(0, 50)
 	v.add_child(f1)
 	var f2 = UI.input(ln, "Last name", func(t): ln = t)
-	f2.custom_minimum_size = Vector2(0, 58)
+	f2.custom_minimum_size = Vector2(0, 50)
 	v.add_child(f2)
+	var f3 = UI.input(sh, "@ Social name (optional)", func(t): sh = t)
+	f3.custom_minimum_size = Vector2(0, 46)
+	v.add_child(f3)
 	var nr = UI.panel(Color(1, 1, 1, 0.05), 14, 14, 10, Color(1, 1, 1, 0.1))
 	var nh = UI.hb(12)
 	nh.add_child(UI.flag(prof.nat, 44))
@@ -387,7 +393,7 @@ func _manager():
 		style = i
 		_apply_style()
 		refresh(), 17))
-	v.add_child(UI.lbl(STYLES[style][2] + " Adjust the points if you like.", 17, UI.MUTED))
+	v.add_child(UI.wrap(STYLES[style][2] + " Adjust the points if you like.", 17, UI.MUTED))
 	for m in G.OPS.MATTR:
 		var k = m[0]
 		var r = UI.panel(Color(1, 1, 1, 0.04), 12, 12, 6)
@@ -476,4 +482,6 @@ func _start():
 	G.new_game(prof, pick)
 	G.s.user["age"] = age
 	G.s.user["style"] = STYLES[style][0]
+	var hd = sh.strip_edges().replace("@", "").replace(" ", "_")
+	G.SOC.data().handle = hd.substr(0, 20) if hd.length() >= 3 else str(prof.name).replace(" ", "")
 	UI.main.root("intro", {"kind": "appoint"})

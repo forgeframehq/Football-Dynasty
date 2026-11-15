@@ -3,7 +3,7 @@ extends "res://scripts/screens/screen.gd"
 const HOME = preload("res://scripts/screens/home.gd")
 # News and messages: list on the left, story in the middle, subject card on the right.
 
-const ICONS = {"info": "mail", "board": "landmark", "offer": "handshake", "contract": "file-text", "result": "flag", "deal": "handshake"}
+const ICONS = {"info": "mail", "board": "landmark", "offer": "handshake", "contract": "file-text", "result": "flag", "deal": "handshake", "story": "message-circle"}
 
 var sel := -1
 
@@ -60,6 +60,25 @@ func build():
 	v.add_child(UI.wrap(m.title.to_upper(), 30, UI.accent, "xbold"))
 	v.add_child(UI.caps(G.fmt_date(m.day, true), 17, UI.DIM))
 	v.add_child(UI.wrap(m.body, 23, UI.TEXT))
+	# a player story: pick how to handle it; the outcome stays under the message
+	if m.has("ch"):
+		if m.has("done"):
+			var dp = UI.panel(Color(UI.accent, 0.12), 10, 14, 10, Color(UI.accent, 0.5))
+			var dv = UI.vb(2)
+			dv.add_child(UI.caps("You chose: %s" % m.ch[int(m.done)], 15, UI.accent))
+			dv.add_child(UI.wrap(str(m.get("out", "")), 19, UI.TEXT))
+			dp.add_child(dv)
+			v.add_child(dp)
+		else:
+			for k in m.ch.size():
+				var kk = k
+				var mm = m
+				var b = UI.btn(m.ch[k], func():
+					var res = G.STY.choose(mm, kk)
+					if res != "":
+						UI.toast(res)
+					refresh(), "primary" if k == 0 else "secondary", "", 48)
+				v.add_child(b)
 	# tags and actions
 	var subj = _subject(m)
 	var tags = UI.hb(8)

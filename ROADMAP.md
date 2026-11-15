@@ -33,12 +33,12 @@ Club
 - [x] Sponsors (shirt and stadium deals with targets)
 - [ ] Match Analysis (shot maps, season trends)
 - [x] Club Identity (kit colours, records, legends, all-time XI)
-- [ ] Staff hiring
+- [x] Staff hiring (eight jobs with real effects, staff search, retired players as staff, the assistant's notes)
 
 Manager
 - [x] Philosophy (club DNA with bonuses)
 - [x] Career Timeline, My Contract, Lifestyle (home, garage, business, language, local causes)
-- [ ] Rival Managers
+- [x] Rival Managers
 - [ ] Board Request (transfer funds, wages, stadium, new contract)
 - [ ] Holiday mode, Game Status
 
@@ -52,7 +52,7 @@ Search
 - [x] Find Similar, Role Finder, Shortlist Alerts, saved filters, Staff Search, Find Club
 
 Options
-- [ ] Editor, Save Backup, Achievements, Hall of Fame, Manual, Scrapbook
+- [x] Editor, Save Backup, Achievements, Hall of Fame, Manual, Scrapbook
 - [ ] Custom dashboard panels
 
 ## Stage 3: depth
@@ -82,12 +82,12 @@ Options
 - [x] Press conference before matches, with effects on morale, fans and board
 - [x] Season Documentary (animated recap from the scrapbook)
 - [ ] Deadline day as a live hour-by-hour event
-- [ ] Rival managers who remember what you said
-- [ ] Player stories (academy captain, veteran farewell, homesick wonderkid)
+- [x] Rival managers who remember what you said (feuds, mind games, sackings, Manager Watch)
+- [x] Player stories (playing time, hype, homesick, bust-ups, agent talk, lateness, veteran farewell, captain backing you)
 - [ ] Legends mode (retired players return as coaches or scouts)
 - [ ] Family, holidays, legacy items (statue, stand), property abroad, owner while managing elsewhere
 - [ ] Images for homes, cars, businesses and property; sponsor logos; manager portraits
-- [x] Social feed with posts, reactions and effects
+- [x] Social feed with posts, reactions and effects; world timeline (clubs, journalists with true and false rumours, rival managers, your players), replies with effects, your own handle, trending
 - [x] Newspaper front page for the appointment, trophy images, sponsor logos, app icon
 - [x] Music player: put track_1.mp3, track_2.mp3, ... in assets/music
 
@@ -211,3 +211,5 @@ Everything Sudhi asked for after playing v0.9.0. Screens and code, in the order 
 - Text: `UI.lbl` never goes below 14 px.
 - Game check: `dev/audit.gd` now also reports overlapping buttons (anything registered with `UI.tap`) and covers the new pages. Last run: 107 pages, no overlaps, no off-screen text; the only error (stadium view variable clash) is fixed. Pages that still scroll are lists (squad, fixtures, tables, wage bill, feeds).
 - Not done: the world system (more nations, generated players), victory films (waiting for Sudhi's Kling clips), a sprint and a celebration animation from Mixamo (the jog is sped up and the celebration is made in code). Nothing here has been tried on a real phone: 22 animated players and the 3D home are the things to check for speed and heat.
+
+- [x] Coaching style perks (each style has a perk the points cannot buy; Balanced gets 4 extra points)

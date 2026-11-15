@@ -250,6 +250,41 @@ func run(m):
 		print("posts ", G.SOC.data().posts.size(), " ", G.SOC.post("Proud of the lads, great win. Haaland was superb"))
 		main.root("hub", {"kind": "social", "grp": "manager"})
 		await snap("social")
+	if want.call("staff"):
+		main.root("staff", {"grp": "club"})
+		await snap("staff", 0.6)
+		var st = main.stack[-1]
+		st.role_f = 1
+		st.refresh()
+		await snap("staff_ass")
+		var sid = G.s.staff_free[0]
+		st._detail(G.s.staff[sid], "ass")
+		await snap("staff_offer", 0.5)
+		UI.close_sheet()
+	if want.call("mgrs"):
+		main.root("managers", {"grp": "world"})
+		await snap("managers", 0.6)
+	if want.call("social"):
+		G.SOC.data().handle = "KingSudhi"
+		var oid = G.s.leagues[G.uc().lg].clubs[0] if G.s.leagues[G.uc().lg].clubs[0] != G.uc().id else G.s.leagues[G.uc().lg].clubs[1]
+		G.MG.of(oid).feud = 55.0
+		G.SOC.manager_post(oid, "Some people talk a lot. Saturday will tell us who is right.")
+		var pl = G.s.players[G.uc().players[3]]
+		G.SOC.player_post(pl, "Some people just don't see it.")
+		G.SOC._rumour()
+		main.root("social", {"grp": "manager"})
+		await snap("social", 0.6)
+		var so = main.stack[-1]
+		so.tab = 3
+		so.refresh()
+		await snap("social_mentions")
+	if want.call("story"):
+		G.STY._post("Test story", "%s has knocked on your door." % G.pname(G.s.players[G.uc().players[5]]), "time", G.uc().players[5], ["Promise him games (3 starts in 6 weeks)", "Tell him to fight for his place", "Say you'd listen to loan offers"])
+		main.root("inbox")
+		var ib = main.stack[-1]
+		ib.sel = 0
+		ib.refresh()
+		await snap("story", 0.5)
 	if want.call("invest"):
 		var lfi = G.OPS.life()
 		lfi.cash = max(lfi.cash, 3000000)

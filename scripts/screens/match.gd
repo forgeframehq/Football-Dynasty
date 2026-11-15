@@ -822,6 +822,7 @@ func _read() -> Array:
 			carded.append(G.pname(G.s.players[pid2]))
 	if carded.size() > 0:
 		out.append(["On a yellow: %s." % ", ".join(carded.slice(0, 3)), UI.MUTED])
+	out.append_array(G.SF.ht_lines(me, op, sim))
 	if out.is_empty():
 		out.append(["An even game so far. Nothing needs changing yet.", UI.MUTED])
 	return out
@@ -912,8 +913,9 @@ func _resume_ht(kind: int):
 		var good = diff >= 0 if kind == 0 else ((diff < 0 or (diff == 0 and me.club.rep > op.club.rep + 2)) if kind == 1 else diff > 0)
 		var roll = G.rng.randf()
 		var mot = G.s.user.get("attr", {}).get("mot", 10)
-		if good and roll < 0.6 + mot * 0.015:
-			me.boost *= 1.025
+		var mv = G.perk("Motivator")
+		if good and roll < 0.6 + mot * 0.015 + (0.12 if mv else 0.0):
+			me.boost *= 1.035 if mv else 1.025
 			UI.toast("The players look fired up.", UI.GREEN)
 		elif not good and roll < 0.5:
 			me.boost *= 0.985

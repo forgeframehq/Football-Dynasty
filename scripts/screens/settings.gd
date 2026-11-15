@@ -1,4 +1,6 @@
 extends "res://scripts/screens/screen.gd"
+
+const MENU = preload("res://scripts/screens/menu.gd")
 # Settings: sound levels, the soundtrack, skins and a few game options. Opened from the title screen
 # and from the in-game Options menu. Everything here is stored in G.settings, not in the career save.
 
@@ -136,6 +138,23 @@ func _soundtrack(row: Control):
 	# diagnostics sit in the left pane, which has room, so the middle pane needs no scroll
 	left_v.add_child(UI.sp(0, 6))
 	left_v.add_child(dg)
+	if G.active and G.s != null:
+		left_v.add_child(UI.sp(0, 4))
+		_head(left_v, "Save backups")
+		var bl = G.backups(G.slot)
+		left_v.add_child(UI.lbl_fill("%d kept · newest %s" % [bl.size(), bl[0].meta.get("date", "-") if bl.size() > 0 else "none yet"], 16, UI.MUTED))
+		var bh = UI.hb(8)
+		var b1 = UI.btn("Back up now", func():
+			G.save_game()
+			if G.backup():
+				UI.toast("Backup made", UI.GREEN)
+			refresh(), "secondary", "save", 42)
+		b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bh.add_child(b1)
+		var b2 = UI.btn("Restore", func(): MENU.backups_sheet(G.slot), "ghost", "", 42)
+		b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bh.add_child(b2)
+		left_v.add_child(bh)
 
 
 func _fill_songs():

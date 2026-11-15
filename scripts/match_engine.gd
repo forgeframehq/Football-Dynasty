@@ -91,6 +91,9 @@ func _on_the_day():
 		if fx.get("ko", false) and t.home and G.s.leagues[t.club.lg].tier > G.s.leagues[o.club.lg].tier:
 			day += 0.025
 			t["lift"] = true
+		# a manager with a grudge against you gets a bit more out of his side
+		if o.get("user", false) and not t.get("user", false):
+			day += G.MG.fired_up(t.club.id)
 		t.boost *= 1.0 + day
 		t["day"] = day
 		t["under"] = gap <= -4.0

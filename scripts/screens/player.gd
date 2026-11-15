@@ -558,6 +558,14 @@ func _manage(p: Dictionary, own: bool, free: bool):
 		else:
 			var yrs = max(0, p.cend - s.season - 1)
 			_act(x, "Offer new contract", "%s a week · %s" % [G.money(p.wage), "ends this June" if yrs == 0 else "%d year%s left" % [yrs, "" if yrs == 1 else "s"]], "handshake", func(): UI.main.open("nego", {"pid": p.id, "mode": "renew"}), UI.AMBER if yrs == 0 else Color(0, 0, 0, 0))
+			if G.age(p) >= 31:
+				var so = p.get("staff_offer", false)
+				_act(x, "Staff role when he retires", "Promised: he joins your staff" if so else "Offer him a coaching job for after his career", "clipboard-list", func():
+					p["staff_offer"] = not p.get("staff_offer", false)
+					if p.staff_offer:
+						p.mor = min(100.0, p.mor + 4.0)
+						UI.toast("%s will join your staff when he retires" % G.pname(p), UI.GREEN)
+					refresh(), UI.GREEN if so else Color(0, 0, 0, 0))
 			if p.get("youth", false):
 				_act(x, "Promote to first team", "He is in the youth squad", "arrow-up", func():
 					p.erase("youth")

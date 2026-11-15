@@ -721,6 +721,8 @@ func _owner(v: Control):
 
 
 func _social(v: Control):
+	UI.main.root.call_deferred("social", {"grp": "manager"})
+	return
 	var s = G.s
 	var u = s.user
 	var c = G.uc()
@@ -829,7 +831,10 @@ func _press(v: Control):
 	for ans in q[1]:
 		var kind = ans[1]
 		var text = ans[0]
+		var about_mgr = q[0].contains("opposition manager")
 		v.add_child(UI.btn(text, func():
+			if about_mgr:
+				G.MG.press(kind)
 			if kind == "bold":
 				for pid in c.players:
 					s.players[pid].mor = min(100.0, s.players[pid].mor + 2.0)

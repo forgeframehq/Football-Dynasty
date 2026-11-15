@@ -53,8 +53,27 @@ static func run(node: Node):
 		print("  ups: ", rv.ups.map(func(x): return G.s.clubs[x[0]].name))
 		print("  downs: ", rv.downs.map(func(x): return G.s.clubs[x[0]].name))
 		print("  players: ", G.s.players.size(), " free: ", G.s.free.size(), " inbox: ", G.s.inbox.size(), " news: ", G.s.news.size())
+		# the newer systems: staff, managers, stories, social feed, backups
+		var kinds = {}
+		for sp in G.SOC.data().posts:
+			kinds[sp.kind] = kinds.get(sp.kind, 0) + 1
+		var stories = 0
+		for m in G.s.inbox:
+			if m.get("kind", "") == "story":
+				stories += 1
+		var fe = 0
+		for mcid in G.s.mgrs:
+			if float(G.s.mgrs[mcid].feud) > 0:
+				fe += 1
+		print("  staff: ", G.uc().staff.size(), " market: ", G.s.staff_free.size(), " ex-players: ", G.s.staff_free.filter(func(x): return G.s.staff[x].ex != null).size(),
+			" | managers: ", G.s.mgrs.size(), " feuds: ", fe, " moves: ", G.s.mgr_log.size(), " | stories in inbox: ", stories, " | posts: ", kinds, " | backups: ", G.backups(G.slot).size())
 		var sizes = G.s.clubs.map(func(x): return x.players.size())
 		print("  squad sizes min/max: ", sizes.min(), "/", sizes.max(), " history: ", G.s.history[0])
+		var bl = G.backups(G.slot)
+		if bl.size() > 1:
+			var day_now = G.s.day
+			var ok = G.restore(bl[1].base, G.slot) and G.load_game(G.slot)
+			print("  restore test: ", ok, " back from day ", day_now, " to day ", G.s.day)
 	node.get_tree().quit()
 
 

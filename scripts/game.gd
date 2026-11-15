@@ -12,6 +12,9 @@ const DL = preload("res://scripts/deals.gd")
 const CM = preload("res://scripts/commentary.gd")
 const TC = preload("res://scripts/tac.gd")
 const MK = preload("res://scripts/market.gd")
+const SF = preload("res://scripts/staff.gd")
+const MG = preload("res://scripts/managers.gd")
+const STY = preload("res://scripts/stories.gd")
 
 const SAVE_V = 2
 var slot := 0
@@ -36,6 +39,13 @@ func delete_save(i: int):
 	for p in [save_path(i), meta_path(i)]:
 		if FileAccess.file_exists(p):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+	clear_backups(i)
+
+
+func clear_backups(i: int):
+	for b in backups(i):
+		for ext in [".sav", ".meta"]:
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(b.base + ext))
 
 
 func load_settings():
@@ -312,6 +322,7 @@ func unread() -> int:
 # ---------------------------------------------------------------- new game
 
 func new_game(profile, club_id: int):
+	clear_backups(slot)     # a new career in this slot: the old career's backups go
 	if typeof(profile) == TYPE_STRING:
 		var nm = profile
 		profile = OPS.default_profile()
@@ -385,6 +396,11 @@ func init_club(c: Dictionary):
 	c.wage_budget = nice(squad_wages(c) * 1.15)
 
 
+func perk(style: String) -> bool:
+	# the coaching style chosen at the start of the career
+	return str(s.user.get("style", "Balanced")) == style
+
+
 func ensure_state():
 	# idempotent: brings older saves up to date and fills in defaults for newer features
 	var raw = DB.load_db()
@@ -444,6 +460,8 @@ func ensure_state():
 			c.formation = "4-3-3"
 		init_user_tactics(c)
 	TC.ensure()
+	SF.ensure()
+	MG.ensure()
 	s.v = SAVE_V
 
 
@@ -781,7 +799,7 @@ func lineup(cid: int, opp: int) -> Dictionary:
 		for i in 11:
 			c.roles[i] = RL.valid(c.roles[i], c.slots[i][0])
 		TC.pins_valid(c)
-		return {"club": cid, "xi": c.xi, "bench": c.bench, "formation": c.formation, "ment": c.ment, "press": c.press, "tempo": c.tempo, "user": true, "boost": 1.0 + (s.user.attr.tac - 10) * 0.0015,
+		return {"club": cid, "xi": c.xi, "bench": c.bench, "formation": c.formation, "ment": c.ment, "press": c.press, "tempo": c.tempo, "user": true, "boost": 1.0 + (s.user.attr.tac - 10) * 0.0015 + SF.match_boost() + (0.008 if perk("Tactician") else 0.0),
 			"slots": c.slots, "rids": c.roles, "instr": c.instr, "pk": c.pk, "fk": c.fk, "ck": c.ck, "capt": c.capt, "pins": c.pins, "tm_pid": c.tm_pid}
 	var r = lu_cache.get(cid, null)
 	if r != null:
@@ -1105,6 +1123,10 @@ func apply_match(sim):
 			if sim.motm >= 0 and s.players.has(sim.motm) and s.players[sim.motm].club == t.club.id:
 				star = pname(s.players[sim.motm])
 			SOC.on_result(t.club, o.club, t.goals, o.goals, star, is_derby(f.h, f.a))
+			MG.after_match(o.club.id, t.goals, o.goals, is_derby(f.h, f.a))
+			STY.after_match(pts)
+			if pts == 3 and sim.motm >= 0 and s.players.has(sim.motm) and s.players[sim.motm].club == t.club.id and rng.randf() < 0.6:
+				SOC.player_post(s.players[sim.motm], SOC.HAPPY[rng.randi() % SOC.HAPPY.size()])
 		if is_derby(f.h, f.a):
 			u.fans = clamp(u.fans + (pts - 1.2) * 3.0, 0.0, 100.0)
 			if pts == 3:
@@ -1319,6 +1341,7 @@ func take_job(cid: int):
 	u.obj = LG.objective(c)
 	init_user_tactics(c)
 	OPS.ensure(c)
+	SF.ensure()
 	msg("Welcome to %s" % c.name, "You have been appointed manager of %s.\n\nObjective: %s." % [c.name, u.obj.text], "board")
 	u["sponsor"] = null
 	OPS.sponsor_call(true)
@@ -1332,15 +1355,86 @@ func has_save(i = null) -> bool:
 
 
 func save_game():
-	var f = FileAccess.open(save_path(), FileAccess.WRITE)
+	# write to a temporary file first and swap it in, so a crash or a flat battery mid-save cannot corrupt the career
+	var tmp = save_path() + ".tmp"
+	var f = FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
 		return
 	f.store_var(s)
 	f.close()
+	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(save_path()))
 	var m = FileAccess.open(meta_path(), FileAccess.WRITE)
 	if m != null:
-		m.store_var({"club": uc().name, "manager": s.user.name, "date": fmt_date(s.day, true), "season": season_name(), "cid": s.user.club, "c1": uc().c1, "c2": uc().c2, "short": uc().short})
+		m.store_var(_meta())
 		m.close()
+	# a backup copy once a week of game time
+	if s.day - int(s.user.get("bk_day", -99)) >= 7:
+		backup()
+
+
+func _meta() -> Dictionary:
+	return {"club": uc().name, "manager": s.user.name, "date": fmt_date(s.day, true), "season": season_name(), "cid": s.user.club, "c1": uc().c1, "c2": uc().c2, "short": uc().short}
+
+
+# ---------------------------------------------------------------- backups
+# user://backups/s<slot>_<day>.sav (+ .meta). The newest BK_KEEP per slot are kept.
+
+const BK_DIR = "user://backups"
+const BK_KEEP = 6
+
+
+func backup() -> bool:
+	if s == null or not FileAccess.file_exists(save_path()):
+		return false
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(BK_DIR))
+	var base = "%s/s%d_%06d" % [BK_DIR, slot, s.day]
+	s.user["bk_day"] = s.day
+	var f = FileAccess.open(base + ".sav", FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_var(s)
+	f.close()
+	var m = FileAccess.open(base + ".meta", FileAccess.WRITE)
+	if m != null:
+		var md = _meta()
+		md["made"] = Time.get_datetime_string_from_system(false, true)
+		m.store_var(md)
+		m.close()
+	var old = backups(slot)
+	for i in range(BK_KEEP, old.size()):
+		for ext in [".sav", ".meta"]:
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(old[i].base + ext))
+	return true
+
+
+func backups(i: int) -> Array:
+	# newest first: [{base, day, meta}]
+	var out = []
+	var d = DirAccess.open(BK_DIR)
+	if d == null:
+		return out
+	for fn in d.get_files():
+		if fn.begins_with("s%d_" % i) and fn.ends_with(".sav"):
+			var base = BK_DIR + "/" + fn.get_basename()
+			var md = {}
+			if FileAccess.file_exists(base + ".meta"):
+				var m = FileAccess.open(base + ".meta", FileAccess.READ)
+				var v = m.get_var()
+				m.close()
+				if typeof(v) == TYPE_DICTIONARY:
+					md = v
+			out.append({"base": base, "day": int(fn.get_basename().split("_")[1]), "meta": md})
+	out.sort_custom(func(a, b): return a.day > b.day)
+	return out
+
+
+func restore(base: String, i: int) -> bool:
+	if not FileAccess.file_exists(base + ".sav"):
+		return false
+	for ext in [[".sav", save_path(i)], [".meta", meta_path(i)]]:
+		if FileAccess.file_exists(base + ext[0]):
+			DirAccess.copy_absolute(ProjectSettings.globalize_path(base + ext[0]), ProjectSettings.globalize_path(ext[1]))
+	return true
 
 
 func load_game(i = null) -> bool:

@@ -155,6 +155,11 @@ static func daily():
 		u.rep = min(100.0, u.rep + 5.0)
 		G.msg("Coaching badge earned", "Congratulations — you now hold the %s licence. You have 3 new attribute points to spend in the board room." % BADGES[u.badge], "board", null, true)
 	market_day(life())
+	G.MG.pre_match()
+	G.STY.daily()
+	G.SOC.daily()
+	if G.cur.day == 1:
+		G.MG.monthly()
 	if G.cur.weekday == 1:
 		weekly()
 		G.TC.weekly()
@@ -512,6 +517,8 @@ static func week_money(c: Dictionary) -> Dictionary:
 		levels += c.fac[k]
 	var upkeep = int(c.wage_budget * 0.011 * levels)
 	wages += G.MK.loan_wages(c)
+	if c.id == s.user.club:
+		wages += G.SF.wage_bill()
 	return {"tickets": tickets, "sponsor": sponsor, "tv": tv, "wages": wages, "upkeep": upkeep, "home": c.fin.home, "net": sponsor + tv + tickets - wages - upkeep}
 
 
@@ -533,6 +540,7 @@ static func weekly():
 	lf.settled = min(100.0, float(lf.settled) + 1.5 + lf.home * 0.8)
 	invest_week(lf)
 	G.SOC.weekly()
+	G.SF.weekly()
 	var wm = week_money(c)
 	var net = wm.net
 	c.budget += net
@@ -576,7 +584,9 @@ static func growth_mult(p: Dictionary) -> float:
 		m *= 1.05
 	if G.age(p) <= 21:
 		m *= 1.0 + (u.attr.you - 10) * 0.02
-	return m
+		if G.perk("Developer"):
+			m *= 1.08
+	return m * G.SF.growth_mult(p)
 
 
 static func monthly_training():
@@ -587,6 +597,11 @@ static func monthly_training():
 	for pid in c.players:
 		var p = s.players[pid]
 		if p.pos == "GK":
+			# the goalkeeping coach works on his keepers' own attributes
+			if p.at.size() > 0 and rng.randf() < clamp((G.SF.r("gk") - 7.0) * 0.03, 0.0, 0.4):
+				var gk = rng.randi() % p.at.size()
+				if p.at[gk] < p.pot + 4:
+					p.at[gk] += 1
 			continue
 		var cap = p.pot + 4
 		if fa.size() > 0 and rng.randf() < 0.22 * [0.8, 1.0, 1.25][c.train.inten]:
@@ -603,11 +618,11 @@ static func monthly_training():
 
 static func recover_rate(p: Dictionary) -> int:
 	var c = G.uc()
-	return [7, 6, 5][c.train.inten] + (1 if c.fac.medical >= 4 else 0)
+	return max(3, [7, 6, 5][c.train.inten] + (1 if c.fac.medical >= 4 else 0) + G.SF.recover_bonus())
 
 
 static func injury_days(days: int) -> int:
-	return max(2, int(days * (1.15 - 0.07 * lvl("medical"))))
+	return max(2, int(days * (1.15 - 0.07 * lvl("medical")) * G.SF.injury_mult()))
 
 
 static func start_retrain(p: Dictionary, pos: String):
@@ -632,7 +647,7 @@ static func pot_text(p: Dictionary) -> String:
 
 
 static func scout_days() -> int:
-	return 12 - 2 * lvl("scouting")
+	return max(3, 12 - 2 * lvl("scouting") - G.SF.scout_bonus())
 
 
 static func scout_player(p: Dictionary) -> String:
@@ -671,7 +686,7 @@ static func _assignment_report():
 			cands.append(p)
 	cands.sort_custom(func(x, y): return x.pot * 1.0 + x.ovr * 0.6 > y.pot * 1.0 + y.ovr * 0.6)
 	var names = []
-	for i in min(3, cands.size()):
+	for i in min(4 if G.SF.r("scout") >= 15 else 3, cands.size()):
 		var p = cands[i]
 		sc.known[p.id] = true
 		if not (p.id in s.shortlist):
