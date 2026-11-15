@@ -377,7 +377,8 @@ func left_inset() -> int:
 	# content); panel edges may reach into the cut-out strip, while the text inside them (about 16 px in) starts past it
 	# FM Mobile style: the content block is centred with the same margin both sides, wide enough to clear the camera
 	var edge = notch_l if rail_wide() else (int(hole_x.y) if hole_x.y > 0 else 0)
-	return edge + 6 if edge > 0 else 0
+	# two thirds of the strip: the camera itself is narrower than the strip Android reports, and panels pad their text
+	return int(edge * 0.66) if edge > 0 else 0
 
 
 func _dev_hole():
