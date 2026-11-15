@@ -43,6 +43,38 @@ const CAT = [
 	["NPFL", "NPF", "Nigeria", "Africa", 60, 50, 0.95, ["Ghana", "Cameroon", "Côte d'Ivoire"],
 		["Enyimba", "Rangers International", "Rivers United", "Remo Stars", "Kano Pillars", "Shooting Stars", "Kwara United", "Plateau United", "Lobi Stars", "Abia Warriors",
 		"Bendel Insurance", "Niger Tornadoes", "Katsina United", "Ikorodu City", "Bayelsa United", "Nasarawa United"]],
+	["Superliga", "DSL", "Denmark", "Europe", 72, 58, 0.65, ["Sweden", "Norway", "Iceland", "Nigeria", "Ghana"],
+		["FC Copenhagen", "FC Midtjylland", "Brøndby IF", "AGF", "FC Nordsjælland", "Randers FC", "Silkeborg IF", "Viborg FF", "OB", "Sønderjyske", "FC Fredericia", "Vejle Boldklub"]],
+	["Allsvenskan", "ALL", "Sweden", "Europe", 68, 56, 0.7, ["Denmark", "Norway", "Finland", "Nigeria", "Ghana"],
+		["Malmö FF", "Mjällby AIF", "Hammarby IF", "AIK", "Djurgårdens IF", "IFK Göteborg", "IF Elfsborg", "BK Häcken", "GAIS", "IK Sirius",
+		"IF Brommapojkarna", "Halmstads BK", "Degerfors IF", "IFK Norrköping", "Östers IF", "IFK Värnamo"]],
+	["Liga BetPlay", "COL", "Colombia", "South America", 68, 57, 0.9, ["Venezuela", "Ecuador", "Argentina", "Uruguay"],
+		["Atlético Nacional", "Millonarios", "América de Cali", "Deportivo Cali", "Junior", "Independiente Santa Fe", "Independiente Medellín", "Deportes Tolima", "Once Caldas", "Atlético Bucaramanga",
+		"Deportivo Pereira", "Alianza FC", "Águilas Doradas", "Fortaleza CEIF", "La Equidad", "Envigado", "Deportivo Pasto", "Boyacá Chicó", "Llaneros", "Unión Magdalena"]],
+	["Primera División de Chile", "CHI", "Chile", "South America", 66, 56, 0.85, ["Argentina", "Uruguay", "Colombia", "Venezuela"],
+		["Colo-Colo", "Universidad de Chile", "Universidad Católica", "Coquimbo Unido", "Palestino", "O'Higgins", "Audax Italiano", "Huachipato", "Everton de Viña del Mar", "Ñublense",
+		"Cobresal", "Unión La Calera", "Deportes Iquique", "Deportes La Serena", "Deportes Limache", "Unión Española"]],
+	["Primera División de Uruguay", "URU", "Uruguay", "South America", 66, 55, 0.9, ["Argentina", "Paraguay", "Brazil", "Colombia"],
+		["Peñarol", "Club Nacional", "Defensor Sporting", "Liverpool Montevideo", "Danubio", "Racing Club de Montevideo", "Montevideo Wanderers", "Cerro Largo", "Boston River", "Plaza Colonia",
+		"Progreso", "River Plate Montevideo", "Juventud de Las Piedras", "Cerro", "Miramar Misiones", "Deportivo Maldonado"]],
+	["K League 1", "KL1", "Korea Republic", "Asia", 66, 57, 0.85, ["Brazil", "Japan", "Australia"],
+		["Ulsan HD", "Jeonbuk Hyundai Motors", "Pohang Steelers", "FC Seoul", "Gangwon FC", "Gimcheon Sangmu", "Daejeon Hana Citizen", "Gwangju FC", "Suwon FC", "Jeju SK", "FC Anyang", "Daegu FC"]],
+	["Chinese Super League", "CSL", "China PR", "Asia", 64, 54, 0.8, ["Brazil", "Serbia", "Côte d'Ivoire", "Portugal"],
+		["Shanghai Port", "Shanghai Shenhua", "Chengdu Rongcheng", "Beijing Guoan", "Shandong Taishan", "Tianjin Jinmen Tiger", "Zhejiang FC", "Wuhan Three Towns", "Henan FC", "Qingdao West Coast",
+		"Yunnan Yukun", "Changchun Yatai", "Shenzhen Peng City", "Meizhou Hakka", "Qingdao Hainiu", "Dalian Yingbo"]],
+	["A-League", "ALM", "Australia", "Asia", 62, 54, 0.8, ["New Zealand", "England", "Japan", "Scotland"],
+		["Auckland FC", "Melbourne City", "Melbourne Victory", "Sydney FC", "Western Sydney Wanderers", "Adelaide United", "Central Coast Mariners", "Brisbane Roar", "Macarthur FC", "Newcastle Jets",
+		"Wellington Phoenix", "Perth Glory"]],
+	["Qatar Stars League", "QSL", "Qatar", "Asia", 66, 52, 0.55, ["Algeria", "Brazil", "Morocco", "Spain", "Ghana"],
+		["Al Sadd", "Al Duhail", "Al Rayyan", "Al Gharafa", "Al Wakrah", "Al Arabi", "Qatar SC", "Umm Salal", "Al Shamal", "Al Shahania", "Al Sailiya", "Al Khor"]],
+	["UAE Pro League", "UAE", "United Arab Emirates", "Asia", 66, 53, 0.55, ["Brazil", "Morocco", "Argentina", "Côte d'Ivoire", "Saudi Arabia"],
+		["Shabab Al Ahli", "Al Ain", "Al Wahda", "Sharjah", "Al Jazira", "Al Nasr", "Al Wasl", "Baniyas", "Ajman", "Khor Fakkan", "Kalba", "Al Bataeh", "Dibba", "Al Dhafra"]],
+	["Egyptian Premier League", "EPL", "Egypt", "Africa", 68, 52, 0.9, ["Ghana", "Morocco", "Mali", "Côte d'Ivoire"],
+		["Al Ahly", "Zamalek", "Pyramids FC", "Al Masry", "Future FC", "Ceramica Cleopatra", "Smouha", "ZED FC", "Ismaily", "Al Ittihad Alexandria",
+		"ENPPI", "El Gouna", "Talaea El Gaish", "National Bank of Egypt", "Ghazl El Mahalla", "Petrojet", "Haras El Hodoud", "Pharco"]],
+	["Betway Premiership", "PSL", "South Africa", "Africa", 66, 52, 0.85, ["Ghana", "Nigeria", "Cameroon", "Senegal"],
+		["Mamelodi Sundowns", "Orlando Pirates", "Kaizer Chiefs", "Stellenbosch FC", "Sekhukhune United", "AmaZulu", "TS Galaxy", "Polokwane City", "Golden Arrows", "Chippa United",
+		"Richards Bay", "Magesi FC", "Siwelele", "Durban City", "Marumo Gallants", "Orbit College"]],
 ]
 # second divisions: [name, short, country (as the top league's), continent, top rep, bottom rep, local share, others, clubs, top league, promoted]
 const CAT2 = [
@@ -64,6 +96,24 @@ const CAT2 = [
 	["Scottish Championship", "SCH", "Scotland", "Europe", 60, 52, 0.75, ["England", "Republic of Ireland", "Northern Ireland"],
 		["Ross County", "St Johnstone", "Partick Thistle", "Dunfermline Athletic", "Raith Rovers", "Ayr United", "Morton", "Queen's Park", "Airdrieonians", "Arbroath"], "Scottish Premiership", 1],
 ]
+# third divisions of the top seven (England and Germany have theirs in the database): same layout as CAT2
+const CAT3 = [
+	["Primera Federación", "PRF", "Spain", "Europe", 63, 54, 0.85, ["Argentina", "Uruguay", "Morocco", "Portugal"],
+		["Racing Ferrol", "Ponferradina", "Celta Fortuna", "Barakaldo", "Real Avilés", "Arenteiro", "Ourense CF", "Gimnástica Segoviana", "Tenerife", "Unionistas de Salamanca",
+		"Lugo", "Zamora CF", "Osasuna Promesas", "Pontevedra", "Bilbao Athletic", "Mérida AD", "Real Unión", "Arenas Club", "Cacereño", "Guadalajara"], "LaLiga 2", 4],
+	["Serie C", "SRC", "Italy", "Europe", 63, 54, 0.85, ["Albania", "Argentina", "Senegal", "Croatia"],
+		["Vicenza", "Triestina", "Atalanta U23", "Lumezzane", "Novara", "Renate", "Trento", "Alcione Milano", "Arzignano", "Pro Vercelli",
+		"Ternana", "Arezzo", "Perugia", "Rimini", "Gubbio", "Pineto", "Catania", "Benevento", "Salernitana", "Crotone"], "Serie B", 4],
+	["Championnat National", "NAT", "France", "Europe", 62, 53, 0.75, ["Senegal", "Mali", "Côte d'Ivoire", "Algeria", "Cameroon"],
+		["Sochaux", "Valenciennes", "Rouen", "Orléans", "Concarneau", "Versailles", "Le Puy", "Bourg-en-Bresse", "Quevilly-Rouen", "Aubagne",
+		"Villefranche", "Caen", "Dijon", "Paris 13 Atletico", "Fleury", "Stade Briochin", "Châteauroux", "Martigues"], "Ligue 2", 3],
+	["Liga 3", "LG3", "Portugal", "Europe", 60, 52, 0.7, ["Brazil", "Cape Verde Islands", "Angola", "Guinea-Bissau"],
+		["Belenenses", "Académica", "Trofense", "Varzim", "Sporting da Covilhã", "SC Braga B", "Vitória SC B", "Caldas", "Amora", "Fafe",
+		"São João de Ver", "Sanjoanense", "Atlético CP", "Mafra", "Lusitano de Évora", "1º Dezembro", "Anadia", "Vilaverdense", "Vianense", "Fontinhas"], "Liga Portugal 2", 2],
+	["Tweede Divisie", "TWD", "Netherlands", "Europe", 58, 51, 0.8, ["Suriname", "Curaçao", "Morocco", "Belgium"],
+		["Katwijk", "Quick Boys", "Spakenburg", "Rijnsburgse Boys", "Kozakken Boys", "IJsselmeervogels", "GVVV", "De Treffers", "AFC Amsterdam", "Excelsior Maassluis",
+		"Hoek", "Jong Sparta", "ACV", "Koninklijke HFC", "Scheveningen", "Barendrecht", "VVSB", "Jong Almere City"], "Eerste Divisie", 2],
+]
 # continental club competitions for the other continents: [id, name, continent, format (group = 32 teams, ko = 16), scale]
 const CONT_COMPS = [["lib", "Copa Libertadores", "South America", "group", 0.5], ["afc", "AFC Champions League", "Asia", "group", 0.4],
 	["caf", "CAF Champions League", "Africa", "group", 0.2], ["ccc", "CONCACAF Champions Cup", "North America", "ko", 0.3]]
@@ -78,6 +128,15 @@ static func nat_of(country: String) -> String:
 	return NAT.get(country, country)
 
 
+static func all_cat() -> Array:
+	# every catalogue league: top flights (CAT), second divisions (CAT2), third divisions (CAT3), in that order
+	return CAT + CAT2 + CAT3
+
+
+static func cat_tier(i: int) -> int:
+	return 1 if i < CAT.size() else (2 if i < CAT.size() + CAT2.size() else 3)
+
+
 static func continent_of(lg: Dictionary) -> String:
 	for e in CAT:
 		if e[0] == lg.name:
@@ -86,17 +145,18 @@ static func continent_of(lg: Dictionary) -> String:
 
 
 static func ensure():
-	# builds the world once per career (also for saves from before it existed); v2 adds the second divisions
+	# builds the world once per career (also for saves from before it existed); v2 adds the second divisions,
+	# v3 the twelve newer leagues (Denmark ... South Africa) and the third divisions of the top seven
 	var s = G.s
-	if s.has("world") and int(s.world.v) >= 2:
+	if s.has("world") and int(s.world.v) >= 3:
 		return
 	if not s.has("world"):
 		s["world"] = {"v": 0}
 	var added = []
-	if int(s.world.v) < 1:
-		added.append_array(_build(CAT, 1))
+	added.append_array(_build(CAT, 1))      # tops up only what is missing, so safe to run again
 	added.append_array(_build(CAT2, 2))
-	s.world.v = 2
+	added.append_array(_build(CAT3, 3))
+	s.world.v = 3
 	if added.size() > 0:
 		G.build_index()
 		fixtures(s.day)
@@ -106,25 +166,33 @@ static func _build(list: Array, tier: int) -> Array:
 	var s = G.s
 	var rng = G.rng
 	var added = []
+	var used = {}
+	for c in s.clubs:
+		used[c.name] = true
+	var live = playable()
 	for e in list:
 		var lg = null
 		for l in s.leagues:
 			if l.name == e[0]:
 				lg = l
+		var fresh = lg == null
 		if lg == null:
 			lg = {"id": s.leagues.size(), "name": e[0], "short": e[1], "country": e[2], "tier": tier, "clubs": [], "roe": false}
-			if tier == 2:
+			if tier >= 2:
 				lg["parent"] = e[9]
 				lg["promo"] = e[10]
 			s.leagues.append(lg)
-		lg["bg"] = true
+		if fresh or not lg.has("cont"):
+			# a new league is quick results unless its nation is already playable (a third division of Spain, say)
+			lg["bg"] = not (lg.country in live)
 		lg["cont"] = e[3]
 		var names = e[8]
 		var have = {}
 		for cid in lg.clubs:
 			have[s.clubs[cid].name] = true
 		var n_old = lg.clubs.size()
-		var todo = names.filter(func(x): return not have.has(x))
+		# a name already used by any club (e.g. a side that is in the database's second division) is skipped
+		var todo = names.filter(func(x): return not have.has(x) and not used.has(x))
 		for i in todo.size():
 			var nm = todo[i]
 			var k = n_old + i

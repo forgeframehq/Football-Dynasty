@@ -16,7 +16,12 @@ func build():
 	var bar = UI.seg(G.WD.CONTINENTS, G.WD.CONTINENTS.find(cont), func(i):
 		cont = G.WD.CONTINENTS[i]
 		refresh(), 15, 5)
-	body.add_child(UI.margin(bar, 20, 0, 20, 4))
+	var row = UI.hb(10)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(bar)
+	var open_now = can_swap()
+	row.add_child(UI.btn("Playable %d of 5%s" % [G.WD.playable().size(), " · change now" if open_now else ""], func(): playable_sheet(), "gold" if open_now else "secondary", "globe", 44))
+	body.add_child(UI.margin(row, 20, 0, 20, 4))
 	var f = content(0, 0)
 	for l in s.leagues:
 		if l.clubs.size() < 4 or (l.roe and not l.has("cont")):
@@ -64,3 +69,68 @@ func _card(l: Dictionary) -> Control:
 	var id = l.id
 	UI.tap(pc, func(): UI.main.open("table", {"lg": id}))
 	return pc
+
+
+# ---------------------------------------------------------------- playable nations
+
+static func can_swap() -> bool:
+	# the playable nations can be changed from the end of the season until four weeks into the new one
+	return G.s.day <= int(G.s.user.get("swap_until", -1))
+
+
+static func nations() -> Array:
+	# every nation with a league programme, once: [country key as the leagues store it, flag/display name]
+	var out = []
+	var seen = {}
+	for l in G.s.leagues:
+		if l.clubs.size() < 4 or (l.roe and not l.has("cont")) or seen.has(l.country):
+			continue
+		seen[l.country] = true
+		out.append([l.country, G.WD.nat_of(l.country)])
+	return out
+
+
+static func playable_sheet():
+	var edit = can_swap()
+	var mine = G.s.leagues[G.uc().lg].country
+	var build = func(v):
+		v.add_child(UI.wrap(("Choose up to five nations for next season's full match engine. Your club's nation always stays. The rest of the world plays quick results." if edit
+			else "These nations use the full match engine. You can change them at the end of each season (for four weeks into the new one)."), 16, UI.MUTED))
+		var cur = G.WD.playable()
+		var g = GridContainer.new()
+		g.columns = 4
+		g.add_theme_constant_override("h_separation", 8)
+		g.add_theme_constant_override("v_separation", 6)
+		for n in nations():
+			var key = n[0]
+			var on = key in cur or key == mine
+			var b = UI.panel(Color(UI.GOLD, 0.2) if on else Color(1, 1, 1, 0.05), 10, 10, 6, UI.GOLD if on else Color(0, 0, 0, 0))
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var bh = UI.hb(8)
+			bh.add_child(UI.flag(n[1], 26))
+			bh.add_child(UI.lbl_fill(n[1], 16, UI.TEXT if on else UI.MUTED, "semi"))
+			if key == mine:
+				bh.add_child(UI.chip("YOU", Color(UI.GOLD, 0.2), UI.GOLD, 12))
+			b.add_child(bh)
+			if edit:
+				UI.tap(b, func():
+					if key == mine:
+						return
+					var now = G.WD.playable()
+					if key in now:
+						now.erase(key)
+					elif now.size() < 5:
+						now.append(key)
+					else:
+						UI.toast("Five nations at most. Switch one off first.", UI.AMBER)
+						return
+					if not (mine in now):
+						now.append(mine)
+					G.WD.set_playable(now)
+					UI.close_sheet()
+					playable_sheet()
+					if UI.main.stack.size() > 0:
+						UI.main.stack[-1].refresh(), true)
+			g.add_child(b)
+		v.add_child(g)
+	UI.sheet("Playable nations", build)

@@ -61,6 +61,26 @@ func run(m):
 			g.add_child(hb)
 		await snap("badges", 0.5)
 		cv.queue_free()
+	if want.call("divs") and not only.is_empty():
+		# the new divisions: Spain's league list, Primera Federación's clubs with the divisions row, Portugal (world)
+		main.open("new_career", {"slot": 0})
+		var nc2 = main.stack[-1]
+		nc2.nat = "Spain"
+		nc2.refresh()
+		await snap("divs_spain")
+		var allc = G.WD.all_cat()
+		for wi in allc.size():
+			if allc[wi][0] == "Primera Federación":
+				nc2.wl = wi
+		nc2.refresh()
+		await snap("divs_primera")
+		for wi in allc.size():
+			if allc[wi][0] == "Liga Portugal":
+				nc2.wl = wi
+		nc2.nat = "Portugal"
+		nc2.refresh()
+		await snap("divs_portugal")
+		main.back()
 	if want.call("new"):
 		main.open("new_career", {"slot": 0})
 		await snap("new_0")
@@ -76,6 +96,13 @@ func run(m):
 		await snap("intro", 1.2)
 		main.root("intro", {"kind": "board"})
 		await snap("intro_board")
+	if want.call("swap") and not only.is_empty():
+		G.s.user["swap_until"] = G.s.day + 28
+		main.root("worldmap")
+		await snap("swap_world")
+		load("res://scripts/screens/worldmap.gd").playable_sheet()
+		await snap("swap_sheet")
+		UI.close_sheet()
 	for i in 3:
 		G.advance()
 	for i in days:

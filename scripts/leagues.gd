@@ -30,6 +30,11 @@ static func zones(lg: int) -> Dictionary:
 			for l2 in G.s.leagues:
 				if l2.get("parent", "") == L.name:
 					z.down = int(l2.promo)
+	elif z.down == 0:
+		# a database league with a world division below it (LaLiga 2 over Primera Federación, Serie B over Serie C ...)
+		for l2 in G.s.leagues:
+			if l2.get("parent", "") == L.name:
+				z.down = int(l2.promo)
 	return z
 
 
@@ -458,12 +463,15 @@ static func rollover():
 		s.leagues[c.lg].clubs.append(c.id)
 	if s.has("world"):
 		G.WD.promotions(tables)
+		# the playable nations may be changed for the new season (World > World Leagues, or the message)
+		s.user["swap_until"] = s.day + 28
+		G.msg("Playable nations for next season", "The season is over: you can change which five nations run on the full match engine (yours always stays). Currently: %s. The window stays open for four weeks." % ", ".join(G.WD.playable().map(func(c): return G.WD.nat_of(c))), "playable", null, true)
 	# prize money before the reset
 	for lg in s.leagues:
 		var t = tables[lg.id]
 		for i in t.size():
 			var c = s.clubs[t[i]]
-			var tierf = 0.12 if lg.roe or lg.has("cont") else [1.0, 0.22, 0.07, 0.03][s.leagues[c.lg].tier - 1]
+			var tierf = (0.12 * [1.0, 0.35, 0.12][clampi(int(lg.tier) - 1, 0, 2)]) if lg.roe or lg.has("cont") else [1.0, 0.22, 0.07, 0.03][s.leagues[c.lg].tier - 1]
 			var base = 900000.0 * pow(1.2, c.rep - 60.0)
 			var prize = 40000000.0 * tierf * (1.0 - float(i) / t.size())
 			if c.id == ucl.id:

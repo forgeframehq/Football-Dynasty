@@ -1,4 +1,5 @@
 extends "res://scripts/screens/screen.gd"
+const WMAP = preload("res://scripts/screens/worldmap.gd")
 
 const HOME = preload("res://scripts/screens/home.gd")
 # News and messages: list on the left, story in the middle, subject card on the right.
@@ -114,6 +115,10 @@ func build():
 		acts.add_child(_act("Contracts", "file-text", func(): UI.main.root("lists", {"kind": "contracts", "grp": "club"})))
 	if m.kind == "board":
 		acts.add_child(_act("Board room", "landmark", func(): UI.main.root("board")))
+	if m.kind == "playable":
+		acts.add_child(_act("Choose nations", "globe", func():
+			UI.main.root("worldmap")
+			WMAP.playable_sheet()))
 	if subj != null:
 		var pid2 = subj.id
 		acts.add_child(_act("View player", "user", func(): UI.main.open("player", {"pid": pid2})))

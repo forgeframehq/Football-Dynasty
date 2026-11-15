@@ -87,15 +87,22 @@ func _load_info():
 			info[ids[k]].rank = k + 1
 			info[ids[k]].of = ids.size()
 	# world leagues: the catalogue's clubs that are not in the database yet, with an estimated strength
-	for wi in G.WD.CAT.size():
-		var e = G.WD.CAT[wi]
+	var raw_names = {}
+	for c in raw.clubs:
+		raw_names[c.name] = true
+	var allc = G.WD.all_cat()
+	for wi in allc.size():
+		var e = allc[wi]
 		var have = {}
 		var raw_ids = []
 		for i in raw.clubs.size():
 			if raw.leagues[int(raw.clubs[i].lg)].name == e[0]:
 				have[raw.clubs[i].name] = true
 				raw_ids.append(i)
-		var todo = e[8].filter(func(x): return not have.has(x))
+		# same rule as the game's world builder: a name already used by a database club elsewhere is skipped
+		var todo = e[8].filter(func(x): return not have.has(x) and not raw_names.has(x))
+		for nm0 in todo:
+			raw_names[nm0] = true     # later catalogue leagues skip it too, as the builder does
 		var top = float(e[4]) if raw_ids.is_empty() else float(e[4]) - 8.0
 		for k in todo.size():
 			var nm = todo[k]
@@ -123,7 +130,7 @@ func _inf(i: int) -> Dictionary:
 
 
 func _lg_name(i: int) -> String:
-	return G.WD.CAT[wclubs[i - WB].cat][0] if i >= WB else raw.leagues[int(raw.clubs[i].lg)].name
+	return G.WD.all_cat()[wclubs[i - WB].cat][0] if i >= WB else raw.leagues[int(raw.clubs[i].lg)].name
 
 
 func can_leave() -> bool:
@@ -200,7 +207,7 @@ func _picker():
 		pick = -1
 		refresh()]]
 	if wl >= 0:
-		crumbs.append([G.WD.CAT[wl][0], func():
+		crumbs.append([G.WD.all_cat()[wl][0], func():
 			pick = -1
 			refresh()])
 	elif nat != "":
@@ -306,10 +313,41 @@ func _picker():
 				lg = idx
 				refresh())
 			grid.add_child(t)
+		# the world's lower divisions of this nation (Primera Federación, Serie C, National)
+		var allc = G.WD.all_cat()
+		for wi in allc.size():
+			var e = allc[wi]
+			if G.WD.cat_tier(wi) < 2 or G.WD.nat_of(e[2]) != G.WD.nat_of(nat):
+				continue
+			var t3 = _world_card(wi)
+			var wix = wi
+			UI.tap(t3, func():
+				wl = wix
+				refresh())
+			grid.add_child(t3)
 	else:
+		var divs = _divisions()
+		if divs.size() > 1:
+			var names = divs.map(func(d): return d[0])
+			var cur = 0
+			for k in divs.size():
+				if (divs[k][1] == "lg" and wl < 0 and divs[k][2] == lg) or (divs[k][1] == "wl" and divs[k][2] == wl):
+					cur = k
+			var dv = UI.seg(names, cur, func(k):
+				pick = -1
+				if divs[k][1] == "lg":
+					lg = divs[k][2]
+					wl = -1
+				else:
+					wl = divs[k][2]
+					lg = -1
+				refresh(), 15, 6)
+			dv.custom_minimum_size = Vector2(300, 0)
+			dv.set_meta("fullrow", true)
+			grid.add_child(dv)
 		var ids = []
 		for i in raw.clubs.size():
-			if (wl < 0 and int(raw.clubs[i].lg) == lg) or (wl >= 0 and raw.leagues[int(raw.clubs[i].lg)].name == G.WD.CAT[wl][0]):
+			if (wl < 0 and int(raw.clubs[i].lg) == lg) or (wl >= 0 and raw.leagues[int(raw.clubs[i].lg)].name == G.WD.all_cat()[wl][0]):
 				ids.append(i)
 		if wl >= 0:
 			for j in wclubs.size():
@@ -357,15 +395,44 @@ func _club_nation() -> String:
 	if pick < 0:
 		return ""
 	if pick >= WB:
-		return G.WD.CAT[wclubs[pick - WB].cat][2]
+		return _key_of(G.WD.all_cat()[wclubs[pick - WB].cat])
 	return raw.leagues[int(raw.clubs[pick].lg)].country
+
+
+func _key_of(e: Array) -> String:
+	# a catalogue league's country as the game's leagues store it (Eredivisie is "Netherlands" in the data, "Holland" in the catalogue)
+	for l in raw.leagues:
+		if l.name == e[0]:
+			return l.country
+	for e2 in G.WD.CAT:
+		if G.WD.nat_of(e2[2]) == G.WD.nat_of(e[2]):
+			for l in raw.leagues:
+				if l.name == e2[0]:
+					return l.country
+	return e[2]
+
+
+func _divisions() -> Array:
+	# every division of the nation being browsed, top first: [name, "lg" or "wl", index, tier]
+	var out = []
+	var n = G.WD.nat_of(nat)
+	for li in raw.leagues.size():
+		var l = raw.leagues[li]
+		if not l.get("roe", false) and G.WD.nat_of(l.country) == n:
+			out.append([l.name, "lg", li, int(l.tier)])
+	var allc = G.WD.all_cat()
+	for wi in allc.size():
+		if G.WD.nat_of(allc[wi][2]) == n:
+			out.append([allc[wi][0], "wl", wi, G.WD.cat_tier(wi)])
+	out.sort_custom(func(a, b): return a[3] < b[3])
+	return out
 
 
 func _playable_sheet():
 	var build = func(v):
 		v.add_child(UI.wrap("Up to five nations use the full match engine: every match properly played, detailed stats, everything you can watch. The rest of the world plays quick results: tables, scorers and transfers still move, at a fraction of the work for your phone. Your club's nation is always playable.", 16, UI.MUTED))
 		var g = GridContainer.new()
-		g.columns = 3
+		g.columns = 4
 		g.add_theme_constant_override("h_separation", 8)
 		g.add_theme_constant_override("v_separation", 6)
 		var mine = _club_nation()
@@ -455,11 +522,19 @@ func _league_card(li: int, cnt: int, avg: float) -> PanelContainer:
 	if UEFA.has(li):
 		fm.append("%d CL" % UEFA[li][0])
 		fm.append("%d EL" % UEFA[li][1])
+	var down = 0
 	for lk in G.LG.LINKS:
 		if lk[1] == li:
 			fm.append("%d up%s" % [lk[2], " + PO" if lk[3] != "rel" else ""])
 		if lk[0] == li:
-			fm.append("%d down" % (lk[2] + (1 if lk[3] == "eng4" else 0)))
+			down = lk[2] + (1 if lk[3] == "eng4" else 0)
+	if down == 0:
+		# a world division below it (Primera Federación under LaLiga 2 ...)
+		for e3 in G.WD.CAT3:
+			if e3[9] == l.name:
+				down = int(e3[10])
+	if down > 0:
+		fm.append("%d down" % down)
 	v.add_child(UI.kv("Format", " · ".join(fm), UI.TEXT, 17))
 	var tierf = [1.0, 0.22, 0.07, 0.03][clampi(int(l.tier) - 1, 0, 3)]
 	var bsum = 0.0
@@ -477,6 +552,43 @@ func _league_card(li: int, cnt: int, avg: float) -> PanelContainer:
 		if cd[2] == l.country and (cd[0] != "lc" or int(l.tier) <= 4):
 			cups.append(cd[1])
 	v.add_child(UI.kv("Cups", ", ".join(cups) if cups.size() > 0 else "—", UI.TEXT, 17))
+	return t
+
+
+func _world_card(wi: int) -> PanelContainer:
+	# a catalogue division in a nation's league list: same size and look as the league cards, less detail
+	var e = G.WD.all_cat()[wi]
+	var tier = G.WD.cat_tier(wi)
+	var col = Color.html(LCOL[(e[0].hash() & 0x7fffffff) % LCOL.size()])
+	var t = UI.panel(col.darkened(0.72), 16, 14, 12, col.darkened(0.2))
+	t.custom_minimum_size = Vector2(336, 250)
+	t.set_meta("base", Vector2(336, 250))
+	var v = UI.vb(6)
+	t.add_child(v)
+	var top = UI.hb(12)
+	top.add_child(UI.flag(e[2], 52))
+	var tt = UI.vb(0)
+	tt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tt.add_child(UI.caps("Tier %d" % tier, 15, UI.GOLD))
+	tt.add_child(UI.lbl_fill(e[0].to_upper(), 24, UI.TEXT, "xbold"))
+	var full = _key_of(e) in playable or _key_of(e) == _club_nation()
+	var cr = UI.hb(8)
+	cr.add_child(UI.chip("FULL ENGINE" if full else "QUICK RESULTS", Color(UI.GREEN if full else UI.MUTED, 0.22), UI.GREEN if full else UI.MUTED, 13))
+	var nclubs = 0
+	for j in wclubs.size():
+		if wclubs[j].cat == wi:
+			nclubs += 1
+	for c in raw.clubs:
+		if raw.leagues[int(c.lg)].name == e[0]:
+			nclubs += 1
+	cr.add_child(UI.caps("%d clubs" % nclubs, 14, UI.MUTED))
+	tt.add_child(cr)
+	top.add_child(tt)
+	v.add_child(top)
+	if tier >= 2:
+		v.add_child(UI.kv("Format", "%d up to the %s" % [int(e[10]), e[9]], UI.TEXT, 17))
+	v.add_child(UI.kv("Players", "Generated", UI.TEXT, 17))
+	v.add_child(UI.kv("Strength", "%d to %d" % [int(e[5]), int(e[4])], UI.TEXT, 17))
 	return t
 
 
