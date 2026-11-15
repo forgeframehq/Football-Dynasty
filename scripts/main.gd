@@ -7,6 +7,7 @@ const SCREENS = {
 	"calendar": preload("res://scripts/screens/calendar.gd"),
 	"invest": preload("res://scripts/screens/invest.gd"),
 	"staff": preload("res://scripts/screens/staff.gd"),
+	"staffsearch": preload("res://scripts/screens/staffsearch.gd"),
 	"social": preload("res://scripts/screens/social.gd"),
 	"managers": preload("res://scripts/screens/managers.gd"),
 	"home3d": preload("res://scripts/screens/home3d.gd"),
@@ -1006,6 +1007,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("sparkles", "Wonderkids", "Best aged 21 or under", func(): root("search", {"list": "wonderkids", "grp": "world"})))
 	elif key == "search":
 		a.append(_row("search", "Player Search", "Every player, sortable", func(): root("search")))
+		a.append(_row("clipboard-list", "Staff Search", "Coaches, physios, scouts", func(): root("staffsearch", {"grp": "search"})))
 		a.append(_row("handshake", "Transfer Market", "Offers, shortlist, your deals", func(): root("transfers")))
 		a.append(_row("binoculars", "Scouting", "%d being watched" % s.scout.queue.size(), func(): root("scouting")))
 		a.append(_row("tags", "Bargains", "Good players, low prices", func(): root("search", {"list": "bargains", "grp": "search"})))
@@ -1041,7 +1043,7 @@ const MENU_GROUPS = {
 		["Money and life", ["Lifestyle", "My Home", "Investments", "Club Ownership", "Social"]], ["Career", ["Trophy Cabinet", "Career Timeline", "Game Status"]]],
 	"world": [["Competitions", ["Club Division", "Cups & Continental"]], ["Leagues", []], "|",
 		["News", ["Live Scores", "Transfer Centre", "Manager Watch", "League Standards"]], ["Best players", ["Player Stats", "Team of the Week", "Awards", "Top 50 Players", "Wonderkids"]]],
-	"search": [["Find", ["Player Search", "Role Finder", "Find Club", "Scouting"]], ["Deals", ["Transfer Market", "Jobs"]], "|",
+	"search": [["Find", ["Player Search", "Staff Search", "Role Finder", "Find Club", "Scouting"]], ["Deals", ["Transfer Market", "Jobs"]], "|",
 		["Quick lists", ["Bargains", "Free Agents", "Transfer Listed", "Expiring Contracts"]]],
 	"options": [["Game", ["Save Game", "Settings", "Manual", "Editor", "Exit to Menu"]], "|", ["Your story", ["Achievements", "Season Documentary", "Hall of Fame"]]],
 }

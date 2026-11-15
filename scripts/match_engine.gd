@@ -426,6 +426,11 @@ func step() -> Array:
 		_foul(1 - ai if rng.randf() < 0.62 else ai, out)
 	if rng.randf() < 0.0022:
 		_injury(out)
+	# when you sim, your assistant runs the side: a good one gets more out of it, a poor one less
+	for i in 2:
+		if sd[i].user and sd[i].auto and not sd[i].has("ass_on"):
+			sd[i]["ass_on"] = true
+			sd[i].boost *= 1.0 + G.SF.sim_boost()
 	if minute >= 58:
 		for i in 2:
 			if sd[i].auto:

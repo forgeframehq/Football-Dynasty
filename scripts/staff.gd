@@ -201,6 +201,61 @@ static func offer(p: Dictionary, role: String, years: int) -> String:
 	return ""
 
 
+# ---------------------------------------------------------------- stars, style, comparing
+
+const STYLE = {"tac": "Tactician", "mot": "Motivator", "youth": "Developer", "judge": "Talent spotter", "coach": "Hands-on coach"}
+
+
+static func stars(rating: float) -> float:
+	# 1-20 shown as half stars: 20 = 5, 10 = 2.5, an empty job's stand-in (6) = 1.5
+	return clamp(snappedf(rating / 4.0, 0.5), 0.5, 5.0)
+
+
+static func style(p: Dictionary) -> String:
+	# what kind of coach he is: his strongest of the coaching attributes
+	var best = "coach"
+	for k in STYLE:
+		if float(p.a[k]) > float(p.a[best]):
+			best = k
+	return STYLE[best]
+
+
+static func vs_mine(p: Dictionary, role: String) -> float:
+	# his stars in this job minus the stars of whoever does it now (an empty job counts as the stand-in)
+	return stars(rating(p, role)) - stars(r(role))
+
+
+static func effect_at(role: String, v: float) -> String:
+	# what this job does at rating v (for "now -> with him" on the hire sheet)
+	match role:
+		"ass": return "Match %+.1f%% · sim %+.0f%%" % [(v - 10.0) * 0.08, sim_boost_at(v) * 100.0]
+		"coach1", "coach2":
+			var other = r("coach2" if role == "coach1" else "coach1")
+			return "Player growth %+d%%" % int(round(((v + other) / 2.0 - 10.0) * 2.0))
+		"gk": return "Keeper growth %+d%%" % int(round((v - 10.0) * 2.5))
+		"fit": return "Recovery %+d a day" % int(round((v - 10.0) / 4.0))
+		"phys":
+			var m = clamp(1.1 - (v - 10.0) * 0.025, 0.8, 1.25)
+			return "Injuries %d%% %s" % [abs(int(round((m - 1.0) * 100))), "longer" if m > 1.0 else "shorter"]
+		"youth": return "Intake %+d now, %+d potential%s" % [int((v - 10.0) / 3.0), int((v - 10.0) / 2.0), ", extra prospect" if v >= 16 else ""]
+		"scout": return "Reports %+d days%s" % [-int((v - 10.0) / 4.0), ", 4 names" if v >= 15 else ""]
+	return ""
+
+
+static func sim_boost_at(v: float) -> float:
+	# when you sim a match (quick result, sim ahead) the assistant runs the side: a good one gets more out of it
+	var st = stars(v)
+	if st >= 4.0:
+		return (st - 3.5) * 0.02
+	if st < 2.5:
+		return -(2.5 - st) * 0.02
+	return 0.0
+
+
+static func sim_boost() -> float:
+	return sim_boost_at(r("ass"))
+
+
 # ---------------------------------------------------------------- effects
 
 static func growth_mult(p: Dictionary) -> float:
@@ -237,7 +292,7 @@ static func match_boost() -> float:
 static func effect_text(role: String) -> String:
 	var v = r(role)
 	match role:
-		"ass": return "Half-time reads and weekly notes · match %+.1f%%" % (match_boost() * 100.0)
+		"ass": return "Notes, half-time reads · sim %+.0f%%" % (sim_boost() * 100.0)
 		"coach1", "coach2": return "Player growth %+d%%" % int(round(((r("coach1") + r("coach2")) / 2.0 - 10.0) * 2.0))
 		"gk": return "Goalkeeper growth %+d%%" % int(round((v - 10.0) * 2.5))
 		"fit": return "Recovery %+d a day" % recover_bonus()

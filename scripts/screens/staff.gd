@@ -42,13 +42,11 @@ func _card(role: String) -> Control:
 	top.add_child(UI.icon(info[2], 16, UI.accent))
 	top.add_child(UI.caps(info[0], 14, UI.accent))
 	top.add_child(UI.sp())
-	if p != null:
-		var rt = G.SF.rating(p, role)
-		top.add_child(UI.lbl("%.0f" % rt, 20, UI.ovr_color(50 + int(rt * 2.4)), "xbold"))
+	top.add_child(UI.half_stars(G.SF.stars(G.SF.r(role)), 15, UI.GOLD if p != null else Color(UI.RED, 0.8)))
 	pv.add_child(top)
 	if p == null:
 		pv.add_child(UI.lbl_fill("Vacant", 18, UI.RED, "semi"))
-		pv.add_child(UI.lbl_fill("Filled by a stand-in rated %d" % int(G.SF.EMPTY), 14, UI.DIM))
+		pv.add_child(UI.lbl_fill("A stand-in covers it badly. Tap to find someone.", 14, UI.DIM))
 		var rr = role
 		UI.tap(pc, func():
 			role_f = G.SF.ROLES.find(rr) + 1
@@ -61,10 +59,10 @@ func _card(role: String) -> Control:
 			nh.add_child(UI.chip("EX-PRO", Color(UI.GOLD, 0.16), UI.GOLD, 12))
 		pv.add_child(nh)
 		pv.add_child(UI.lbl_fill(G.SF.effect_text(role), 14, UI.GREEN if G.SF.r(role) >= 10 else UI.AMBER))
-		pv.add_child(UI.lbl_fill("%d · %s a week · until %d" % [G.SF.age(p), G.money(p.wage), int(p.cend) + 1], 14, UI.DIM))
+		pv.add_child(UI.lbl_fill("%s · %d · %s a week · until %d" % [G.SF.style(p), G.SF.age(p), G.money(p.wage), int(p.cend) + 1], 14, UI.DIM))
 		var pp = p
 		var rr2 = role
-		UI.tap(pc, func(): _detail(pp, rr2))
+		UI.tap(pc, func(): detail(pp, rr2, refresh))
 	pc.add_child(pv)
 	return pc
 
@@ -74,6 +72,9 @@ func _market(v: VBoxContainer):
 	var top = UI.hb(6)
 	top.add_child(UI.caps("Find staff", 16, UI.accent))
 	top.add_child(UI.sp())
+	var sa = UI.chip("SEARCH ALL", UI.accent, UI.on_color(UI.accent), 14)
+	UI.tap(sa, func(): UI.main.open("staffsearch", {"role": role_f}), true)
+	top.add_child(sa)
 	var ex = UI.chip("EX-PLAYERS", Color(UI.GOLD, 0.22) if only_ex else Color(1, 1, 1, 0.05), UI.GOLD if only_ex else UI.MUTED, 14)
 	UI.tap(ex, func():
 		only_ex = not only_ex
@@ -97,7 +98,7 @@ func _market(v: VBoxContainer):
 		var br = role if role != "" else G.SF.best_role(p)
 		list.append([p, br, G.SF.rating(p, br)])
 	list.sort_custom(func(x, y): return x[2] + (2.0 if x[0].ex != null and x[0].ex.get("own", false) else 0.0) > y[2] + (2.0 if y[0].ex != null and y[0].ex.get("own", false) else 0.0))
-	v.add_child(UI.trow(["Name", "Job", "Rtg", "Wage"], [0, 92, -36, -64], {"head": true, "size": 16, "pad": 1}))
+	v.add_child(UI.trow(["Name", "Job", "Stars", "", "Wage"], [0, 74, 86, 22, -60], {"head": true, "size": 16, "pad": 1}))
 	for it in list.slice(0, 40):
 		var p = it[0]
 		var nm = UI.hb(5)
@@ -107,13 +108,24 @@ func _market(v: VBoxContainer):
 			nm.add_child(UI.chip("YOURS" if p.ex.get("own", false) else "EX-PRO", Color(UI.GOLD, 0.16), UI.GOLD, 12))
 		var pp = p
 		var br = it[1]
-		v.add_child(UI.trow([nm, G.SF.ROLE[br][0].split(" ")[-1].capitalize() if br != "ass" else "Assistant", "%.0f" % it[2], G.money(p.wage)], [0, 92, -36, -64],
-			{"size": 16, "pad": 2, "cols": {1: UI.MUTED, 2: UI.ovr_color(50 + int(it[2] * 2.4))}, "tap": func(): _detail(pp, br)}))
+		v.add_child(UI.trow([nm, short_job(br), UI.half_stars(G.SF.stars(it[2]), 14), arrow(G.SF.vs_mine(p, br)), G.money(p.wage)], [0, 74, 86, 22, -60],
+			{"size": 16, "pad": 2, "cols": {1: UI.MUTED}, "tap": func(): detail(pp, br, refresh)}))
 	if list.is_empty():
 		v.add_child(UI.wrap("Nobody available for that job right now. New names come onto the market every week.", 16, UI.DIM))
 
 
-func _detail(p: Dictionary, role: String):
+static func short_job(r: String) -> String:
+	return {"ass": "Assistant", "coach1": "Coach", "coach2": "Coach", "gk": "GK coach", "fit": "Fitness", "phys": "Physio", "youth": "Youth", "scout": "Scout"}[r]
+
+
+static func arrow(d: float) -> Control:
+	# green up / red down against the person you have in that job now
+	if absf(d) < 0.25:
+		return UI.lbl("=", 15, UI.DIM, "disp")
+	return UI.icon("arrow-up" if d > 0 else "arrow-down", 16, UI.GREEN if d > 0 else UI.RED)
+
+
+static func detail(p: Dictionary, role: String, after: Callable):
 	var mine = int(p.club) == G.uc().id
 	var build = func(v):
 		var hd = UI.hb(10)
@@ -126,6 +138,10 @@ func _detail(p: Dictionary, role: String):
 			sub += " · former %s (peak %d)%s" % [p.ex.pos, int(p.ex.ovr), (", " + str(p.ex.club)) if str(p.ex.club) != "" else ""]
 		tv.add_child(UI.lbl_fill(sub, 16, UI.MUTED))
 		hd.add_child(tv)
+		var srow = UI.hb(8)
+		srow.add_child(UI.half_stars(G.SF.stars(G.SF.rating(p, role)), 20))
+		srow.add_child(UI.lbl("as %s · %s" % [G.SF.ROLE[role][0].to_lower(), G.SF.style(p)], 16, UI.MUTED))
+		hd.add_child(srow)
 		v.add_child(hd)
 		var g = GridContainer.new()
 		g.columns = 2
@@ -140,7 +156,8 @@ func _detail(p: Dictionary, role: String):
 		for r in ["ass", "coach1", "gk", "fit", "phys", "youth", "scout"]:
 			var lab = {"ass": "AST", "coach1": "COA", "gk": "GK", "fit": "FIT", "phys": "PHY", "youth": "YTH", "scout": "SCT"}[r]
 			var rt = G.SF.rating(p, r)
-			jr.add_child(UI.chip("%s %.0f" % [lab, rt], Color(UI.ovr_color(50 + int(rt * 2.4)), 0.16), UI.ovr_color(50 + int(rt * 2.4)), 14))
+			var stv = G.SF.stars(rt)
+			jr.add_child(UI.chip("%s %s/5" % [lab, str(stv).trim_suffix(".0")], Color(UI.ovr_color(50 + int(rt * 2.4)), 0.16), UI.ovr_color(50 + int(rt * 2.4)), 14))
 		v.add_child(jr)
 		if mine:
 			v.add_child(UI.kv("Contract", "%s a week until summer %d" % [G.money(p.wage), int(p.cend) + 1], UI.TEXT, 17))
@@ -150,14 +167,14 @@ func _detail(p: Dictionary, role: String):
 				p.wage = G.nice(int(p.wage * 1.1))
 				UI.close_sheet()
 				UI.toast("Contract extended", UI.GREEN)
-				refresh(), "secondary", "file-text", 48)
+				after.call(), "secondary", "file-text", 48)
 			rn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(rn)
 			var rl = UI.btn("Release (%s)" % G.money(G.SF.payoff(p)), func():
 				UI.close_sheet()
 				UI.confirm("Release %s?" % G.SF.nm(p), "His compensation of %s comes out of the transfer budget. The job stays empty until you hire someone." % G.money(G.SF.payoff(p)), "Release", func():
 					G.SF.release(p)
-					refresh(), true), "ghost", "", 48)
+					after.call(), true), "ghost", "", 48)
 			rl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(rl)
 			v.add_child(row)
@@ -166,7 +183,13 @@ func _detail(p: Dictionary, role: String):
 		var a = G.SF.ask(p, role)
 		var cur = G.SF.who(role)
 		v.add_child(UI.kv("Job", G.SF.ROLE[role][0], UI.TEXT, 17))
-		v.add_child(UI.kv("Rating in that job", "%.0f%s" % [G.SF.rating(p, role), (" (yours: %.0f)" % G.SF.rating(cur, role)) if cur != null else " (vacant)"], UI.TEXT, 17))
+		var gain = UI.panel(Color(UI.GREEN if G.SF.vs_mine(p, role) >= 0 else UI.RED, 0.10), 10, 12, 8)
+		var gv = UI.vb(0)
+		gv.add_child(UI.caps("What changes", 14, UI.MUTED))
+		gv.add_child(UI.lbl_fill("Now: %s" % G.SF.effect_at(role, G.SF.r(role)), 17, UI.MUTED))
+		gv.add_child(UI.lbl_fill("With him: %s" % G.SF.effect_at(role, G.SF.rating(p, role)), 18, UI.GREEN if G.SF.vs_mine(p, role) >= 0 else UI.RED, "semi"))
+		gain.add_child(gv)
+		v.add_child(gain)
 		v.add_child(UI.kv("He wants", "%s a week" % G.money(a.wage), UI.TEXT, 17))
 		v.add_child(UI.kv("Chance he says yes", ["Slim", "Fair", "Good", "Very likely"][clampi(int(a.chance * 4.0), 0, 3)], UI.cond_color(a.chance * 100.0), 17))
 		if cur != null:
@@ -183,7 +206,7 @@ func _detail(p: Dictionary, role: String):
 				else:
 					UI.sfx("error", -8.0)
 					UI.toast(why, UI.RED)
-				refresh(), "primary" if y == 2 else "secondary", "", 48)
+				after.call(), "primary" if y == 2 else "secondary", "", 48)
 			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			hr.add_child(b)
 		v.add_child(hr)
@@ -191,5 +214,5 @@ func _detail(p: Dictionary, role: String):
 			var other = "coach2" if role == "coach1" else "coach1"
 			v.add_child(UI.btn("Hire as the other coach instead", func():
 				UI.close_sheet()
-				_detail(p, other), "ghost", "", 42))
+				detail(p, other, after), "ghost", "", 42))
 	UI.sheet(G.SF.ROLE[role][0] if not mine else "Your staff", build)

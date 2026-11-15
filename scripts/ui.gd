@@ -854,6 +854,34 @@ func stars(rep: float, size := 22) -> HBoxContainer:
 	return h
 
 
+func half_stars(v: float, size := 16, col := Color(-1, 0, 0)) -> HBoxContainer:
+	# 0.5-5 stars with halves: a half star is a full star clipped to its left half
+	if col.r < 0:
+		col = GOLD
+	var h = hb(1)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for i in 5:
+		var f = clamp(v - i, 0.0, 1.0)
+		var cell = Control.new()
+		cell.custom_minimum_size = Vector2(size, size)
+		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var bg = icon("star-f", size, Color(1, 1, 1, 0.12))
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(bg)
+		if f > 0.0:
+			var clip = Control.new()
+			clip.clip_contents = true
+			clip.size = Vector2(size * (0.5 if f < 1.0 else 1.0), size)
+			clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var fg = icon("star-f", size, col)
+			fg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			fg.size = Vector2(size, size)
+			clip.add_child(fg)
+			cell.add_child(clip)
+		h.add_child(cell)
+	return h
+
+
 func input(text: String, placeholder: String, cb: Callable) -> LineEdit:
 	var le = LineEdit.new()
 	le.text = text

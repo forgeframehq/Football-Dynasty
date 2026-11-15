@@ -258,9 +258,17 @@ func run(m):
 		st.refresh()
 		await snap("staff_ass")
 		var sid = G.s.staff_free[0]
-		st._detail(G.s.staff[sid], "ass")
+		st.detail(G.s.staff[sid], "ass", st.refresh)
 		await snap("staff_offer", 0.5)
 		UI.close_sheet()
+	if want.call("ssearch"):
+		main.root("staffsearch", {"grp": "search"})
+		await snap("staffsearch", 0.6)
+		var sq = main.stack[-1]
+		sq.job = 2
+		sq.min_i = 2
+		sq.refresh()
+		await snap("staffsearch_coach")
 	if want.call("mgrs"):
 		main.root("managers", {"grp": "world"})
 		await snap("managers", 0.6)
