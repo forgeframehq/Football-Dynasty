@@ -517,6 +517,35 @@ func tap(c: Control, cb: Callable, stop := false):
 	c.mouse_exited.connect(func(): c.modulate = Color.WHITE)
 
 
+# Sudhi's gold icon set (assets/icons, ChatGPT): used where an icon stands on its own (rail, menu rows); small
+# inline icons stay the tinted line set
+const GOLD_ICON = {"mail": "inbox", "house": "home", "user": "manager", "globe": "world", "search": "search", "settings": "settings",
+	"shirt": "shirt", "graduation-cap": "youth", "layout-grid": "tactics", "dumbbell": "whistle", "stethoscope": "medical",
+	"file-text": "contract", "scroll-text": "contract", "repeat": "transfer", "arrow-left-right": "transfer", "calendar-days": "calendar",
+	"calendar": "calendar", "layers": "clipboard", "clipboard-list": "clipboard", "wallet": "coins", "users": "chat", "megaphone": "mic",
+	"chart-bar": "chart", "shield": "badge", "trophy": "trophy", "award": "trophy", "crown": "star", "sparkles": "star", "binoculars": "binoculars",
+	"briefcase": "briefcase", "building": "stadium", "landmark": "board", "handshake": "handshake", "trending-up": "growth", "flag": "flag",
+	"list-ordered": "table", "list": "table", "save": "save", "play": "play", "goal": "ball", "target": "ball", "swords": "flag", "tags": "coins",
+	"book-open": "news", "clock": "stopwatch", "sofa": "key", "info": "bell", "circle-question-mark": "bell"}
+
+
+func gicon(nm: String, size := 28, color := TEXT) -> TextureRect:
+	# the gold version when there is one (shown as drawn, dimmed a little when color is dim), else the line icon
+	var g = GOLD_ICON.get(nm, "")
+	var path = "res://assets/icons/%s.png" % g
+	if g == "" or not ResourceLoader.exists(path):
+		return icon(nm, size, color)
+	var t = TextureRect.new()
+	t.texture = load(path)
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	t.custom_minimum_size = Vector2(size, size)
+	t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.modulate = Color(1, 1, 1, clampf(color.a, 0.35, 1.0) * (0.62 if color.get_luminance() < 0.42 else 1.0))
+	return t
+
+
 func icon(nm: String, size := 28, color := TEXT) -> TextureRect:
 	var t = TextureRect.new()
 	if not icon_cache.has(nm) and icon_src.has(nm):

@@ -72,14 +72,19 @@ func _draw():
 	if sponsor != "" or logo != null:
 		var plate = Rect2(P.call(0.29, 0.4), Vector2(0.42, 0.13) * s)
 		# the logos are white artwork, so they sit on a dark plate unless the shirt itself is plain and dark
-		var dark = c1.get_luminance() < 0.3 and pat in [0, 5]
-		if not dark:
-			draw_rect(plate, Color("12121a") if logo != null else Color(1, 1, 1, 0.92))
+		# plain shirts: the logo is printed straight on, white or near-black for contrast; patterned shirts keep a dark plate
+		var plain = pat in [0, 5]
+		var dark = c1.get_luminance() < 0.3 and plain
+		if logo != null and not plain:
+			draw_rect(plate, Color("12121a"))
+		elif logo == null and not dark:
+			draw_rect(plate, Color(1, 1, 1, 0.92))
 		if logo != null:
 			var ts = logo.get_size()
-			var k = min(plate.size.x * 0.94 / ts.x, plate.size.y * 0.9 / ts.y)
+			var k = min(plate.size.x * 0.94 / ts.x, plate.size.y * 1.15 / ts.y)
 			var r = Rect2(plate.get_center() - ts * k * 0.5, ts * k)
-			draw_texture_rect(logo, r, false, Color.WHITE if not dark else Color(1, 1, 1, 1))
+			var ink = Color.WHITE if (not plain or c1.get_luminance() < 0.55) else Color("15161c")
+			draw_texture_rect(logo, r, false, ink)
 		else:
 			var f = UI.fonts["xbold"]
 			var fs = int(plate.size.y * 0.6)

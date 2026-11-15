@@ -664,7 +664,7 @@ func _build_rail():
 		elif key == "club":
 			ic = UI.badge(G.uc(), isz + 6)
 		else:
-			ic = UI.icon(RAIL_ICON[key], isz, fg)
+			ic = UI.gicon(RAIL_ICON[key], isz + 4, UI.TEXT if (sel or key == "inbox") else UI.DIM)
 		var ctr = UI.center(ic)
 		ctr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		ctr.offset_left = pad_l
@@ -1159,7 +1159,7 @@ func open_menu(key: String):
 				if it[4] != "":
 					h.add_child(UI.flag(it[4], 28))
 				else:
-					h.add_child(UI.icon(it[0], 24, UI.TEXT))
+					h.add_child(UI.gicon(it[0], 30, UI.TEXT))
 				var tv = UI.vb(-4)
 				tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				tv.add_child(UI.lbl_fill(it[1], 22, UI.TEXT, "semi"))

@@ -21,9 +21,11 @@ const HOMES = [["Club flat", 0, "A small flat the club lends you."], ["City apar
 const CARS = [["Club car", 0], ["Executive saloon", 45000], ["Sports coupe", 160000], ["Supercar", 600000], ["Classic collection", 2500000]]
 const BIZ = [["Local restaurant", 250000, 1800], ["Football academy school", 1200000, 9500], ["Boutique hotel", 5000000, 42000]]
 const LANG = {"England": "English", "Spain": "Spanish", "Italy": "Italian", "Germany": "German", "France": "French"}
-const SPONSORS = [["AeroNova", "Airline"], ["SkyLink", "Airline"], ["Horizon Trust", "Bank"], ["Pinnacle Bank", "Bank"], ["NovaCore", "Tech"], ["PulseDyn", "Tech"],
-	["HelixSys", "Tech"], ["Apex Motors", "Car maker"], ["TurboForge", "Car maker"], ["WaveConnect", "Telecom"], ["SignalPulse", "Telecom"], ["LuminaVolt", "Energy"],
-	["TerraSpark", "Energy"], ["FizzVital", "Drinks"], ["AquaBoost", "Drinks"], ["AegisGuard", "Insurance"]]
+const SPONSORS = [["NovaJet", "Airline"], ["Kestrel Air", "Airline"], ["Aurum Bank", "Bank"], ["Northgate", "Bank"], ["Nexora", "Tech"], ["PulseDyn", "Tech"],
+	["Onyx Tech", "Tech"], ["Apex Motors", "Car maker"], ["TitanForge", "Car maker"], ["Orbitel", "Telecom"], ["Meridian", "Telecom"], ["Solaris Energy", "Energy"],
+	["TerraSpark", "Energy"], ["Voltaic", "Drinks"], ["BlueHaven", "Drinks"], ["Crestline", "Insurance"]]
+# names before the logo set of 15 Nov (same index, same company in saves)
+const OLD_SPONSORS = ["AeroNova", "SkyLink", "Horizon Trust", "Pinnacle Bank", "NovaCore", "PulseDyn", "HelixSys", "Apex Motors", "TurboForge", "WaveConnect", "SignalPulse", "LuminaVolt", "TerraSpark", "FizzVital", "AquaBoost", "AegisGuard"]
 const DNA = [["Balanced", "", "No bonus, no extra demands."], ["Total Football", "tac", "Tactical knowledge +2. The board expects attacking play."],
 	["Iron Discipline", "mot", "Motivation +2. Players respond to firm team talks."], ["Home Grown", "you", "Youth development +2. The board wants academy players used."],
 	["Moneyball", "neg", "Negotiation +2. Buy low, sell high."]]
@@ -142,15 +144,11 @@ func _fans(v: Control):
 
 
 func _logo(name_: String, h: float) -> Control:
-	var idx = -1
-	for i in SPONSORS.size():
-		if SPONSORS[i][0] == name_:
-			idx = i
-	var path = "res://assets/sponsors/sponsor_%02d.png" % (idx + 1)
-	if idx < 0 or not ResourceLoader.exists(path):
+	var tex = G.OPS.sponsor_logo(name_)
+	if tex == null:
 		return UI.lbl(name_.to_upper(), 30, UI.TEXT, "xbold")
 	var t = TextureRect.new()
-	t.texture = load(path)
+	t.texture = tex
 	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	t.custom_minimum_size = Vector2(h * 4.0, h)

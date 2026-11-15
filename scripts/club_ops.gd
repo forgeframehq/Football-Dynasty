@@ -451,8 +451,17 @@ static func sponsor_now():
 	# this season's shirt sponsor, or null if none has been signed yet
 	var sp = G.s.user.get("sponsor")
 	if sp != null and int(sp.get("season", -1)) == G.s.season:
+		_rename(sp)
 		return sp
 	return null
+
+
+static func _rename(d):
+	# a deal signed before the new logo set keeps its company under the new name
+	if d is Dictionary and d.has("name"):
+		var i = load("res://scripts/screens/hub.gd").OLD_SPONSORS.find(str(d.name))
+		if i >= 0:
+			d.name = sponsor_list()[i][0]
 
 
 static func sponsor_list() -> Array:
@@ -460,13 +469,12 @@ static func sponsor_list() -> Array:
 
 
 static func sponsor_logo(nm: String) -> Texture2D:
-	var all = sponsor_list()
-	for i in all.size():
-		if all[i][0] == nm:
-			var path = "res://assets/sponsors/sponsor_%02d.png" % (i + 1)
-			if ResourceLoader.exists(path):
-				return load(path)
-	return null
+	# white artwork from assets/sponsors/<name>.png (Sudhi's ChatGPT set: 30 fictional brands); old names map across
+	var old = load("res://scripts/screens/hub.gd").OLD_SPONSORS.find(nm)
+	if old >= 0:
+		nm = sponsor_list()[old][0]
+	var path = "res://assets/sponsors/%s.png" % nm.to_lower().replace(" ", "_")
+	return load(path) if ResourceLoader.exists(path) else null
 
 
 static func sponsor_offers() -> Array:
@@ -952,6 +960,7 @@ static func spx() -> Dictionary:
 static func spx_now(kind: String):
 	var d = spx().get(kind)
 	if d != null and int(d.until) >= G.s.season:
+		_rename(d)
 		return d
 	return null
 
@@ -1051,7 +1060,7 @@ static func car_node(idx: int) -> Node3D:
 # Data on the manager's life record: px (price now), ph (daily closes, newest last), cost (average price paid),
 # mnews (headlines), trades (recent orders).
 
-const TICK = ["AERO", "SKYL", "HZTR", "PNBK", "NOVA", "PLSD", "HLXS", "APXM", "TRBF", "WAVC", "SGPL", "LMVT", "TRSP", "FZVT", "AQBT", "AEGS"]
+const TICK = ["NOVJ", "KSTR", "AURM", "NGTE", "NXRA", "PLSD", "ONYX", "APXM", "TTNF", "ORBT", "MRDN", "SLRS", "TRSP", "VLTC", "BLHV", "CRST"]
 # sector: [daily volatility, yearly dividend yield]
 const SECTOR = {"Airline": [0.022, 0.010], "Bank": [0.015, 0.035], "Tech": [0.026, 0.004], "Car maker": [0.020, 0.015],
 	"Telecom": [0.011, 0.042], "Energy": [0.019, 0.026], "Drinks": [0.010, 0.030], "Insurance": [0.010, 0.036]}
