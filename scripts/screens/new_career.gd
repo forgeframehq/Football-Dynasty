@@ -221,6 +221,8 @@ func _picker():
 	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var gs = UI.scroll(grid)
 	h.add_child(gs)
+	gs.resized.connect(func(): _fit_tiles(grid, gs))
+	_fit_tiles.call_deferred(grid, gs)
 	if nat == "" and wl < 0:
 		var ct = UI.seg(G.WD.CONTINENTS, G.WD.CONTINENTS.find(cont), func(i):
 			cont = G.WD.CONTINENTS[i]
@@ -387,9 +389,34 @@ func _playable_sheet():
 	UI.sheet("Playable nations", build)
 
 
+func _fit_tiles(grid: HFlowContainer, gs: Control):
+	# tiles were a fixed size and left a big empty strip; now they share the row (balanced rows) and, when there
+	# are only a few, the height too
+	if not is_instance_valid(grid) or not is_instance_valid(gs):
+		return
+	var tiles = grid.get_children().filter(func(t): return t is Control and t.has_meta("base"))
+	var n = tiles.size()
+	var W = gs.size.x - 6
+	var H = gs.size.y - 6
+	if n == 0 or W < 100:
+		return
+	var sep = 12.0
+	var base: Vector2 = tiles[0].get_meta("base")
+	var cols = clampi(int((W + sep) / (base.x + sep)), 1, n)
+	var rows = int(ceil(n / float(cols)))
+	cols = int(ceil(n / float(rows)))
+	var w = floor((W - sep * (cols - 1)) / cols)
+	var hh = base.y
+	if rows * (base.y + sep) <= H + sep:
+		hh = min(floor((H - sep * (rows - 1)) / rows), base.y * 1.6)
+	for t in tiles:
+		t.custom_minimum_size = Vector2(w, max(base.y, hh))
+
+
 func _tile(w: float, hgt: float, on := false) -> PanelContainer:
 	var t = UI.panel(Color(UI.GOLD, 0.14) if on else UI.CARD, 18, 14, 12, UI.GOLD if on else UI.LINE)
 	t.custom_minimum_size = Vector2(w, hgt)
+	t.set_meta("base", Vector2(w, hgt))
 	var tv = UI.vb(6)
 	tv.alignment = BoxContainer.ALIGNMENT_CENTER
 	t.add_child(tv)

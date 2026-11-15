@@ -26,6 +26,14 @@ func _ready():
 	add_child(body)
 	build()
 	_push_title()
+	_inset()
+
+
+func _inset():
+	# screens without the rail: backgrounds fill the glass; the content steps just far enough right that text clears the camera
+	if body == null or UI.main == null:
+		return
+	body.offset_left = 0 if chrome else UI.main.left_inset()
 
 
 func _push_title():
@@ -52,6 +60,7 @@ func refresh():
 		UI.main.t_sub = ""
 	build()
 	_push_title()
+	_inset()
 	if UI.main != null:
 		UI.main.refresh_nav()
 	if y > 0:

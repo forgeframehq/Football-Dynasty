@@ -238,3 +238,7 @@ Everything Sudhi asked for after playing v0.9.0. Screens and code, in the order 
 ## v1.1.2 (15 Nov, APK, code 16): always full screen, random opening song
 - Sudhi's phone still showed a bare band on the left of rail-less screens (his cut-out counts as `rail_wide()`). He does not mind things sitting behind the camera, so `main.left_inset()` now always returns 0. The rail keeps its own handling.
 - Music: `UI._launch_song()` picks a random enabled song each launch (never last launch's opener); shuffle is on by default (`shuffle_v2` flag turns it on once for older settings files; the Settings switch still works).
+
+## dev after v1.1.2 (15 Nov): full screen, but no text behind the camera; picker tiles fill
+- Sudhi wants full screen with nothing important behind the notch (not the old safe band). `main.safe` margin_left is always 0; rail-less screens shift only their `body` by `main.left_inset()` = cut-out edge - 14 (`notch_l` for a long notch, hole right edge for a small hole), so panel edges reach into the cut-out strip and the text inside starts just past it (`screen.gd _inset()`, also called from `main._apply_left`). Backgrounds hang off the screen node, not `body`: `screen.backdrop()`, and the title picture is `menu.gd` node `title_bg`.
+- New career picker: `new_career._fit_tiles(grid, gs)` stretches tiles (base size in meta `base`) to share rows evenly and fills the height (up to 1.6x) when there are few, so no empty strip in the middle.
