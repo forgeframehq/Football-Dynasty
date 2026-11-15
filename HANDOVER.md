@@ -267,3 +267,5 @@ Everything Sudhi asked for after playing v0.9.0. Screens and code, in the order 
 
 ## Locked-in list after v1.2.0 (Sudhi, 15 Nov): collect, do not build until he says go
 1. New career picker, nation tiles: long league names (Primera División de Chile / de Uruguay) make their tiles wider than the rest, so rows are uneven. Fix: tile name wraps (two lines) or shrinks inside the fitted width; a tile must never be wider than `_fit_tiles` gives it.
+2. Picker back button from a world league (K League 1, Brasileirão and so on) lands on a "nation" page built only from database leagues: Korea is blank; Brazil shows only Série B (the top flight is skipped because `_world_card` cards are tier 2+ only). Fix: a world nation page lists all its catalogue divisions including the top flight, and back from a nation with no database leagues returns to the continent list.
+3. Picker tiles: a lone card stretches to the full grid width (Série B). Cap tile width at about 1.5x its base size.
