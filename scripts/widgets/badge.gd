@@ -15,6 +15,15 @@ const AVOID = {1: ["Chelsea", "Aston Villa"], 2: ["Crystal Palace", "Lazio", "Be
 	40: ["Hull City"], 43: ["Derby County"], 45: ["Coventry"], 52: ["Crystal Palace", "Lazio", "Benfica", "Eintracht"], 78: ["Brentford"]}
 
 static var _tex := {}
+# premium badges (big sizes only): 16 gold frames from Sudhi's ChatGPT sheets, assets/badges/frames/bf_NN_rim.png
+# (gold, field cut out) and bf_NN_field.png (the field, shaded grey, tinted with the club colour).
+# [centre x, centre y, field size] as fractions of the frame, for placing the emblem
+const PREMIUM_MIN = 72
+const PMETA = [[0.496, 0.506, 0.664], [0.496, 0.498, 0.695], [0.498, 0.496, 0.801], [0.498, 0.484, 0.707], [0.498, 0.5, 0.801], [0.494, 0.586, 0.621], [0.498, 0.504, 0.684], [0.498, 0.545, 0.637], [0.498, 0.5, 0.762], [0.498, 0.498, 0.574], [0.498, 0.514, 0.746], [0.498, 0.516, 0.637], [0.498, 0.496, 0.789], [0.494, 0.547, 0.734], [0.5, 0.5, 0.609], [0.5, 0.547, 0.641]]
+# the flat badge's shape -> the gold frames that look like it (the club keeps its silhouette)
+const PFRAMES = [[0, 10, 12], [1, 15], [3, 11, 9], [2, 11], [4, 8], [5, 15, 13], [7, 14], [6, 8]]
+const PSHIELD = [0, 1, 5, 6, 7, 10, 12, 14, 15]
+var pf := 0
 
 var c1 := Color.WHITE
 var c2 := Color.BLACK
@@ -57,6 +66,8 @@ func setup(c: Dictionary, sz: int):
 	sh = pk[0]
 	em = pk[1]
 	lay = pk[2]
+	var opts = PFRAMES[sh]
+	pf = opts[((key.hash() & 0x7fffffff) / 7919) % opts.size()]
 	# two near-identical colours would hide the layout: use white as the second colour
 	if absf(c1.get_luminance() - c2.get_luminance()) < 0.12 and c1.is_equal_approx(c2):
 		c2 = Color.WHITE
@@ -76,6 +87,9 @@ func _ink(on: Color, want: Color) -> Color:
 func _draw():
 	var w = size.x
 	var h = size.y
+	if w >= PREMIUM_MIN and tex("frames/bf_%02d_rim" % pf) != null:
+		_draw_premium(w, h)
+		return
 	var fill_shape = CIRCLE if sh == RING else sh
 	var st = tex("sh_%d" % fill_shape)
 	var et = tex("em_%02d" % em)
@@ -106,3 +120,35 @@ func _draw():
 		var er = Rect2(Vector2((w - es) / 2.0, (h - es) / 2.0 + (h * 0.02 if sh in [0, 1, 5, 6] else 0.0)), Vector2(es, es))
 		var want = c2 if field == c1 else c1
 		draw_texture_rect(et, er, false, _ink(field, want))
+
+
+func _draw_premium(w: float, h: float):
+	# gold frame, field in the club's colours (shaded grey texture tinted), emblem embossed, gold rim on top
+	var full = Rect2(Vector2.ZERO, Vector2(w, h))
+	var ft = tex("frames/bf_%02d_field" % pf)
+	var rt = tex("frames/bf_%02d_rim" % pf)
+	var m = PMETA[pf]
+	var field = c1
+	match lay:
+		0:
+			draw_texture_rect(ft, full, false, c1)
+		1:
+			draw_texture_rect(ft, full, false, c1)
+			var c = Vector2(m[0] * w, m[1] * h)
+			var k = 0.8
+			draw_texture_rect(ft, Rect2(c - (c - Vector2.ZERO) * k, Vector2(w, h) * k), false, c2)
+			field = c2
+		2:
+			draw_texture_rect(ft, full, false, c2)
+			field = c2
+	var et = tex("em_%02d" % em)
+	if et != null:
+		var es = m[2] * w * (0.6 if pf in PSHIELD else 0.66)
+		var cy = m[1] * h - (h * 0.03 if pf in PSHIELD else 0.0)
+		var er = Rect2(Vector2(m[0] * w - es / 2.0, cy - es / 2.0), Vector2(es, es))
+		var ink = _ink(field, c2 if field == c1 else c1)
+		var d = max(1.0, w * 0.012)
+		draw_texture_rect(et, Rect2(er.position + Vector2(d, d * 1.4), er.size), false, Color(0, 0, 0, 0.45))
+		draw_texture_rect(et, Rect2(er.position - Vector2(d, d) * 0.6, er.size), false, Color(1, 1, 1, 0.3))
+		draw_texture_rect(et, er, false, ink)
+	draw_texture_rect(rt, full, false)
