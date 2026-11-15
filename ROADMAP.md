@@ -213,3 +213,4 @@ Everything Sudhi asked for after playing v0.9.0. Screens and code, in the order 
 - Not done: the world system (more nations, generated players), victory films (waiting for Sudhi's Kling clips), a sprint and a celebration animation from Mixamo (the jog is sped up and the celebration is made in code). Nothing here has been tried on a real phone: 22 animated players and the 3D home are the things to check for speed and heat.
 
 - [x] Coaching style perks (each style has a perk the points cannot buy; Balanced gets 4 extra points)
+- [x] Scouting network: scouts with regions and senior/youth stars, missions with instructions, reports with uncertain ranges, youth prospects to sign, Youth Academy, recruitment hub with offers, shortlist alerts

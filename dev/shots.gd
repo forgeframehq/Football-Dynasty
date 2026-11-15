@@ -269,6 +269,25 @@ func run(m):
 		sq.min_i = 2
 		sq.refresh()
 		await snap("staffsearch_coach")
+	if want.call("snet"):
+		G.SN.ensure()
+		var scs = G.SN.scouts()
+		if scs.size() > 0:
+			G.SN.start(scs[0], "youth", "South America", 2, 0, 0, 0, 0)
+		var mk = G.SN.market()
+		if mk.size() > 0 and G.SN.hire(G.s.staff[mk[0]]) == "":
+			G.SN.start(G.s.staff[mk[0]], "senior", "Iberia", 3, 0, 1, 0, 2)
+		for d in 40:
+			G.advance_day()
+		main.root("scoutnet", {"grp": "search"})
+		await snap("scout_net", 0.6)
+		var sn = main.stack[-1]
+		sn.tab = 1
+		sn.refresh()
+		await snap("scout_reports")
+		sn.tab = 2
+		sn.refresh()
+		await snap("scout_youth")
 	if want.call("mgrs"):
 		main.root("managers", {"grp": "world"})
 		await snap("managers", 0.6)

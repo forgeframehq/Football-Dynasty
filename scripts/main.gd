@@ -8,6 +8,7 @@ const SCREENS = {
 	"invest": preload("res://scripts/screens/invest.gd"),
 	"staff": preload("res://scripts/screens/staff.gd"),
 	"staffsearch": preload("res://scripts/screens/staffsearch.gd"),
+	"scoutnet": preload("res://scripts/screens/scoutnet.gd"),
 	"social": preload("res://scripts/screens/social.gd"),
 	"managers": preload("res://scripts/screens/managers.gd"),
 	"home3d": preload("res://scripts/screens/home3d.gd"),
@@ -951,6 +952,8 @@ func menu_items(key: String) -> Array:
 		var f = G.next_user_fixture()
 		a.append(_row("shirt", "First Team", "%d players" % (c.players.size() - youth), func(): root("squad", {"tab": 0})))
 		a.append(_row("graduation-cap", "Youth & Reserves", "%d players" % youth, func(): root("squad", {"tab": 1})))
+		G.SN.ensure()
+		a.append(_row("graduation-cap", "Youth Academy", "%d prospect%s found by scouts" % [s.sn.prospects.size(), "" if s.sn.prospects.size() == 1 else "s"], func(): root("scoutnet", {"tab": 2, "grp": "club"})))
 		a.append(_row("layout-grid", "Tactics", "%s · %s" % [c.formation, G.MENTALITY[c.ment]], func(): root("tactics")))
 		a.append(_row("dumbbell", "Development Hub", "%s focus" % G.OPS.FOCUS[c.train.focus], func(): root("training")))
 		a.append(_row("stethoscope", "Medical Centre", "%d injured" % inj if inj > 0 else "All fit", func(): root("lists", {"kind": "medical", "grp": "club"})))
@@ -1009,7 +1012,8 @@ func menu_items(key: String) -> Array:
 		a.append(_row("search", "Player Search", "Every player, sortable", func(): root("search")))
 		a.append(_row("clipboard-list", "Staff Search", "Coaches, physios, scouts", func(): root("staffsearch", {"grp": "search"})))
 		a.append(_row("handshake", "Transfer Market", "Offers, shortlist, your deals", func(): root("transfers")))
-		a.append(_row("binoculars", "Scouting", "%d being watched" % s.scout.queue.size(), func(): root("scouting")))
+		G.SN.ensure()
+		a.append(_row("binoculars", "Scouting", "%d scout%s · %d out · %d reports" % [G.SN.scouts().size(), "" if G.SN.scouts().size() == 1 else "s", s.sn.missions.size(), s.sn.reports.size()], func(): root("scoutnet", {"grp": "search"})))
 		a.append(_row("tags", "Bargains", "Good players, low prices", func(): root("search", {"list": "bargains", "grp": "search"})))
 		a.append(_row("clock", "Expiring Contracts", "Out of contract in June", func(): root("search", {"list": "expiring", "grp": "search"})))
 		a.append(_row("users", "Free Agents", "Available now", func(): root("search", {"list": "free", "grp": "search"})))
@@ -1037,7 +1041,7 @@ func menu_items(key: String) -> Array:
 
 # Menu layout: headings with the rows under them, "|" starts the second column. Rows not named land in the last group.
 const MENU_GROUPS = {
-	"club": [["Squad", ["First Team", "Youth & Reserves", "Tactics", "Loan Watch"]], ["Players", ["Development Hub", "Medical Centre", "Contracts", "Dressing Room", "Staff"]], "|",
+	"club": [["Squad", ["First Team", "Youth & Reserves", "Youth Academy", "Tactics", "Loan Watch"]], ["Players", ["Development Hub", "Medical Centre", "Contracts", "Dressing Room", "Staff"]], "|",
 		["Club", ["Kit & Sponsors", "Finances", "Club City", "Fans", "Club Records"]], ["Season", ["Calendar", "Fixtures", "Tactical Plans", "Team Report", "Match Analysis"]]],
 	"manager": [["Job", ["Manager Profile", "Board Confidence", "My Contract", "Board Request", "Jobs", "Philosophy"]], "|",
 		["Money and life", ["Lifestyle", "My Home", "Investments", "Club Ownership", "Social"]], ["Career", ["Trophy Cabinet", "Career Timeline", "Game Status"]]],

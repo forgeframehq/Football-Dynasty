@@ -18,6 +18,14 @@ static func run(node: Node):
 	else:
 		G.new_game("Tester", cid)
 	print("new game ms: ", Time.get_ticks_msec() - t0, " players: ", G.s.players.size(), " fixtures: ", G.s.fixtures.size())
+	# send the club's scout on a senior mission and a hired one on a youth mission
+	G.SN.ensure()
+	G.uc().budget += 1000000
+	var sc0 = G.SN.scouts()[0]
+	G.SN.start(sc0, "senior", "Iberia", 3, 0, 1, 0, 2)
+	var mk0 = G.SN.market()
+	if mk0.size() > 0 and G.SN.hire(G.s.staff[mk0[0]]) == "":
+		G.SN.start(G.s.staff[mk0[0]], "youth", "Africa", 2, 0, 0, 0, 0)
 	var c = G.uc()
 	print("club: ", c.name, " rep ", snapped(c.rep, 0.1), " budget ", G.money(c.budget), " obj ", G.s.user.obj)
 	for se in seasons:
@@ -66,7 +74,7 @@ static func run(node: Node):
 			if float(G.s.mgrs[mcid].feud) > 0:
 				fe += 1
 		print("  staff: ", G.uc().staff.size(), " market: ", G.s.staff_free.size(), " ex-players: ", G.s.staff_free.filter(func(x): return G.s.staff[x].ex != null).size(),
-			" | managers: ", G.s.mgrs.size(), " feuds: ", fe, " moves: ", G.s.mgr_log.size(), " | stories in inbox: ", stories, " | posts: ", kinds, " | backups: ", G.backups(G.slot).size())
+			" | managers: ", G.s.mgrs.size(), " feuds: ", fe, " moves: ", G.s.mgr_log.size(), " | stories in inbox: ", stories, " | posts: ", kinds, " | backups: ", G.backups(G.slot).size(), " | scout reports: ", G.s.sn.reports.size(), " prospects: ", G.s.sn.prospects.size(), " missions out: ", G.s.sn.missions.size())
 		var sizes = G.s.clubs.map(func(x): return x.players.size())
 		print("  squad sizes min/max: ", sizes.min(), "/", sizes.max(), " history: ", G.s.history[0])
 		var bl = G.backups(G.slot)

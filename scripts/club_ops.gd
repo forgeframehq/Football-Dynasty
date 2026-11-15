@@ -158,6 +158,7 @@ static func daily():
 	G.MG.pre_match()
 	G.STY.daily()
 	G.SOC.daily()
+	G.SN.daily()
 	if G.cur.day == 1:
 		G.MG.monthly()
 	if G.cur.weekday == 1:
@@ -518,7 +519,7 @@ static func week_money(c: Dictionary) -> Dictionary:
 	var upkeep = int(c.wage_budget * 0.011 * levels)
 	wages += G.MK.loan_wages(c)
 	if c.id == s.user.club:
-		wages += G.SF.wage_bill()
+		wages += G.SF.wage_bill() + G.SN.wage_bill()
 	return {"tickets": tickets, "sponsor": sponsor, "tv": tv, "wages": wages, "upkeep": upkeep, "home": c.fin.home, "net": sponsor + tv + tickets - wages - upkeep}
 
 
@@ -640,6 +641,9 @@ static func knows(p: Dictionary) -> bool:
 static func pot_text(p: Dictionary) -> String:
 	if knows(p):
 		return str(p.pot)
+	var rep = G.SN.report_for(p.id)
+	if rep != null:
+		return "%d–%d" % [rep.pot[0], rep.pot[1]]
 	var h = (p.id * 2654435761) % 97
 	var lo = max(p.ovr, p.pot - 3 - h % 4)
 	var hi = min(99, max(lo + 3, p.pot + 2 + (h / 4) % 5))

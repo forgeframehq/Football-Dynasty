@@ -15,6 +15,7 @@ const MK = preload("res://scripts/market.gd")
 const SF = preload("res://scripts/staff.gd")
 const MG = preload("res://scripts/managers.gd")
 const STY = preload("res://scripts/stories.gd")
+const SN = preload("res://scripts/scout_net.gd")
 
 const SAVE_V = 2
 var slot := 0
@@ -462,6 +463,7 @@ func ensure_state():
 	TC.ensure()
 	SF.ensure()
 	MG.ensure()
+	SN.ensure()
 	s.v = SAVE_V
 
 
