@@ -416,11 +416,33 @@ func _apply_left():
 			_build_rail()
 
 
+func exit_prompt():
+	# with autosave on, leaving saves; with it off, the player chooses
+	if G.settings.get("autosave", true):
+		UI.confirm("Leave the game?", "Your career is saved automatically.", "Save & exit to menu", func():
+			G.save_game()
+			G.active = false
+			root("menu"))
+		return
+	var build = func(v):
+		v.add_child(UI.wrap("Autosave is off. Last saved on %s." % G.fmt_date(int(G.s.user.get("last_save", G.s.day)), true), 18, UI.MUTED))
+		v.add_child(UI.btn("Save & exit to menu", func():
+			UI.close_sheet()
+			G.save_game()
+			G.active = false
+			root("menu"), "primary", "save", 54))
+		v.add_child(UI.btn("Exit without saving", func():
+			UI.close_sheet()
+			G.active = false
+			root("menu"), "ghost", "log-out", 50))
+	UI.sheet("Leave the game?", build)
+
+
 func _notification(what):
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		back()
 	elif what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
-		if G.active and (stack.size() == 0 or stack[-1].sname != "match"):
+		if G.active and (stack.size() == 0 or stack[-1].sname != "match") and G.settings.get("autosave", true):
 			G.save_game()
 
 
@@ -510,10 +532,7 @@ func back():
 		if nm == "menu":
 			get_tree().quit()
 		elif nm == "home":
-			UI.confirm("Leave the game?", "Your career is saved automatically.", "Save & exit to menu", func():
-				G.save_game()
-				G.active = false
-				root("menu"))
+			exit_prompt()
 		elif G.active:
 			root("home")
 		return
@@ -841,7 +860,7 @@ func _go(mode: String, target := 0):
 				break
 			if i % 4 == 3:
 				await get_tree().process_frame
-	G.save_game()
+	G.autosave()
 	busy = false
 	if s.review != null:
 		root("review")
@@ -1027,7 +1046,7 @@ func menu_items(key: String) -> Array:
 		a.append(_row("shield", "Find Club", "Search every club", func(): root("hub", {"kind": "findclub", "grp": "search"})))
 		a.append(_row("briefcase", "Jobs", "Clubs interested in you", func(): root("jobs")))
 	elif key == "options":
-		a.append(_row("save", "Save Game", "Saved automatically each day", func():
+		a.append(_row("save", "Save Game", "Autosave is on" if G.settings.get("autosave", true) else "Autosave off: last saved %s" % G.fmt_date(int(s.user.get("last_save", s.day))).substr(4), func():
 			G.save_game()
 			close_menu()
 			UI.toast("Game saved", UI.GREEN)))
@@ -1037,10 +1056,9 @@ func menu_items(key: String) -> Array:
 		a.append(_row("crown", "Hall of Fame", "Honours and scrapbook", func(): root("hub", {"kind": "fame", "grp": "options"})))
 		a.append(_row("pencil", "Editor", "On" if G.settings.get("editor", false) else "Off", func(): root("hub", {"kind": "editor", "grp": "options"})))
 		a.append(_row("book-open", "Manual", "How to play", func(): root("hub", {"kind": "manual", "grp": "options"})))
-		a.append(_row("log-out", "Exit to Menu", "Saves first", func():
-			G.save_game()
-			G.active = false
-			root("menu")))
+		a.append(_row("log-out", "Exit to Menu", "Saves first" if G.settings.get("autosave", true) else "Save or leave without saving", func():
+			close_menu()
+			exit_prompt()))
 	return a
 
 

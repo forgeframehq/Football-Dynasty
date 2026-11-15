@@ -1,7 +1,7 @@
 # Football Dynasty 26 — Handover (14 Nov 2026, v1.0.0 on `main`)
 
 ## Start here (new chat, written 14 Nov 2026 midday)
-State: `main` = `dev` = v1.0.0 (commit 2689c0a), APK published (134 MB) at https://github.com/forgeframehq/Football-Dynasty/releases/download/latest/FootballDynasty.apk. Sudhi has installed it and is giving feedback. He is collecting a new list and has said "lock it in, don't make the game yet": do not build until he says go.
+State: `main` = `dev` = v1.1.0, APK published (built from main) at https://github.com/forgeframehq/Football-Dynasty/releases/download/latest/FootballDynasty.apk. Sudhi has installed it and is giving feedback. He is collecting a new list and has said "lock it in, don't make the game yet": do not build until he says go.
 
 How Sudhi works:
 - He is on his phone: answer first, short, no preamble. He wants a direct recommendation, not options.
@@ -216,3 +216,8 @@ Everything Sudhi asked for after playing v0.9.0. Screens and code, in the order 
 - International tournaments: `scripts/intl.gd` (`G.IT`). `T` (World Cup 48 teams every 4 years from 2030, Euros 24 from 2028, Copa América 16 from 2028, AFCON 24 every 2 years from 2027 in June, Asian Cup 24 every 4 years from January 2027), confederations `CONF`, estimated strength `EST` for nations without players. Squads are each nation's best 23 anywhere in the game; groups of four, best thirds, single-game knockouts with penalties. Caps and goals go into `PS.caps(p)`. Asian Cup: AFC players at your club get `p.away` and `G.available()` treats them as unavailable until their nation is out. After the final: morale for winners, a 5% injury chance, message and social post. `s.intl = {live, done}`; screen `scripts/screens/intl.gd` (World > International).
 - Checked: selftest 2 seasons (Asian Cup 2027, AFCON 2027, continental winners both seasons, promotions), `--selftest 1 world` (a Flamengo career with Brazil, Argentina, England, Spain, Portugal playable), audit 60 days (113 pages, no errors). Save is now about 20 MB in memory.
 - Known: many smaller nations have no flag image (blank flag); top scorers in fully simulated generated leagues can run high (58 in one Brasileirão run) and may need tuning; world clubs have no domestic cups.
+
+## v1.1.0 (14 Nov 2026, APK): autosave switch
+- `G.autosave()` replaces the automatic saves (end of a day or a Continue run, after a match, after a deal or a lifestyle purchase). Settings > Autosave: Every day (default) or Off. Off: the game saves only when the player chooses (Options > Save Game, Save & exit), except that `autosave()` always saves once `s.user.last_save` is 14 or more days old (toast). The app no longer saves on pause/close when autosave is off. Leaving to the menu with autosave off opens `main.exit_prompt()`: Save & exit, or Exit without saving. New careers, new jobs and the season review still always save.
+- Settings: Save backups moved to the right pane.
+- Version 1.1.0, code 14: everything since v1.0.0 (sections above) is in this APK.

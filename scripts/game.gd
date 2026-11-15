@@ -1226,7 +1226,7 @@ func advance() -> void:
 		start_of_day()
 		if user_fixture_today() != null or stop_flag or s.review != null or s.user.sacked:
 			break
-	save_game()
+	autosave()
 
 
 func start_of_day():
@@ -1380,8 +1380,21 @@ func has_save(i = null) -> bool:
 	return FileAccess.file_exists(save_path(i))
 
 
+func autosave():
+	# the automatic save after a day, a match or a deal. With autosave off (Settings) the game only saves when the
+	# player asks, except that it always saves after two weeks of game time without one.
+	if s == null:
+		return
+	if G.settings.get("autosave", true):
+		save_game()
+	elif s.day - int(s.user.get("last_save", s.day)) >= 14:
+		save_game()
+		UI.toast("Game saved (it always saves every two weeks)", UI.MUTED)
+
+
 func save_game():
 	# write to a temporary file first and swap it in, so a crash or a flat battery mid-save cannot corrupt the career
+	s.user["last_save"] = s.day
 	var tmp = save_path() + ".tmp"
 	var f = FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:

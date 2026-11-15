@@ -83,7 +83,7 @@ func _buy(lf: Dictionary, cost: int, what: String, apply: Callable):
 	apply.call()
 	UI.sfx("cash", -8.0)
 	UI.toast(what, UI.GREEN)
-	G.save_game()
+	G.autosave()
 	refresh()
 
 

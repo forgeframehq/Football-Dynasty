@@ -23,6 +23,7 @@ func build():
 	_audio(row)
 	_soundtrack(row)
 	_look(row)
+	_backups()
 	if not UI.song_changed.is_connected(_fill_songs):
 		UI.song_changed.connect(_fill_songs)
 
@@ -62,6 +63,7 @@ func _vol(v: Control, label: String, key: String):
 
 
 var left_v: VBoxContainer
+var right_v: VBoxContainer
 
 
 func _audio(row: Control):
@@ -79,6 +81,14 @@ func _audio(row: Control):
 	v.add_child(UI.seg(["In order", "Shuffle"], sh, func(i):
 		_put("shuffle", i == 1)
 		refresh(), 19, 5))
+	v.add_child(UI.sp(0, 4))
+	_head(v, "Autosave")
+	var asv = 0 if G.settings.get("autosave", true) else 1
+	v.add_child(UI.seg(["Every day", "Off"], asv, func(i):
+		_put("autosave", i == 0)
+		refresh(), 19, 5))
+	if asv == 1:
+		v.add_child(UI.lbl_fill("Saves when you choose, and every two weeks", 14, UI.DIM))
 	v.add_child(UI.sp(0, 4))
 	_head(v, "Intro film")
 	var it = 0 if G.settings.get("intro", true) else 1
@@ -138,23 +148,7 @@ func _soundtrack(row: Control):
 	# diagnostics sit in the left pane, which has room, so the middle pane needs no scroll
 	left_v.add_child(UI.sp(0, 6))
 	left_v.add_child(dg)
-	if G.active and G.s != null:
-		left_v.add_child(UI.sp(0, 4))
-		_head(left_v, "Save backups")
-		var bl = G.backups(G.slot)
-		left_v.add_child(UI.lbl_fill("%d kept · newest %s" % [bl.size(), bl[0].meta.get("date", "-") if bl.size() > 0 else "none yet"], 16, UI.MUTED))
-		var bh = UI.hb(8)
-		var b1 = UI.btn("Back up now", func():
-			G.save_game()
-			if G.backup():
-				UI.toast("Backup made", UI.GREEN)
-			refresh(), "secondary", "save", 42)
-		b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		bh.add_child(b1)
-		var b2 = UI.btn("Restore", func(): MENU.backups_sheet(G.slot), "ghost", "", 42)
-		b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		bh.add_child(b2)
-		left_v.add_child(bh)
+
 
 
 func _fill_songs():
@@ -220,6 +214,7 @@ func _toggle_song(id: String):
 func _look(row: Control):
 	var pn = pane(330, 2)
 	var v = pn[1]
+	right_v = v
 	row.add_child(pn[0])
 	_head(v, "Skin")
 	var cur = UI.skin().id
@@ -272,3 +267,24 @@ func _show_errors():
 			UI.close_sheet()
 			refresh(), "ghost", "", 56)))
 	G.errlog.save()
+
+
+func _backups():
+	if right_v == null or not (G.active and G.s != null):
+		return
+	right_v.add_child(UI.sp(0, 4))
+	_head(right_v, "Save backups")
+	var bl = G.backups(G.slot)
+	right_v.add_child(UI.lbl_fill("%d kept · newest %s" % [bl.size(), bl[0].meta.get("date", "-") if bl.size() > 0 else "none yet"], 16, UI.MUTED))
+	var bh = UI.hb(8)
+	var b1 = UI.btn("Back up now", func():
+		G.save_game()
+		if G.backup():
+			UI.toast("Backup made", UI.GREEN)
+		refresh(), "secondary", "save", 42)
+	b1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bh.add_child(b1)
+	var b2 = UI.btn("Restore", func(): MENU.backups_sheet(G.slot), "ghost", "", 42)
+	b2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bh.add_child(b2)
+	right_v.add_child(bh)

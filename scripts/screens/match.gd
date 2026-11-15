@@ -1588,5 +1588,5 @@ func _finish():
 		if not o.fx.played:
 			G.apply_match(o)
 	G.play_day_fixtures()
-	G.save_game()
+	G.autosave()
 	UI.main.root("home")

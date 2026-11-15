@@ -528,7 +528,7 @@ static func complete(d: Dictionary, t: Dictionary):
 		say(d, "agent", "Pre-contract signed.")
 		G.news("%s has agreed to join %s when his %s contract ends in June." % [G.pfull(p), uc.name, G.s.clubs[p.club].name if p.club >= 0 else ""])
 		G.scrap("Pre-contract: %s" % G.pname(p), "%s agreed to join on a free transfer in the summer." % G.pfull(p))
-		G.save_game()
+		G.autosave()
 		return
 	if d.mode == "renew":
 		G.TR.renew(p, t.wage, t.years)
@@ -568,7 +568,7 @@ static func complete(d: Dictionary, t: Dictionary):
 		p.erase("bon")
 	d.stage = "done"
 	say(d, "agent", "Contract signed.")
-	G.save_game()
+	G.autosave()
 
 
 # ---------------------------------------------------------------- money owed later
