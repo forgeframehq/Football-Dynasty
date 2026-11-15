@@ -10,6 +10,7 @@ const SCREENS = {
 	"staffsearch": preload("res://scripts/screens/staffsearch.gd"),
 	"scoutnet": preload("res://scripts/screens/scoutnet.gd"),
 	"worldmap": preload("res://scripts/screens/worldmap.gd"),
+	"intl": preload("res://scripts/screens/intl.gd"),
 	"social": preload("res://scripts/screens/social.gd"),
 	"managers": preload("res://scripts/screens/managers.gd"),
 	"home3d": preload("res://scripts/screens/home3d.gd"),
@@ -994,6 +995,8 @@ func menu_items(key: String) -> Array:
 		a.append(_row("list-ordered", "Club Division", "%s in the %s" % [G.LG.ordinal(G.LG.position(c.id)), s.leagues[c.lg].name], func(): root("table", {"lg": c.lg})))
 		a.append(_row("trophy", "Cups & Continental", "%d competitions" % G.CP.club_comps(c.id).size(), func(): root("comps")))
 		a.append(_row("globe", "World Leagues", "Every league, five continents", func(): root("worldmap", {"grp": "world"})))
+		G.IT.ensure()
+		a.append(_row("trophy", "International", ("%s live" % s.intl.live[0].name) if s.intl.live.size() > 0 else "World Cup, Euros, Copa América", func(): root("intl", {"grp": "world"})))
 		for nat in NATIONS:
 			for i in s.leagues.size():
 				var l = s.leagues[i]
@@ -1047,7 +1050,7 @@ const MENU_GROUPS = {
 		["Club", ["Kit & Sponsors", "Finances", "Club City", "Fans", "Club Records"]], ["Season", ["Calendar", "Fixtures", "Tactical Plans", "Team Report", "Match Analysis"]]],
 	"manager": [["Job", ["Manager Profile", "Board Confidence", "My Contract", "Board Request", "Jobs", "Philosophy"]], "|",
 		["Money and life", ["Lifestyle", "My Home", "Investments", "Club Ownership", "Social"]], ["Career", ["Trophy Cabinet", "Career Timeline", "Game Status"]]],
-	"world": [["Competitions", ["Club Division", "Cups & Continental", "World Leagues"]], ["Leagues", []], "|",
+	"world": [["Competitions", ["Club Division", "Cups & Continental", "World Leagues", "International"]], ["Leagues", []], "|",
 		["News", ["Live Scores", "Transfer Centre", "Manager Watch", "League Standards"]], ["Best players", ["Player Stats", "Team of the Week", "Awards", "Top 50 Players", "Wonderkids"]]],
 	"search": [["Find", ["Player Search", "Staff Search", "Role Finder", "Find Club", "Scouting"]], ["Deals", ["Transfer Market", "Jobs"]], "|",
 		["Quick lists", ["Bargains", "Free Agents", "Transfer Listed", "Expiring Contracts"]]],

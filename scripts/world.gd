@@ -44,6 +44,29 @@ const CAT = [
 		["Enyimba", "Rangers International", "Rivers United", "Remo Stars", "Kano Pillars", "Shooting Stars", "Kwara United", "Plateau United", "Lobi Stars", "Abia Warriors",
 		"Bendel Insurance", "Niger Tornadoes", "Katsina United", "Ikorodu City", "Bayelsa United", "Nasarawa United"]],
 ]
+# second divisions: [name, short, country (as the top league's), continent, top rep, bottom rep, local share, others, clubs, top league, promoted]
+const CAT2 = [
+	["Série B", "SRB", "Brazil", "South America", 66, 57, 0.92, ["Argentina", "Uruguay", "Paraguay"],
+		["Coritiba", "Goiás", "Athletico Paranaense", "Chapecoense", "Remo", "Criciúma", "Novorizontino", "Cuiabá", "Avaí", "Operário-PR",
+		"Atlético Goianiense", "Vila Nova", "América Mineiro", "Ferroviária", "Athletic Club", "Botafogo-SP", "Volta Redonda", "Paysandu", "Amazonas", "CRB"], "Brasileirão", 4],
+	["Primera Nacional", "PNA", "Argentina", "South America", 63, 55, 0.9, ["Uruguay", "Paraguay", "Chile"],
+		["Gimnasia La Plata", "Colón", "Quilmes", "Ferro Carril Oeste", "Chacarita Juniors", "Almirante Brown", "Atlanta", "All Boys", "Defensores de Belgrano", "Estudiantes de Buenos Aires",
+		"Gimnasia de Jujuy", "Gimnasia de Mendoza", "Deportivo Morón", "Nueva Chicago", "San Martín de Tucumán", "San Martín de San Juan", "Temperley", "Tristán Suárez", "Patronato", "Arsenal de Sarandí"], "Liga Profesional", 2],
+	["Liga Portugal 2", "LP2", "Portugal", "Europe", 63, 54, 0.6, ["Brazil", "Cape Verde Islands", "Angola", "Spain"],
+		["Marítimo", "Académico de Viseu", "Vizela", "Chaves", "Leixões", "Feirense", "Penafiel", "Portimonense", "Oliveirense", "Paços de Ferreira",
+		"Torreense", "Benfica B", "FC Porto B", "União de Leiria", "Felgueiras", "Farense", "Lusitânia Lourosa", "Sporting CP B"], "Liga Portugal", 2],
+	["Eerste Divisie", "EED", "Netherlands", "Europe", 63, 54, 0.75, ["Belgium", "Suriname", "Curaçao", "Morocco"],
+		["Willem II", "RKC Waalwijk", "Almere City", "De Graafschap", "Cambuur", "ADO Den Haag", "Roda JC", "FC Den Bosch", "FC Emmen", "Vitesse",
+		"MVV Maastricht", "FC Dordrecht", "Helmond Sport", "VVV-Venlo", "TOP Oss", "FC Eindhoven", "Jong Ajax", "Jong PSV", "Jong AZ", "Jong FC Utrecht"], "Eredivisie", 2],
+	["1. Lig", "1LG", "Türkiye", "Europe", 64, 55, 0.7, ["Brazil", "Nigeria", "Senegal", "Portugal"],
+		["Sivasspor", "Hatayspor", "Adana Demirspor", "Bodrumspor", "Erzurumspor", "Pendikspor", "Bandırmaspor", "Iğdır FK", "Manisa FK", "Ümraniyespor",
+		"Esenler Erokspor", "Keçiörengücü", "Sakaryaspor", "Boluspor", "Amedspor", "Serik Belediyespor", "Sarıyer", "Vanspor"], "Süper Lig", 3],
+	["Scottish Championship", "SCH", "Scotland", "Europe", 60, 52, 0.75, ["England", "Republic of Ireland", "Northern Ireland"],
+		["Ross County", "St Johnstone", "Partick Thistle", "Dunfermline Athletic", "Raith Rovers", "Ayr United", "Morton", "Queen's Park", "Airdrieonians", "Arbroath"], "Scottish Premiership", 1],
+]
+# continental club competitions for the other continents: [id, name, continent, format (group = 32 teams, ko = 16), scale]
+const CONT_COMPS = [["lib", "Copa Libertadores", "South America", "group", 0.5], ["afc", "AFC Champions League", "Asia", "group", 0.4],
+	["caf", "CAF Champions League", "Africa", "group", 0.2], ["ccc", "CONCACAF Champions Cup", "North America", "ko", 0.3]]
 const CONTINENTS = ["Europe", "South America", "North America", "Asia", "Africa"]
 const POS = ["GK", "GK", "CB", "CB", "CB", "CB", "LB", "LB", "RB", "RB", "CDM", "CDM", "CM", "CM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST", "ST"]
 const COLS = [["C8102E", "FFFFFF"], ["034694", "FFFFFF"], ["000000", "FFFFFF"], ["006400", "FFFFFF"], ["FDB913", "000000"], ["6CABDD", "1C2C5B"], ["7A263A", "FFD700"],
@@ -63,20 +86,36 @@ static func continent_of(lg: Dictionary) -> String:
 
 
 static func ensure():
-	# builds the world once per career (also for saves from before it existed)
+	# builds the world once per career (also for saves from before it existed); v2 adds the second divisions
 	var s = G.s
-	if s.has("world"):
+	if s.has("world") and int(s.world.v) >= 2:
 		return
-	s["world"] = {"v": 1}
+	if not s.has("world"):
+		s["world"] = {"v": 0}
+	var added = []
+	if int(s.world.v) < 1:
+		added.append_array(_build(CAT, 1))
+	added.append_array(_build(CAT2, 2))
+	s.world.v = 2
+	if added.size() > 0:
+		G.build_index()
+		fixtures(s.day)
+
+
+static func _build(list: Array, tier: int) -> Array:
+	var s = G.s
 	var rng = G.rng
 	var added = []
-	for e in CAT:
+	for e in list:
 		var lg = null
 		for l in s.leagues:
 			if l.name == e[0]:
 				lg = l
 		if lg == null:
-			lg = {"id": s.leagues.size(), "name": e[0], "short": e[1], "country": e[2], "tier": 1, "clubs": [], "roe": false}
+			lg = {"id": s.leagues.size(), "name": e[0], "short": e[1], "country": e[2], "tier": tier, "clubs": [], "roe": false}
+			if tier == 2:
+				lg["parent"] = e[9]
+				lg["promo"] = e[10]
 			s.leagues.append(lg)
 		lg["bg"] = true
 		lg["cont"] = e[3]
@@ -94,9 +133,7 @@ static func ensure():
 			var rep = lerp(top, float(e[5]), float(k - (0 if n_old == 0 else n_old)) / max(1.0, float(todo.size() - 1))) + rng.randf_range(-1.5, 1.5)
 			var c = _club(nm, lg.id, rep, e)
 			added.append(c.id)
-	if added.size() > 0:
-		G.build_index()
-		fixtures(s.day)
+	return added
 
 
 static func _short(nm: String) -> String:
@@ -114,7 +151,7 @@ static func _club(nm: String, lg_id: int, rep: float, e: Array) -> Dictionary:
 	s.clubs.append(c)
 	s.leagues[lg_id].clubs.append(id)
 	for pos in POS:
-		var nat = e[2] if rng.randf() < float(e[6]) else e[7][rng.randi() % e[7].size()]
+		var nat = nat_of(e[2]) if rng.randf() < float(e[6]) else e[7][rng.randi() % e[7].size()]
 		var a = clampi(int(rng.randfn(26.0, 4.5)), 17, 35)
 		var ovr = clampi(int(rng.randfn(rep - 3.0, 4.5)), 40, 86)
 		var p = G.gen_player(id, pos, a, ovr, ovr, nat)
@@ -331,6 +368,127 @@ static func window_tick():
 	if best.id in s.shortlist or was_known:
 		G.msg("%s moves to %s" % [G.pname(best), b.short], "%s (%d, %s) has left %s for %s for %s. You %s." % [G.pfull(best), G.age(best), best.pos, from.name, b.name, G.money(fee),
 			"had him on your shortlist" if best.id in s.shortlist else "had a scout report on him"], "deal", best.id)
+
+
+static func set_playable(countries: Array):
+	# the nations the manager chose to run on the full match engine; everything else plays quick results
+	var s = G.s
+	for l in s.leagues:
+		if l.roe and not l.has("cont"):
+			continue      # the small rest-of-Europe leagues have no league programme
+		l["bg"] = not (l.country in countries)
+
+
+static func playable() -> Array:
+	var out = []
+	for l in G.s.leagues:
+		if l.clubs.size() >= 4 and not l.get("bg", false) and not (l.roe and not l.has("cont")) and not (l.country in out):
+			out.append(l.country)
+	return out
+
+
+static func promotions(tables: Array):
+	# end of season in the world's second divisions: the top sides swap with the bottom of the league above
+	var s = G.s
+	for l2 in s.leagues:
+		if not l2.has("parent"):
+			continue
+		var l1 = null
+		for l in s.leagues:
+			if l.name == l2.parent:
+				l1 = l
+		if l1 == null or l2.id >= tables.size() or l1.id >= tables.size():
+			continue
+		var k = int(l2.promo)
+		var ups = tables[l2.id].slice(0, k)
+		var t1 = tables[l1.id]
+		var downs = t1.slice(t1.size() - k)
+		for cid in ups:
+			l2.clubs.erase(cid)
+			l1.clubs.append(cid)
+			s.clubs[cid].lg = l1.id
+		for cid in downs:
+			l1.clubs.erase(cid)
+			l2.clubs.append(cid)
+			s.clubs[cid].lg = l2.id
+		if s.user.club in ups:
+			G.msg("Promoted!", "%s finish in the promotion places and go up to the %s." % [s.clubs[s.user.club].name, l1.name], "board", null, true)
+		elif s.user.club in downs:
+			G.msg("Relegated", "%s go down to the %s." % [s.clubs[s.user.club].name, l2.name], "board", null, true)
+		if ups.size() > 0:
+			G.news("%s: %s promoted to the %s; %s go down." % [l2.name, ", ".join(ups.map(func(x): return s.clubs[x].short)), l1.name, ", ".join(downs.map(func(x): return s.clubs[x].short))])
+
+
+static func continental():
+	# called at the start of each season after the European draw (CP.setup_season)
+	var s = G.s
+	for cc in CONT_COMPS:
+		var pool = []
+		for l in s.leagues:
+			if l.get("cont", "") == cc[2] and int(l.tier) == 1:
+				var ids = l.clubs.duplicate()
+				ids.sort_custom(func(a, b): return s.clubs[a].rep > s.clubs[b].rep)
+				pool.append(ids)
+		if pool.is_empty():
+			continue
+		var n = 32 if cc[3] == "group" else 16
+		var teams = []
+		var i = 0
+		while teams.size() < n:
+			var added = false
+			for ids in pool:
+				if i < ids.size() and teams.size() < n:
+					teams.append(ids[i])
+					added = true
+			if not added:
+				break
+			i += 1
+		if cc[3] == "group" and teams.size() == 32:
+			G.CP.add_group_comp(cc[0], cc[1], teams, cc[4])
+		elif teams.size() >= 16:
+			G.CP.add_ko_comp(cc[0], cc[1], teams.slice(0, 16), cc[4])
+
+
+static func is_bg_club(cid: int) -> bool:
+	return cid >= 0 and G.s.leagues[G.s.clubs[cid].lg].get("bg", false)
+
+
+static func quick_cup(f: Dictionary):
+	# a cup or continental tie between two background clubs: result, then penalties if still level
+	var s = G.s
+	var h = s.clubs[f.h]
+	var a = s.clubs[f.a]
+	var d = (h.rep - a.rep) * 0.045
+	f.played = true
+	f.hg = _pois(1.4 * exp(d))
+	f.ag = _pois(1.15 * exp(-d))
+	for side in [[h, f.hg, f.ag], [a, f.ag, f.hg]]:
+		var res = "W" if side[1] > side[2] else ("L" if side[1] < side[2] else "D")
+		side[0].form.append(res)
+		if side[0].form.size() > 5:
+			side[0].form.pop_front()
+		var xi = _xi(side[0])
+		for p in xi:
+			p.ss.ap += 0      # cup games do not count in league stats
+		for g in side[1]:
+			var sc = _pick(xi)
+			if sc != null:
+				sc.cg += 1
+	var hg = int(f.hg)
+	var ag = int(f.ag)
+	if int(f.get("leg", 0)) == 2 and f.has("first"):
+		var f1 = s.fixtures[int(f.first)]
+		hg += int(f1.ag)
+		ag += int(f1.hg)
+	var decide = f.ko and (int(f.get("leg", 0)) != 1)
+	if decide and hg == ag:
+		var ph = G.rng.randi_range(3, 5)
+		var pa = ph
+		while pa == ph:
+			pa = G.rng.randi_range(2, 5)
+		f["pens"] = [ph, pa]
+	if f.has("comp"):
+		G.CP.on_result(f)
 
 
 static func make_playable(lg_id: int):

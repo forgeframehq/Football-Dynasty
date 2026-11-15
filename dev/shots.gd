@@ -313,6 +313,23 @@ func run(m):
 		nc.nat = "Brazil"
 		nc.refresh()
 		await snap("new_world_clubs", 0.5)
+	if want.call("intl"):
+		# play into February so the Asian Cup has been played
+		var guard = 0
+		while G.s.day < G.ymd(2027, 1, 20) and guard < 400:
+			guard += 1
+			var f = G.user_fixture_today()
+			if f != null:
+				G.sim_fixture(f)
+			G.advance_day()
+		main.root("intl", {"grp": "world"})
+		await snap("intl", 0.6)
+	if want.call("playable"):
+		main.root("new_career", {"slot": 0})
+		var nc2 = main.stack[-1]
+		nc2._playable_sheet()
+		await snap("playable", 0.6)
+		UI.close_sheet()
 	if want.call("mgrs"):
 		main.root("managers", {"grp": "world"})
 		await snap("managers", 0.6)

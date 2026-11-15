@@ -143,6 +143,57 @@ static func setup_season():
 			G.msg("%s draw" % ed[1], "You have been drawn in Group %s of the %s with %s." % ["ABCDEFGH"[gi], ed[1], ", ".join(names)], "board")
 
 
+	if s.has("world"):
+		G.WD.continental()
+
+static func add_group_comp(id: String, name: String, teams: Array, scale: float):
+	# a 32-team competition in the Champions League format (eight groups of four, then two-legged knockouts)
+	var s = G.s
+	teams = teams.duplicate()
+	teams.sort_custom(func(a, b): return s.clubs[a].rep > s.clubs[b].rep)
+	var groups = []
+	for g in 8:
+		groups.append([])
+	for pot in 4:
+		var p = teams.slice(pot * 8, pot * 8 + 8)
+		p.shuffle()
+		for g in 8:
+			groups[g].append(p[g])
+	var dates = []
+	for i in EURO_DATES.size():
+		dates.append(snap(EURO_DATES[i], 6 if i == EURO_DATES.size() - 1 else 3))
+	var comp = {"id": id, "name": name, "kind": "euro", "dates": dates, "round": 0, "groups": groups, "gt": {}, "alive": [], "byes": [], "fx": [], "done": false, "winner": -1, "rounds": [], "scale": scale, "stage": 0}
+	for cid in teams:
+		comp.gt[cid] = G.new_table()
+		s.clubs[cid].budget += int(12000000 * scale)
+	for md in 6:
+		comp.round = md
+		for g in 8:
+			for m in GROUP_MD[md]:
+				comp.fx.append(_add(comp, dates[md], groups[g][m[0]], groups[g][m[1]], false, "Group %s" % "ABCDEFGH"[g]))
+	comp.round = 0
+	s.comps.append(comp)
+	if s.user.has("club") and s.user.club in teams:
+		for g in 8:
+			if s.user.club in groups[g]:
+				var names = groups[g].filter(func(x): return x != s.user.club).map(func(x): return s.clubs[x].name)
+				G.msg("%s draw" % name, "You have been drawn in Group %s of the %s with %s." % ["ABCDEFGH"[g], name, ", ".join(names)], "board")
+
+
+const KO_DATES = [[10, 22], [2, 18], [4, 8], [5, 13]]
+
+
+static func add_ko_comp(id: String, name: String, teams: Array, scale: float):
+	# a 16-team knockout (single games) for a continent's cup
+	var s = G.s
+	var dates = []
+	for md in KO_DATES:
+		dates.append(snap(md, 3))
+	var comp = {"id": id, "name": name, "kind": "cup", "country": "", "dates": dates, "round": 0, "alive": teams.duplicate(), "byes": [], "fx": [], "done": false, "winner": -1, "rounds": [], "scale": scale}
+	s.comps.append(comp)
+	_draw_round(comp)
+
+
 static func _two_legs(comp: Dictionary, day: int, h: int, a: int, label: String):
 	# European knockout rounds before the final: away first, home second a week later, settled on aggregate
 	var s = G.s

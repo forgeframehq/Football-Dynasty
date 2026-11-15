@@ -215,3 +215,4 @@ Everything Sudhi asked for after playing v0.9.0. Screens and code, in the order 
 - [x] Coaching style perks (each style has a perk the points cannot buy; Balanced gets 4 extra points)
 - [x] Scouting network: scouts with regions and senior/youth stars, missions with instructions, reports with uncertain ranges, youth prospects to sign, Youth Academy, recruitment hub with offers, shortlist alerts
 - [x] Big world: 13 more leagues on five continents with real club names and generated players, quick-result background leagues, hidden home-based players found by scouts, big clubs buying from them each window, continent picker, World Leagues screen
+- [x] Pick up to five playable nations; second divisions for six world leagues; Copa Libertadores, AFC, CAF and CONCACAF club competitions; World Cup, Euros, Copa América, AFCON and Asian Cup with call-ups

@@ -19,6 +19,17 @@ static func zones(lg: int) -> Dictionary:
 		if l[1] == lg:
 			z.up = l[2]
 			z.po = 4 if l[3] == "eng4" else (1 if l[3] == "rel" else 3)
+	# world leagues: continental places at the top, and promotion/relegation with their second divisions
+	var L = G.s.leagues[lg]
+	if L.has("cont"):
+		if L.has("parent"):
+			z.up = int(L.promo)
+		else:
+			z.cl = 4
+			z.eu = 6
+			for l2 in G.s.leagues:
+				if l2.get("parent", "") == L.name:
+					z.down = int(l2.promo)
 	return z
 
 
@@ -118,6 +129,12 @@ static func objective(c: Dictionary, shift := 0) -> Dictionary:
 		else:
 			text = "Avoid relegation"
 			target = safe
+	var L = G.s.leagues[c.lg]
+	if L.has("cont") and text.contains("Champions League"):
+		var cn = {"South America": "Copa Libertadores", "Asia": "AFC Champions League", "Africa": "CAF Champions League", "North America": "CONCACAF Champions Cup"}.get(L.cont, "Champions League")
+		text = text.replace("the Champions League", "the " + cn)
+	if L.has("cont") and text == "Qualify for Europe" and L.cont != "Europe":
+		text = "Finish in the top six"
 	return {"exp": ex, "target": target, "text": text}
 
 
@@ -439,6 +456,8 @@ static func rollover():
 		s.leagues[c.lg].clubs.erase(c.id)
 		c.lg = m[1]
 		s.leagues[c.lg].clubs.append(c.id)
+	if s.has("world"):
+		G.WD.promotions(tables)
 	# prize money before the reset
 	for lg in s.leagues:
 		var t = tables[lg.id]

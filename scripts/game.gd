@@ -17,6 +17,7 @@ const MG = preload("res://scripts/managers.gd")
 const STY = preload("res://scripts/stories.gd")
 const SN = preload("res://scripts/scout_net.gd")
 const WD = preload("res://scripts/world.gd")
+const IT = preload("res://scripts/intl.gd")
 
 const SAVE_V = 2
 var slot := 0
@@ -244,7 +245,8 @@ func money(v) -> String:
 
 
 func available(p: Dictionary) -> bool:
-	return p.inj <= 0 and p.susp <= 0
+	# away: on international duty (a winter tournament) until that day
+	return p.inj <= 0 and p.susp <= 0 and int(p.get("away", 0)) <= s.day
 
 
 func squad_wages(c: Dictionary) -> int:
@@ -350,6 +352,8 @@ func new_game(profile, club_id: int):
 	for c in s.clubs:
 		init_club(c)
 	WD.ensure()
+	if profile.has("playable"):
+		WD.set_playable(profile.playable)
 	if profile.get("world_club", "") != "":
 		for c in s.clubs:
 			if c.name == profile.world_club:
@@ -471,6 +475,7 @@ func ensure_state():
 		init_user_tactics(c)
 	TC.ensure()
 	WD.ensure()
+	IT.ensure()
 	SF.ensure()
 	MG.ensure()
 	SN.ensure()
@@ -1003,6 +1008,10 @@ func play_day_fixtures():
 		# background leagues get a quick result instead of the full match engine
 		if f.get("lg", -1) >= 0 and not f.get("ko", false) and f.get("comp", "") == "" and s.leagues[f.lg].get("bg", false):
 			WD.quick(f)
+			continue
+		# so do cup and continental ties between two clubs from background leagues
+		if (f.get("comp", "") != "" or f.get("ko", false)) and not f.get("fr", false) and WD.is_bg_club(f.h) and WD.is_bg_club(f.a):
+			WD.quick_cup(f)
 			continue
 		sim_fixture(f)
 

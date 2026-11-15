@@ -29,6 +29,8 @@ var cont := "Europe"
 var wl := -1
 var wclubs: Array = []
 var winfo: Array = []
+# nations run on the full match engine (up to five); the club's nation is always one of them
+var playable: Array = ["England", "Spain", "Italy", "Germany", "France"]
 
 
 func _load_info():
@@ -208,7 +210,10 @@ func _picker():
 		lg = int(raw.clubs[pick].lg)
 		nat = raw.leagues[lg].country
 		refresh(), "secondary", "shuffle", 48)
-	_header("Pick a team", crumbs, rnd)
+	var hr = UI.hb(8)
+	hr.add_child(UI.btn("Playable: %d of 5" % playable.size(), _playable_sheet, "secondary", "globe", 48))
+	hr.add_child(rnd)
+	_header("Pick a team", crumbs, hr)
 	var h = panes(16, 24)
 	var grid = HFlowContainer.new()
 	grid.add_theme_constant_override("h_separation", 12)
@@ -222,6 +227,7 @@ func _picker():
 			refresh(), 16, 6)
 		ct.custom_minimum_size = Vector2(900, 0)
 		grid.add_child(ct)
+		var later = []     # world league tiles go after the big five
 		for wi in G.WD.CAT.size():
 			var e = G.WD.CAT[wi]
 			if e[3] != cont:
@@ -241,6 +247,7 @@ func _picker():
 				nat = G.WD.CAT[wii][2]
 				refresh())
 			grid.add_child(t2)
+			later.append(t2)
 		for n in (NATIONS if cont == "Europe" else []):
 			var cnt = 0
 			var clubs = 0
@@ -264,6 +271,8 @@ func _picker():
 				nat = nn
 				refresh())
 			grid.add_child(t)
+		for t3 in later:
+			grid.move_child(t3, grid.get_child_count() - 1)
 	elif lg < 0 and wl < 0:
 		for li in raw.leagues.size():
 			var l = raw.leagues[li]
@@ -317,6 +326,65 @@ func _picker():
 				refresh())
 			grid.add_child(t)
 	h.add_child(_club_panel())
+
+
+func _nations() -> Array:
+	# [country key as the league stores it, display name, flag nation] for every nation with a league programme
+	var out = []
+	for n in NATIONS:
+		out.append([n, n, n])
+	for e in G.WD.CAT:
+		var key = e[2]
+		for l in raw.leagues:
+			if l.name == e[0]:
+				key = l.country
+		out.append([key, G.WD.nat_of(key), G.WD.nat_of(key)])
+	return out
+
+
+func _club_nation() -> String:
+	# the country key of the picked club's league
+	if pick < 0:
+		return ""
+	if pick >= WB:
+		return G.WD.CAT[wclubs[pick - WB].cat][2]
+	return raw.leagues[int(raw.clubs[pick].lg)].country
+
+
+func _playable_sheet():
+	var build = func(v):
+		v.add_child(UI.wrap("Up to five nations use the full match engine: every match properly played, detailed stats, everything you can watch. The rest of the world plays quick results: tables, scorers and transfers still move, at a fraction of the work for your phone. Your club's nation is always playable.", 16, UI.MUTED))
+		var g = GridContainer.new()
+		g.columns = 3
+		g.add_theme_constant_override("h_separation", 8)
+		g.add_theme_constant_override("v_separation", 6)
+		var mine = _club_nation()
+		for n in _nations():
+			var key = n[0]
+			var on = key in playable or key == mine
+			var b = UI.panel(Color(UI.GOLD, 0.2) if on else Color(1, 1, 1, 0.05), 10, 10, 6, UI.GOLD if on else Color(0, 0, 0, 0))
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var bh = UI.hb(8)
+			bh.add_child(UI.flag(n[2], 26))
+			bh.add_child(UI.lbl_fill(n[1], 17, UI.TEXT if on else UI.MUTED, "semi"))
+			if key == mine:
+				bh.add_child(UI.chip("YOUR CLUB", Color(UI.GOLD, 0.2), UI.GOLD, 12))
+			b.add_child(bh)
+			UI.tap(b, func():
+				if key == mine:
+					return
+				if key in playable:
+					playable.erase(key)
+				elif playable.size() + (0 if mine == "" or mine in playable else 1) < 5:
+					playable.append(key)
+				else:
+					UI.toast("Five nations at most. Switch one off first.", UI.AMBER)
+					return
+				UI.close_sheet()
+				_playable_sheet(), true)
+			g.add_child(b)
+		v.add_child(g)
+	UI.sheet("Playable nations", build)
 
 
 func _tile(w: float, hgt: float, on := false) -> PanelContainer:
@@ -559,6 +627,14 @@ func _start():
 			parts.append(w.substr(0, 1).to_upper() + w.substr(1))
 	prof.name = " ".join(parts) if parts.size() > 0 else "Manager"
 	G.slot = args.get("slot", 0)
+	# the club's nation is always playable; if that makes six, the last one picked drops out
+	var pl = playable.duplicate()
+	var cn = _club_nation()
+	if not (cn in pl):
+		pl.append(cn)
+	while pl.size() > 5:
+		pl.remove_at(pl.size() - 2)
+	prof["playable"] = pl
 	if pick >= WB:
 		prof["world_club"] = wclubs[pick - WB].name
 		G.new_game(prof, 0)
