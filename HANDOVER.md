@@ -235,6 +235,6 @@ Everything Sudhi asked for after playing v0.9.0. Screens and code, in the order 
 - Scorers: the engine's shot share (`x0` in `ME.recalc`) is divided by `1 + max(0, season goals - 12) / 24`, which only moves who shoots, not team goals (still 2.74 a game). Top scorers now about 40-50 in all competitions; Kane still reaches 60+ because he takes Bayern's penalties and free kicks. Quick results (`WD.quick`): rep gap capped (`clamp(... * 0.04, -0.65, 0.65)`), flatter scorer weights with the same tally taper; world-league top scorers 15-25, fully played Brasileirão about 25-35.
 - Version 1.1.1, code 15. Includes badges, trophies and flags from the sections above.
 
-## dev after v1.1.1 (15 Nov): always full screen, random opening song
+## v1.1.2 (15 Nov, APK, code 16): always full screen, random opening song
 - Sudhi's phone still showed a bare band on the left of rail-less screens (his cut-out counts as `rail_wide()`). He does not mind things sitting behind the camera, so `main.left_inset()` now always returns 0. The rail keeps its own handling.
 - Music: `UI._launch_song()` picks a random enabled song each launch (never last launch's opener); shuffle is on by default (`shuffle_v2` flag turns it on once for older settings files; the Settings switch still works).
