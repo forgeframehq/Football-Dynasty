@@ -1,5 +1,5 @@
 extends Control
-# Small drawn national flag. Unknown nations get a neutral plate.
+# Small national flag: a picture from assets/flags when there is one, otherwise drawn; unknown nations get a neutral plate.
 
 const F = {
 	"England": ["cross", "ffffff", "ce1124"], "Northern Ireland": ["cross", "ffffff", "ce1124"],
@@ -48,9 +48,32 @@ func setup(n: String, w: float):
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+static var _codes := {}
+static var _tex := {}
+
+
+static func tex(n: String) -> Texture2D:
+	# a real flag picture from assets/flags (flag-icons, MIT licence), or null to fall back to the drawn one
+	if _codes.is_empty():
+		var fa = FileAccess.open("res://data/flags.json", FileAccess.READ)
+		if fa != null:
+			_codes = JSON.parse_string(fa.get_as_text())
+			fa.close()
+	if not _tex.has(n):
+		var code = str(_codes.get(n, ""))
+		var p = "res://assets/flags/%s.png" % code
+		_tex[n] = load(p) if code != "" and ResourceLoader.exists(p) else null
+	return _tex[n]
+
+
 func _draw():
 	var w = size.x
 	var h = size.y
+	var t = tex(nat)
+	if t != null:
+		draw_texture_rect(t, Rect2(0, 0, w, h), false)
+		draw_rect(Rect2(0, 0, w, h), Color(0, 0, 0, 0.25), false, 1.0)
+		return
 	var f = F.get(nat, null)
 	if f == null:
 		draw_rect(Rect2(0, 0, w, h), Color("2a3550"))

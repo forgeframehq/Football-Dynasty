@@ -612,7 +612,26 @@ func badge(c: Dictionary, size := 64) -> Control:
 func trophy(title: String, h := 96.0) -> Control:
 	# picture for a trophy, chosen from its name; falls back to the icon
 	var n = 5
-	if title.contains("Champions League"):
+	# the world's competitions first: several of their names contain "Champions League", "Copa" or "Cup"
+	if title.contains("Libertadores"):
+		n = 11
+	elif title.contains("AFC Champions"):
+		n = 12
+	elif title.contains("CAF Champions"):
+		n = 13
+	elif title.contains("CONCACAF"):
+		n = 14
+	elif title.contains("World Cup"):
+		n = 15
+	elif title.contains("European Championship"):
+		n = 16
+	elif title.contains("Copa América"):
+		n = 17
+	elif title.contains("Africa Cup"):
+		n = 18
+	elif title.contains("Asian Cup"):
+		n = 19
+	elif title.contains("Champions League"):
 		n = 6
 	elif title.contains("Europa"):
 		n = 7

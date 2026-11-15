@@ -55,6 +55,7 @@ func _side(v: VBoxContainer, shown: Array):
 func _tournament(v: VBoxContainer, t: Dictionary):
 	var s = G.s
 	var head = UI.hb(8)
+	head.add_child(UI.trophy(t.name, 56))
 	head.add_child(UI.lbl("%s %d" % [t.name, t.year], 24, UI.TEXT, "xbold"))
 	head.add_child(UI.lbl_fill("  %s" % t.host, 16, UI.MUTED))
 	v.add_child(head)
