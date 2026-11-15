@@ -15,6 +15,7 @@ var f_line := 0
 var f_age := 0
 var f_focus := 0
 var f_budget := 0
+var f_where := 2
 # reports
 var r_line := 0
 var r_sort := 0
@@ -183,9 +184,18 @@ func _ticket(w: VBoxContainer):
 		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tv.add_child(r3)
 	if f_kind == 0:
-		tv.add_child(UI.seg(G.SN.FOCUS, f_focus, func(i):
+		var r5 = UI.hb(8)
+		var ws = UI.seg(G.SN.WHERE, f_where, func(i):
+			f_where = i
+			refresh(), 14, 4)
+		ws.custom_minimum_size = Vector2(300, 0)
+		r5.add_child(ws)
+		var fs = UI.seg(G.SN.FOCUS, f_focus, func(i):
 			f_focus = i
-			refresh(), 14, 4))
+			refresh(), 14, 4)
+		fs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		r5.add_child(fs)
+		tv.add_child(r5)
 	var kind = "senior" if f_kind == 0 else "youth"
 	var eye = G.SN.eye(sc, kind, f_region)
 	var r4 = UI.hb(8)
@@ -199,7 +209,7 @@ func _ticket(w: VBoxContainer):
 		"talent-rich region" if float(G.SN.TALENT.get(f_region, 1.0)) >= 1.1 else ("cheap region" if G.SN.CHEAP.has(f_region) else "")], 14, UI.DIM))
 	r4.add_child(info)
 	var go = UI.btn("Send %s" % sc.ln, func():
-		var why = G.SN.start(sc, kind, f_region, f_months, f_line, f_age, f_focus, f_budget)
+		var why = G.SN.start(sc, kind, f_region, f_months, f_line, f_age, f_focus, f_budget, f_where)
 		if why != "":
 			UI.toast(why, UI.RED)
 			return

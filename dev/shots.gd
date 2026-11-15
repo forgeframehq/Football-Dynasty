@@ -288,6 +288,31 @@ func run(m):
 		sn.tab = 2
 		sn.refresh()
 		await snap("scout_youth")
+	if want.call("world"):
+		for d in 30:
+			G.advance_day()
+		main.root("worldmap", {"grp": "world"})
+		await snap("world_eu", 0.6)
+		var wm = main.stack[-1]
+		wm.cont = "South America"
+		wm.refresh()
+		await snap("world_sa")
+		var bra = -1
+		for l in G.s.leagues:
+			if l.name == "Brasileirão":
+				bra = l.id
+		main.open("table", {"lg": bra})
+		await snap("world_table", 0.5)
+	if want.call("newworld"):
+		main.root("new_career", {"slot": 0})
+		var nc = main.stack[-1]
+		nc.cont = "South America"
+		nc.refresh()
+		await snap("new_world", 0.5)
+		nc.wl = 5
+		nc.nat = "Brazil"
+		nc.refresh()
+		await snap("new_world_clubs", 0.5)
 	if want.call("mgrs"):
 		main.root("managers", {"grp": "world"})
 		await snap("managers", 0.6)

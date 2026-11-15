@@ -158,7 +158,7 @@ static func generate_fixtures():
 	s.fixtures = []
 	s.playoffs = []
 	for lg in s.leagues:
-		if lg.roe:
+		if lg.roe or lg.has("cont"):
 			continue
 		var ids = lg.clubs.duplicate()
 		ids.shuffle()
@@ -186,6 +186,8 @@ static func generate_fixtures():
 		for r in rounds.size():
 			for m in rounds[r]:
 				s.fixtures.append({"id": s.fixtures.size(), "lg": lg.id, "rd": r + 1, "day": days[r], "h": m[0], "a": m[1], "hg": -1, "ag": -1, "played": false, "ko": false, "label": ""})
+	if s.has("world"):
+		G.WD.fixtures(s.day)
 	G.build_index()
 	G.CP.setup_season()
 	# pre-season friendlies for the manager's club
@@ -442,7 +444,7 @@ static func rollover():
 		var t = tables[lg.id]
 		for i in t.size():
 			var c = s.clubs[t[i]]
-			var tierf = 0.12 if lg.roe else [1.0, 0.22, 0.07, 0.03][s.leagues[c.lg].tier - 1]
+			var tierf = 0.12 if lg.roe or lg.has("cont") else [1.0, 0.22, 0.07, 0.03][s.leagues[c.lg].tier - 1]
 			var base = 900000.0 * pow(1.2, c.rep - 60.0)
 			var prize = 40000000.0 * tierf * (1.0 - float(i) / t.size())
 			if c.id == ucl.id:
@@ -497,7 +499,7 @@ static func rollover():
 		var acad = c.fac.academy if mine and c.has("fac") else 3
 		var yb = G.SF.youth_bonus() if mine else [0, 0, 0]
 		for k in (2 + (1 if c.rep > 76 else 0) + (1 if mine and acad >= 4 else 0) + yb[2] + (1 if mine and G.perk("Developer") else 0)):
-			var nat = country if rng.randf() < 0.75 else s.leagues[rng.randi() % s.leagues.size()].country
+			var nat = G.WD.nat_of(country) if rng.randf() < 0.75 else G.WD.nat_of(s.leagues[rng.randi() % s.leagues.size()].country)
 			var o = clampi(int(c.rep) - 22 + rng.randi_range(-5, 6) + (acad - 3 if mine else 0) + yb[0], 40, 70)
 			var pot = clampi(o + rng.randi_range(8, 22) + (rng.randi_range(0, 8) if rng.randf() < 0.15 else 0) + (acad - 3) * 3 + yb[1], o + 4, 94)
 			var pos_opts = ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST", "ST"]

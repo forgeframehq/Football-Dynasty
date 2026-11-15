@@ -57,6 +57,8 @@ func build():
 	else:
 		var budget = c.budget
 		for p in s.players.values():
+			if G.WD.hidden(p):
+				continue
 			var sc_ = 0.0
 			var extra = ""
 			var cl = s.clubs[p.club].name if p.club >= 0 else "Free agent"

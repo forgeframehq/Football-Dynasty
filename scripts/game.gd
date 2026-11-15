@@ -16,6 +16,7 @@ const SF = preload("res://scripts/staff.gd")
 const MG = preload("res://scripts/managers.gd")
 const STY = preload("res://scripts/stories.gd")
 const SN = preload("res://scripts/scout_net.gd")
+const WD = preload("res://scripts/world.gd")
 
 const SAVE_V = 2
 var slot := 0
@@ -348,6 +349,14 @@ func new_game(profile, club_id: int):
 		add_raw_player(r, prng)
 	for c in s.clubs:
 		init_club(c)
+	WD.ensure()
+	if profile.get("world_club", "") != "":
+		for c in s.clubs:
+			if c.name == profile.world_club:
+				club_id = c.id
+				WD.make_playable(c.lg)
+				break
+	WD.make_playable(s.clubs[club_id].lg)
 	s.user = {"name": mname, "club": club_id, "rep": 0.0, "conf": 60.0, "obj": {}, "p": 0, "w": 0, "d": 0, "l": 0, "trophies": [], "sacked": false, "jobs": []}
 	var mc = uc()
 	for k in ["nat", "badge", "bg", "attr"]:
@@ -461,6 +470,7 @@ func ensure_state():
 			c.formation = "4-3-3"
 		init_user_tactics(c)
 	TC.ensure()
+	WD.ensure()
 	SF.ensure()
 	MG.ensure()
 	SN.ensure()
@@ -990,6 +1000,10 @@ func play_day_fixtures():
 		var f = s.fixtures[i]
 		if f.played or f.h == s.user.club or f.a == s.user.club:
 			continue
+		# background leagues get a quick result instead of the full match engine
+		if f.get("lg", -1) >= 0 and not f.get("ko", false) and f.get("comp", "") == "" and s.leagues[f.lg].get("bg", false):
+			WD.quick(f)
+			continue
 		sim_fixture(f)
 
 
@@ -1340,6 +1354,7 @@ func take_job(cid: int):
 	s.negos = {}
 	s.deals = {}
 	var c = uc()
+	WD.make_playable(c.lg)
 	u.obj = LG.objective(c)
 	init_user_tactics(c)
 	OPS.ensure(c)

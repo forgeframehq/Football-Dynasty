@@ -18,6 +18,9 @@ static func run(node: Node):
 	else:
 		G.new_game("Tester", cid)
 	print("new game ms: ", Time.get_ticks_msec() - t0, " players: ", G.s.players.size(), " fixtures: ", G.s.fixtures.size())
+	var ts0 = Time.get_ticks_msec()
+	G.save_game()
+	print("save ms: ", Time.get_ticks_msec() - ts0, " file: ", FileAccess.get_file_as_bytes(G.save_path()).size() / 1024, " KB")
 	# send the club's scout on a senior mission and a hired one on a youth mission
 	G.SN.ensure()
 	G.uc().budget += 1000000
@@ -75,6 +78,17 @@ static func run(node: Node):
 				fe += 1
 		print("  staff: ", G.uc().staff.size(), " market: ", G.s.staff_free.size(), " ex-players: ", G.s.staff_free.filter(func(x): return G.s.staff[x].ex != null).size(),
 			" | managers: ", G.s.mgrs.size(), " feuds: ", fe, " moves: ", G.s.mgr_log.size(), " | stories in inbox: ", stories, " | posts: ", kinds, " | backups: ", G.backups(G.slot).size(), " | scout reports: ", G.s.sn.reports.size(), " prospects: ", G.s.sn.prospects.size(), " missions out: ", G.s.sn.missions.size())
+		# the wider world: last season's champions and how many moved to the big leagues
+		var wl = []
+		for l in G.s.leagues:
+			if l.has("cont"):
+				wl.append("%s %d clubs" % [l.name, l.clubs.size()])
+		var exports = 0
+		for pid in G.s.players:
+			var pp = G.s.players[pid]
+			if pp.has("prevc") and pp.prevc >= 0 and G.s.leagues[G.s.clubs[pp.prevc].lg].has("cont") and pp.club >= 0 and not G.s.leagues[G.s.clubs[pp.club].lg].has("cont"):
+				exports += 1
+		print("  world: ", wl, " | exports to the big leagues: ", exports, " | world champions: ", G.s.champs[0].c.keys().size() if G.s.champs.size() > 0 else 0)
 		var sizes = G.s.clubs.map(func(x): return x.players.size())
 		print("  squad sizes min/max: ", sizes.min(), "/", sizes.max(), " history: ", G.s.history[0])
 		var bl = G.backups(G.slot)

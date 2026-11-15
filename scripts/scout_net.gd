@@ -13,10 +13,10 @@ const REGIONS = {
 	"France": ["France"],
 	"Italy": ["Italy"],
 	"Germany & Alps": ["Germany", "Austria", "Switzerland"],
-	"Benelux": ["Holland", "Belgium", "Luxembourg"],
+	"Benelux": ["Holland", "Belgium", "Luxembourg", "Netherlands"],
 	"Scandinavia": ["Denmark", "Norway", "Sweden", "Finland", "Iceland"],
-	"Eastern Europe": ["Poland", "Czech Republic", "Ukraine", "Hungary", "Slovakia", "Romania", "Russia", "Georgia", "Bulgaria"],
-	"Balkans & Turkey": ["Croatia", "Serbia", "Bosnia and Herzegovina", "Slovenia", "Albania", "Kosovo", "Greece", "Turkey", "North Macedonia", "Montenegro"],
+	"Eastern Europe": ["Poland", "Czech Republic", "Ukraine", "Hungary", "Slovakia", "Romania", "Russia", "Georgia", "Bulgaria", "Czechia"],
+	"Balkans & Turkey": ["Croatia", "Serbia", "Bosnia and Herzegovina", "Slovenia", "Albania", "Kosovo", "Greece", "Turkey", "North Macedonia", "Montenegro", "Türkiye"],
 	"South America": ["Brazil", "Argentina", "Uruguay", "Colombia", "Ecuador", "Chile", "Venezuela", "Paraguay", "Peru", "Bolivia"],
 	"Africa": ["Morocco", "Senegal", "Nigeria", "Côte d'Ivoire", "Ghana", "Algeria", "Cameroon", "Mali", "Congo DR", "Guinea", "Gambia", "Burkina Faso", "Tunisia", "Egypt"],
 	"North America": ["United States", "Canada", "Mexico", "Jamaica"],
@@ -30,6 +30,7 @@ const FOCUS = ["Potential", "Ready now", "Pace", "Technique", "Defending"]
 const LINES = ["Any", "GK", "DEF", "MID", "ATT"]
 const AGES = [["Any", 40], ["Under 24", 23], ["Under 21", 20]]
 const BUDGETS = [["Any", 999999999], ["€5M", 5000000], ["€15M", 15000000], ["€40M", 40000000]]
+const WHERE = ["Home-based", "In Europe", "Both"]
 const COST = {"senior": 20000, "youth": 10000}     # travel each month of a mission
 const YOUTH_POS = ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST", "ST"]
 
@@ -141,7 +142,7 @@ static func wage_bill() -> int:
 
 # ---------------------------------------------------------------- missions
 
-static func start(p: Dictionary, kind: String, region: String, months: int, line: int, age_i: int, focus: int, budget_i: int) -> String:
+static func start(p: Dictionary, kind: String, region: String, months: int, line: int, age_i: int, focus: int, budget_i: int, where := 2) -> String:
 	var s = G.s
 	var c = G.uc()
 	if busy(p):
@@ -152,7 +153,7 @@ static func start(p: Dictionary, kind: String, region: String, months: int, line
 	c.budget -= cost
 	var gap = report_gap(p, kind, region)
 	s.sn.missions.append({"id": s.sn.next, "sid": p.id, "kind": kind, "region": region, "line": line, "age": age_i, "focus": focus, "budget": budget_i,
-		"start": s.day, "end": s.day + months * 30, "nextr": s.day + gap, "found": 0})
+		"start": s.day, "end": s.day + months * 30, "nextr": s.day + gap, "found": 0, "where": where})
 	s.sn.next += 1
 	return ""
 
@@ -208,9 +209,15 @@ static func _senior_report(sc: Dictionary, m: Dictionary):
 		if r.has("pid"):
 			seen[int(r.pid)] = true
 	var cands = []
+	var where = int(m.get("where", 2))
 	for pid in s.players:
 		var p = s.players[pid]
-		if not (p.nat in nats) or p.club == c.id or p.get("youth", false) or seen.has(pid):
+		if p.club == c.id or p.get("youth", false) or seen.has(pid):
+			continue
+		# home-based: playing in a league of this region (mostly hidden generated players); in Europe: from the region but playing in the big leagues
+		var home = p.club >= 0 and s.leagues[s.clubs[p.club].lg].country in nats and s.leagues[s.clubs[p.club].lg].has("cont")
+		var abroad = p.nat in nats and not home
+		if not ((where != 1 and home) or (where != 0 and abroad)):
 			continue
 		if G.age(p) > max_age or G.value(p) > max_val:
 			continue

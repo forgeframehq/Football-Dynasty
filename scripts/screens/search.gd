@@ -85,6 +85,9 @@ func _pass(p: Dictionary, c: Dictionary, st: int, ql: String) -> bool:
 	var s = G.s
 	if p.club == c.id:
 		return false
+	# home-based players in the wider world only show up once a scout has reported on them
+	if G.WD.hidden(p):
+		return false
 	if p.club >= 0 and s.leagues[s.clubs[p.club].lg].roe and ql == "":
 		return false
 	if F.grp >= 0 and G.LINE.get(p.pos, 2) != F.grp:

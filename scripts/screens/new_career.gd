@@ -23,6 +23,12 @@ var lg := -1
 var pick := -1
 var raw: Dictionary = {}
 var info: Array = []   # per club: rep, budget, n, star, att, mid, def, rank, of
+# the wider world (G.WD.CAT): continent tab, the world league being browsed, and its generated clubs (pick >= WB)
+const WB = 10000
+var cont := "Europe"
+var wl := -1
+var wclubs: Array = []
+var winfo: Array = []
 
 
 func _load_info():
@@ -66,6 +72,44 @@ func _load_info():
 		for k in ids.size():
 			info[ids[k]].rank = k + 1
 			info[ids[k]].of = ids.size()
+	# world leagues: the catalogue's clubs that are not in the database yet, with an estimated strength
+	for wi in G.WD.CAT.size():
+		var e = G.WD.CAT[wi]
+		var have = {}
+		var raw_ids = []
+		for i in raw.clubs.size():
+			if raw.leagues[int(raw.clubs[i].lg)].name == e[0]:
+				have[raw.clubs[i].name] = true
+				raw_ids.append(i)
+		var todo = e[8].filter(func(x): return not have.has(x))
+		var top = float(e[4]) if raw_ids.is_empty() else float(e[4]) - 8.0
+		for k in todo.size():
+			var nm = todo[k]
+			var col = G.WD.COLS[(nm.hash() & 0x7fffffff) % G.WD.COLS.size()]
+			var r = lerp(top, float(e[5]), float(k) / max(1.0, float(todo.size() - 1)))
+			wclubs.append({"name": nm, "short": G.WD._short(nm), "c1": col[0], "c2": col[1], "stadium": "", "cat": wi})
+			winfo.append({"rep": r, "budget": G.nice(900000.0 * pow(1.2, r - 60.0) * 0.6), "n": 22, "star": "Unknown until you arrive", "star_ovr": 0, "star_pos": "",
+				"att": int(r), "mid": int(r), "def": int(r), "rank": 0, "of": 0})
+		var all = raw_ids.duplicate()
+		for j in wclubs.size():
+			if wclubs[j].cat == wi:
+				all.append(WB + j)
+		all.sort_custom(func(x, y): return _inf(x).rep > _inf(y).rep)
+		for k in all.size():
+			_inf(all[k]).rank = k + 1
+			_inf(all[k]).of = all.size()
+
+
+func _cl(i: int) -> Dictionary:
+	return wclubs[i - WB] if i >= WB else raw.clubs[i]
+
+
+func _inf(i: int) -> Dictionary:
+	return winfo[i - WB] if i >= WB else info[i]
+
+
+func _lg_name(i: int) -> String:
+	return G.WD.CAT[wclubs[i - WB].cat][0] if i >= WB else raw.leagues[int(raw.clubs[i].lg)].name
 
 
 func can_leave() -> bool:
@@ -73,8 +117,9 @@ func can_leave() -> bool:
 		step = 0
 	elif pick >= 0:
 		pick = -1
-	elif lg >= 0:
+	elif lg >= 0 or wl >= 0:
 		lg = -1
+		wl = -1
 	elif nat != "":
 		nat = ""
 	else:
@@ -137,9 +182,14 @@ func _picker():
 	var crumbs = [["Nations", func():
 		nat = ""
 		lg = -1
+		wl = -1
 		pick = -1
 		refresh()]]
-	if nat != "":
+	if wl >= 0:
+		crumbs.append([G.WD.CAT[wl][0], func():
+			pick = -1
+			refresh()])
+	elif nat != "":
 		crumbs.append([nat, func():
 			lg = -1
 			pick = -1
@@ -166,8 +216,32 @@ func _picker():
 	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var gs = UI.scroll(grid)
 	h.add_child(gs)
-	if nat == "":
-		for n in NATIONS:
+	if nat == "" and wl < 0:
+		var ct = UI.seg(G.WD.CONTINENTS, G.WD.CONTINENTS.find(cont), func(i):
+			cont = G.WD.CONTINENTS[i]
+			refresh(), 16, 6)
+		ct.custom_minimum_size = Vector2(900, 0)
+		grid.add_child(ct)
+		for wi in G.WD.CAT.size():
+			var e = G.WD.CAT[wi]
+			if e[3] != cont:
+				continue
+			var t2 = _tile(260, 190)
+			var tv2 = t2.get_child(0)
+			tv2.add_child(UI.center(UI.flag(e[2], 120)))
+			var l2 = UI.lbl(e[0].to_upper(), 26, UI.TEXT, "xbold")
+			l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			tv2.add_child(l2)
+			var sl2 = UI.caps("%s · %d clubs" % [e[2], e[8].size() + (8 if cont == "Europe" else 0)], 16, UI.MUTED)
+			sl2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			tv2.add_child(sl2)
+			var wii = wi
+			UI.tap(t2, func():
+				wl = wii
+				nat = G.WD.CAT[wii][2]
+				refresh())
+			grid.add_child(t2)
+		for n in (NATIONS if cont == "Europe" else []):
 			var cnt = 0
 			var clubs = 0
 			for li in raw.leagues.size():
@@ -190,7 +264,7 @@ func _picker():
 				nat = nn
 				refresh())
 			grid.add_child(t)
-	elif lg < 0:
+	elif lg < 0 and wl < 0:
 		for li in raw.leagues.size():
 			var l = raw.leagues[li]
 			if l.country != nat or l.get("roe", false):
@@ -216,11 +290,15 @@ func _picker():
 	else:
 		var ids = []
 		for i in raw.clubs.size():
-			if int(raw.clubs[i].lg) == lg:
+			if (wl < 0 and int(raw.clubs[i].lg) == lg) or (wl >= 0 and raw.leagues[int(raw.clubs[i].lg)].name == G.WD.CAT[wl][0]):
 				ids.append(i)
-		ids.sort_custom(func(a, b): return info[a].rep > info[b].rep)
+		if wl >= 0:
+			for j in wclubs.size():
+				if wclubs[j].cat == wl:
+					ids.append(WB + j)
+		ids.sort_custom(func(a, b): return _inf(a).rep > _inf(b).rep)
 		for ci in ids:
-			var c = raw.clubs[ci]
+			var c = _cl(ci)
 			var on = ci == pick
 			var t = _tile(176, 138, on)
 			var tv = t.get_child(0)
@@ -230,7 +308,7 @@ func _picker():
 			l.clip_text = true
 			l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			tv.add_child(l)
-			var st = UI.stars(info[ci].rep, 14)
+			var st = UI.stars(_inf(ci).rep, 14)
 			st.alignment = BoxContainer.ALIGNMENT_CENTER
 			tv.add_child(st)
 			var idx = ci
@@ -263,9 +341,9 @@ func _club_panel() -> Control:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(l)
 		return p
-	var c = raw.clubs[pick]
-	var inf = info[pick]
-	var l = raw.leagues[int(c.lg)]
+	var c = _cl(pick)
+	var inf = _inf(pick)
+	var l = {"name": _lg_name(pick), "country": nat, "tier": 1} if pick >= WB or wl >= 0 else raw.leagues[int(c.lg)]
 	var head = UI.hb(14)
 	head.add_child(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": pick}, 84))
 	var hv = UI.vb(-2)
@@ -285,6 +363,8 @@ func _club_panel() -> Control:
 	v.add_child(UI.kv("Predicted finish", "%s of %d" % [ord.call(inf.rank), inf.of]))
 	v.add_child(UI.kv("Star player", "%s (%s, %d)" % [inf.star, inf.star_pos, inf.star_ovr]))
 	v.add_child(UI.kv("Squad size", str(inf.n)))
+	if pick >= WB or wl >= 0:
+		v.add_child(UI.wrap("A league in the wider world: its players are generated for your career, and you will discover them as you go.", 16, UI.MUTED))
 	var frac = float(inf.rank - 1) / max(1.0, inf.of - 1.0)
 	var diff = "Expected to win" if frac < 0.12 else ("Comfortable" if frac < 0.4 else ("Challenging" if frac < 0.75 else "Hard"))
 	if int(l.tier) > 1 and frac < 0.3:
@@ -324,7 +404,7 @@ func _apply_style():
 
 
 func _manager():
-	var c = raw.clubs[pick]
+	var c = _cl(pick)
 	_header("Your manager", [[c.name, func():
 		step = 0
 		refresh()]])
@@ -479,7 +559,12 @@ func _start():
 			parts.append(w.substr(0, 1).to_upper() + w.substr(1))
 	prof.name = " ".join(parts) if parts.size() > 0 else "Manager"
 	G.slot = args.get("slot", 0)
-	G.new_game(prof, pick)
+	if pick >= WB:
+		prof["world_club"] = wclubs[pick - WB].name
+		G.new_game(prof, 0)
+	else:
+		prof.erase("world_club")
+		G.new_game(prof, pick)
 	G.s.user["age"] = age
 	G.s.user["style"] = STYLES[style][0]
 	var hd = sh.strip_edges().replace("@", "").replace(" ", "_")

@@ -159,6 +159,7 @@ static func daily():
 	G.STY.daily()
 	G.SOC.daily()
 	G.SN.daily()
+	G.WD.window_tick()
 	if G.cur.day == 1:
 		G.MG.monthly()
 	if G.cur.weekday == 1:
