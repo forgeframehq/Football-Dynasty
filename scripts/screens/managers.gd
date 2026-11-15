@@ -1,4 +1,5 @@
 extends "res://scripts/screens/screen.gd"
+const FED = preload("res://scripts/face_editor.gd")
 # Manager Watch: who is under pressure in your league (and everywhere), your rivals and your record against them,
 # and the latest sackings and appointments.
 
@@ -44,6 +45,7 @@ func _hot(v: VBoxContainer):
 		var cid = it[0]
 		var m = G.MG.of(cid)
 		var nm = UI.hb(6)
+		nm.add_child(FED.make(G.MG.face(m), 34))
 		nm.add_child(UI.badge(s.clubs[cid], 22))
 		var tv = UI.vb(-5)
 		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -72,6 +74,7 @@ func _rivals(v: VBoxContainer):
 		var cid = it[0]
 		var m = it[1]
 		var nm = UI.hb(6)
+		nm.add_child(FED.make(G.MG.face(m), 34))
 		nm.add_child(UI.badge(s.clubs[cid], 22))
 		var tv = UI.vb(-5)
 		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL

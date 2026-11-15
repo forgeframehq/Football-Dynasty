@@ -372,6 +372,8 @@ func new_game(profile, club_id: int):
 	s.user["points"] = 0
 	s.user["study"] = 0
 	s.user.rep = 22.0 + profile.badge * 11.0 + profile.bg * 5.0
+	if profile.has("face"):
+		s.user["face"] = profile.face
 	s.user.conf = clamp(60.0 - max(0.0, (mc.rep - 25.0) - s.user.rep) * 0.9, 30.0, 60.0)
 	s.user.obj = LG.objective(mc)
 	init_user_tactics(mc)

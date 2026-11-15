@@ -180,6 +180,10 @@ func _post(p: Dictionary) -> Control:
 	var pv = UI.vb(3)
 	var ph = UI.hb(8)
 	var cid = int(p.get("cid", -1))
+	if kind == "me":
+		ph.add_child(load("res://scripts/face_editor.gd").make(G.s.user.get("face", {}), 30))
+	elif kind == "mgr" and cid >= 0:
+		ph.add_child(load("res://scripts/face_editor.gd").make(G.MG.face(G.MG.of(cid)), 30))
 	if cid >= 0 and kind in ["club", "mgr", "player"]:
 		ph.add_child(UI.badge(G.s.clubs[cid], 22))
 	ph.add_child(UI.lbl(str(p.who), 18, UI.TEXT, "bold"))

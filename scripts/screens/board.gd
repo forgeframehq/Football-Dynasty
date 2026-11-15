@@ -1,4 +1,5 @@
 extends "res://scripts/screens/screen.gd"
+const FED = preload("res://scripts/face_editor.gd")
 # Board room: the objective and confidence, the manager's profile and attributes, and the career record.
 
 
@@ -55,6 +56,12 @@ func build():
 	h.add_child(b[0])
 	v = b[1]
 	var mh = UI.hb(10)
+	var fc = FED.make(u.get("face", {}), 84)
+	mh.add_child(fc)
+	UI.tap(fc, func(): FED.open(u.get("face", {}), func(nf):
+		u["face"] = nf
+		refresh()), true)
+	fc.mouse_filter = Control.MOUSE_FILTER_STOP
 	mh.add_child(UI.flag(u.nat, 34))
 	var nv = UI.vb(-2)
 	nv.size_flags_horizontal = Control.SIZE_EXPAND_FILL

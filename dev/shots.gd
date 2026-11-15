@@ -40,6 +40,26 @@ func run(m):
 		main.open("settings")
 		await snap("settings_title")
 		main.back()
+	if want.call("faces") and not only.is_empty():
+		var cv2 = ColorRect.new()
+		cv2.color = Color("1a1530")
+		cv2.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		main.add_child(cv2)
+		var g2 = GridContainer.new()
+		g2.columns = 8
+		g2.position = Vector2(20, 10)
+		cv2.add_child(g2)
+		var FC = load("res://scripts/widgets/face.gd")
+		for i in 16:
+			var fc = FC.new()
+			fc.custom_minimum_size = Vector2(150, 150)
+			fc.setup(FC.default_face() if i == 0 else FC.random(i * 7919))
+			g2.add_child(fc)
+		await snap("faces", 0.5)
+		cv2.queue_free()
+		load("res://scripts/face_editor.gd").open({}, func(nf): pass)
+		await snap("face_editor", 0.5)
+		UI.close_sheet()
 	if want.call("badges") and not only.is_empty():
 		# small (flat) and big (premium) badge side by side for the first 24 database clubs
 		var raw = DB.load_db()

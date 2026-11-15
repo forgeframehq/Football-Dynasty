@@ -1,4 +1,5 @@
 extends "res://scripts/screens/screen.gd"
+const FED = preload("res://scripts/face_editor.gd")
 # New career: Nation > League > Club picker with a club panel, then the manager profile.
 
 const NATIONS = ["England", "Spain", "Italy", "Germany", "France"]
@@ -914,7 +915,19 @@ func _manager():
 	h.add_child(sp)
 	var rep = 22.0 + prof.badge * 11.0 + prof.bg * 5.0
 	var full = ("%s %s" % [fn, ln]).strip_edges()
-	sv.add_child(UI.center(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": pick, "name": c.name}, 78)))
+	if not prof.has("face"):
+		prof["face"] = load("res://scripts/widgets/face.gd").default_face()
+	var fr2 = UI.hb(10)
+	fr2.alignment = BoxContainer.ALIGNMENT_CENTER
+	fr2.add_child(FED.make(prof.face, 104))
+	var fb = UI.vb(6)
+	fb.alignment = BoxContainer.ALIGNMENT_CENTER
+	fb.add_child(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": pick, "name": c.name}, 50))
+	fb.add_child(UI.btn("Your face", func(): FED.open(prof.face, func(nf):
+		prof["face"] = nf
+		refresh()), "secondary", "pencil", 40))
+	fr2.add_child(fb)
+	sv.add_child(fr2)
 	var nl = UI.lbl((full if full != "" else "Manager").to_upper(), 30, UI.TEXT, "xbold")
 	nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nl.clip_text = true

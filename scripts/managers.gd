@@ -37,6 +37,13 @@ static func of(cid: int) -> Dictionary:
 	return s.mgrs[cid]
 
 
+static func face(m: Dictionary) -> Dictionary:
+	# every AI manager gets a face from the face creator's parts, fixed by his name
+	if not m.has("face"):
+		m["face"] = load("res://scripts/widgets/face.gd").random(("%s %s" % [m.fn, m.ln]).hash())
+	return m.face
+
+
 static func nm(m: Dictionary) -> String:
 	return "%s %s" % [m.fn, m.ln]
 
