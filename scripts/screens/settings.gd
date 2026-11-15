@@ -77,7 +77,7 @@ func _audio(row: Control):
 	_vol(v, "Match crowd", "vol_crowd")
 	v.add_child(UI.sp(0, 4))
 	_head(v, "Play order")
-	var sh = 1 if G.settings.get("shuffle", false) else 0
+	var sh = 1 if G.settings.get("shuffle", true) else 0
 	v.add_child(UI.seg(["In order", "Shuffle"], sh, func(i):
 		_put("shuffle", i == 1)
 		refresh(), 19, 5))

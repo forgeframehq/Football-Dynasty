@@ -373,10 +373,8 @@ func rail_wide() -> bool:
 func left_inset() -> int:
 	# screens without the rail: a small camera hole no longer costs the whole strip beside it. The page runs to the
 	# edge of the glass (a corner of a panel may sit behind the hole); only a long notch still pushes everything right.
-	if rail_wide():
-		return notch_l
-	# panels may start under the hole, but their text (16 px in) starts just clear of it
-	return max(0, int(hole_x.y) - 16) if hole_x.y > 0 else 0
+	# Sudhi's call (15 Nov): always full screen, even with a long notch; a little of the page may sit behind the camera
+	return 0
 
 
 func _dev_hole():

@@ -219,7 +219,7 @@ var first_song := true
 
 
 func _launch_song(tr: Array):
-	# each launch opens on a different song: the one after last launch's opener (or a random other one on shuffle)
+	# each launch opens on a random song (not last launch's opener)
 	first_song = false
 	var live = []
 	for i in tr.size():
@@ -232,17 +232,12 @@ func _launch_song(tr: Array):
 	for i in tr.size():
 		if tr[i].id == last:
 			li = i
-	var nxt = live[0]
-	if G.settings.get("shuffle", false) and live.size() > 1:
-		nxt = live[randi() % live.size()]
-		while nxt == li:
-			nxt = live[randi() % live.size()]
-	elif li >= 0:
-		for k in range(1, tr.size() + 1):
-			var j = posmod(li + k, tr.size())
-			if j in live:
-				nxt = j
-				break
+	# every launch opens on a random song from the rotation, never the same opener twice running
+	randomize()
+	var pool = live.filter(func(i): return i != li)
+	if pool.is_empty():
+		pool = live
+	var nxt = pool[randi() % pool.size()]
 	music_i = nxt
 	G.settings["last_song"] = tr[nxt].id
 	G.save_settings()
@@ -295,7 +290,7 @@ func music_step(dir: int):
 		return
 	var cur = posmod(music_i, tr.size())
 	var nxt = live[0]
-	if G.settings.get("shuffle", false) and live.size() > 1:
+	if G.settings.get("shuffle", true) and live.size() > 1:
 		nxt = cur
 		while nxt == cur:
 			nxt = live[randi() % live.size()]

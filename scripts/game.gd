@@ -66,6 +66,10 @@ func load_settings():
 	if not settings.get("music", true):
 		settings["vol_music"] = 0
 		settings["music"] = true
+	# v1.1.2: the soundtrack shuffles by default (turned on once for older settings; can still be switched off)
+	if not settings.has("shuffle_v2"):
+		settings["shuffle"] = true
+		settings["shuffle_v2"] = true
 	UI.apply_skin()
 	UI.apply_perf()
 	if errlog == null:
