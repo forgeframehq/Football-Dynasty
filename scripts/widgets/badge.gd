@@ -1,83 +1,108 @@
 extends Control
-# Procedurally drawn club badge: a shield in the club colours with its short code.
-# (Original artwork generated at runtime - no real crests are used.)
+# Club badge built at runtime from original artwork (assets/badges: 80 emblems, 8 shapes): a white rim, the shape
+# filled in the club's colours in one of three layouts, and an emblem. Shape, layout and emblem come from a hash of
+# the club's name, so a club keeps its badge in every career. No real crests are used, and an emblem that is a
+# famous club's signature (Wolves' wolf, Leicester's fox...) is never given to that club.
+
+const N_EMB = 80
+const N_SHAPE = 8
+const CIRCLE = 2
+const RING = 3
+const DIAMOND = 4
+# emblem index -> clubs that must not get it
+const AVOID = {1: ["Chelsea", "Aston Villa"], 2: ["Crystal Palace", "Lazio", "Benfica", "Eintracht"], 3: ["Crystal Palace", "Lazio", "Benfica", "Eintracht"],
+	4: ["Wolverhampton", "Roma"], 5: ["Torino"], 7: ["Stuttgart"], 8: ["Porto"], 11: ["Leicester"], 13: ["Sheffield Wednesday"], 14: ["Tottenham"], 15: ["Swansea"], 32: ["West Ham"],
+	40: ["Hull City"], 43: ["Derby County"], 45: ["Coventry"], 52: ["Crystal Palace", "Lazio", "Benfica", "Eintracht"], 78: ["Brentford"]}
+
+static var _tex := {}
 
 var c1 := Color.WHITE
 var c2 := Color.BLACK
-var code := ""
-var style := 0
+var em := 0
+var sh := 0
+var lay := 0
+
+
+static func tex(name: String) -> Texture2D:
+	if not _tex.has(name):
+		var p = "res://assets/badges/%s.png" % name
+		_tex[name] = load(p) if ResourceLoader.exists(p) else null
+	return _tex[name]
+
+
+static func pick(key: String) -> Array:
+	# [shape, emblem, layout] for a club name
+	var h = key.hash() & 0x7fffffff
+	var s = h % N_SHAPE
+	var e = (h / N_SHAPE) % N_EMB
+	var l = (h / (N_SHAPE * N_EMB)) % 3
+	var guard = 0
+	while AVOID.has(e) and guard < 10:
+		var bad = false
+		for n in AVOID[e]:
+			if key.contains(n):
+				bad = true
+		if not bad:
+			break
+		e = (e + 7) % N_EMB
+		guard += 1
+	return [s, e, l]
 
 
 func setup(c: Dictionary, sz: int):
 	c1 = Color(c.c1)
 	c2 = Color(c.c2)
-	code = c.short
-	style = int(c.id) % 4
+	var key = str(c.get("name", c.get("short", "")))
+	var pk = pick(key)
+	sh = pk[0]
+	em = pk[1]
+	lay = pk[2]
+	# two near-identical colours would hide the layout: use white as the second colour
+	if absf(c1.get_luminance() - c2.get_luminance()) < 0.12 and c1.is_equal_approx(c2):
+		c2 = Color.WHITE
 	custom_minimum_size = Vector2(sz, sz)
 	size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-func _shield(w: float, h: float, inset: float) -> PackedVector2Array:
-	var pts = PackedVector2Array()
-	var l = 0.1 * w + inset
-	var r = 0.9 * w - inset
-	var top = 0.06 * h + inset
-	var mid = 0.56 * h
-	var bot = 0.96 * h - inset * 1.3
-	pts.append(Vector2(l, top))
-	pts.append(Vector2(r, top))
-	pts.append(Vector2(r, mid))
-	for i in range(1, 9):
-		var t = i / 9.0
-		var a = Vector2(r, mid).lerp(Vector2(r, bot * 0.86), t)
-		var b = Vector2(r, bot * 0.86).lerp(Vector2(w / 2.0, bot), t)
-		pts.append(a.lerp(b, t))
-	pts.append(Vector2(w / 2.0, bot))
-	for i in range(8, 0, -1):
-		var t = i / 9.0
-		var a = Vector2(l, mid).lerp(Vector2(l, bot * 0.86), t)
-		var b = Vector2(l, bot * 0.86).lerp(Vector2(w / 2.0, bot), t)
-		pts.append(a.lerp(b, t))
-	pts.append(Vector2(l, mid))
-	return pts
+func _ink(on: Color, want: Color) -> Color:
+	# the emblem's colour: the wanted club colour unless it would vanish on the field behind it
+	if absf(want.get_luminance() - on.get_luminance()) >= 0.22:
+		return want
+	return Color.WHITE if on.get_luminance() < 0.55 else Color("10141f")
 
 
 func _draw():
 	var w = size.x
 	var h = size.y
-	var outer = _shield(w, h, 0.0)
-	var ring = Color(1, 1, 1, 0.92)
-	draw_colored_polygon(outer, ring)
-	var inset = max(1.5, w * 0.045)
-	var inner = _shield(w, h, inset)
-	draw_colored_polygon(inner, c1)
-	var l = 0.1 * w + inset
-	var r = 0.9 * w - inset
-	var top = 0.06 * h + inset
-	match style:
+	var fill_shape = CIRCLE if sh == RING else sh
+	var st = tex("sh_%d" % fill_shape)
+	var et = tex("em_%02d" % em)
+	if st == null:
+		draw_circle(Vector2(w, h) / 2.0, w / 2.0, c1)
+		return
+	var full = Rect2(Vector2.ZERO, Vector2(w, h))
+	var rim = max(1.5, w * 0.06)
+	var inner = full.grow(-rim)
+	# white rim, then the club's colours
+	draw_texture_rect(st, full, false, Color(1, 1, 1, 0.95))
+	var field = c1
+	match lay:
+		0:
+			draw_texture_rect(st, inner, false, c1)
 		1:
-			draw_rect(Rect2(l, top, r - l, h * 0.2), c2)
+			draw_texture_rect(st, inner, false, c1)
+			draw_texture_rect(st, inner.grow(-w * 0.1), false, c2)
+			field = c2
 		2:
-			draw_rect(Rect2(l, h * 0.3, r - l, h * 0.2), c2)
-		3:
-			draw_rect(Rect2(w / 2.0, top, r - w / 2.0, 0.56 * h - top), c2)
-			var half = PackedVector2Array()
-			for p in inner:
-				if p.x >= w / 2.0 - 0.01 and p.y >= 0.56 * h - 0.01:
-					half.append(p)
-			half.append(Vector2(w / 2.0, 0.56 * h))
-			if half.size() >= 3:
-				draw_colored_polygon(half, c2)
-	var font = UI.fonts["xbold"]
-	var fs = int(h * (0.36 if code.length() <= 3 else 0.28))
-	var tw = font.get_string_size(code, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var tp = Vector2((w - tw) / 2.0, h * 0.5 + fs * 0.3)
-	var tc = Color.WHITE
-	var oc = Color(0, 0, 0, 0.55)
-	if c1.get_luminance() > 0.6 and (style == 0 or c2.get_luminance() > 0.6):
-		tc = Color("10141f")
-		oc = Color(1, 1, 1, 0.5)
-	draw_string_outline(font, tp, code, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, max(2, int(fs * 0.22)), oc)
-	draw_string(font, tp, code, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, tc)
+			draw_texture_rect(st, inner, false, c2)
+			field = c2
+	if sh == RING:
+		draw_texture_rect(tex("sh_%d" % RING), inner.grow(-w * 0.02), false, Color(_ink(field, c1 if field == c2 else c2), 0.9))
+	if et != null:
+		var k = 0.5 if sh == DIAMOND else (0.54 if sh == RING else 0.58)
+		var es = w * k
+		var er = Rect2(Vector2((w - es) / 2.0, (h - es) / 2.0 + (h * 0.02 if sh in [0, 1, 5, 6] else 0.0)), Vector2(es, es))
+		var want = c2 if field == c1 else c1
+		draw_texture_rect(et, er, false, _ink(field, want))

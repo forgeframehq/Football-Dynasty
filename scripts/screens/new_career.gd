@@ -311,7 +311,7 @@ func _picker():
 			var on = ci == pick
 			var t = _tile(176, 138, on)
 			var tv = t.get_child(0)
-			tv.add_child(UI.center(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": ci}, 62)))
+			tv.add_child(UI.center(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": ci, "name": c.name}, 62)))
 			var l = UI.lbl(c.name, 19, UI.TEXT, "semi")
 			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			l.clip_text = true
@@ -413,7 +413,7 @@ func _club_panel() -> Control:
 	var inf = _inf(pick)
 	var l = {"name": _lg_name(pick), "country": nat, "tier": 1} if pick >= WB or wl >= 0 else raw.leagues[int(c.lg)]
 	var head = UI.hb(14)
-	head.add_child(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": pick}, 84))
+	head.add_child(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": pick, "name": c.name}, 84))
 	var hv = UI.vb(-2)
 	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hv.add_child(UI.wrap(c.name.to_upper(), 30, UI.TEXT, "xbold"))
@@ -574,7 +574,7 @@ func _manager():
 	h.add_child(sp)
 	var rep = 22.0 + prof.badge * 11.0 + prof.bg * 5.0
 	var full = ("%s %s" % [fn, ln]).strip_edges()
-	sv.add_child(UI.center(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": pick}, 78)))
+	sv.add_child(UI.center(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": pick, "name": c.name}, 78)))
 	var nl = UI.lbl((full if full != "" else "Manager").to_upper(), 30, UI.TEXT, "xbold")
 	nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nl.clip_text = true

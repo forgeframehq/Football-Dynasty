@@ -83,7 +83,7 @@ func build():
 		var meta = G.save_meta(newest)
 		var cp = UI.panel(UI.GOLD, 18, 18, 10)
 		var h = UI.hb(14)
-		h.add_child(UI.badge({"c1": meta.c1, "c2": meta.c2, "short": meta.short, "id": meta.cid}, 56))
+		h.add_child(UI.badge({"c1": meta.c1, "c2": meta.c2, "short": meta.short, "id": meta.cid, "name": meta.club}, 56))
 		var cv = UI.vb(-4)
 		cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		cv.add_child(UI.lbl("CONTINUE", 32, Color("0a0e17"), "xbold"))
@@ -217,7 +217,7 @@ func _load():
 func _slot_row(i: int, meta: Dictionary, cb: Callable, can_delete: bool) -> Control:
 	var c = UI.panel(UI.CARD, 16, 16, 10, UI.LINE)
 	var h = UI.hb(14)
-	h.add_child(UI.badge({"c1": meta.c1, "c2": meta.c2, "short": meta.short, "id": meta.cid}, 52))
+	h.add_child(UI.badge({"c1": meta.c1, "c2": meta.c2, "short": meta.short, "id": meta.cid, "name": meta.club}, 52))
 	var cv = UI.vb(-3)
 	cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cv.add_child(UI.caps("Career %d" % (i + 1), 17, UI.GOLD))
