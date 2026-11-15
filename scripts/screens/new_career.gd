@@ -227,7 +227,8 @@ func _picker():
 		var ct = UI.seg(G.WD.CONTINENTS, G.WD.CONTINENTS.find(cont), func(i):
 			cont = G.WD.CONTINENTS[i]
 			refresh(), 16, 6)
-		ct.custom_minimum_size = Vector2(900, 0)
+		ct.custom_minimum_size = Vector2(300, 0)
+		ct.set_meta("fullrow", true)
 		grid.add_child(ct)
 		var later = []     # world league tiles go after the big five
 		for wi in G.WD.CAT.size():
@@ -394,8 +395,8 @@ func _league_card(li: int, cnt: int, avg: float) -> PanelContainer:
 	var l = raw.leagues[li]
 	var col = Color.html(LCOL[li % LCOL.size()])
 	var t = UI.panel(col.darkened(0.72), 16, 14, 12, col.darkened(0.2))
-	t.custom_minimum_size = Vector2(360, 250)
-	t.set_meta("base", Vector2(360, 250))
+	t.custom_minimum_size = Vector2(336, 250)
+	t.set_meta("base", Vector2(336, 250))
 	var v = UI.vb(5)
 	t.add_child(v)
 	var top = UI.hb(12)
@@ -471,6 +472,9 @@ func _fit_tiles(grid: HFlowContainer, gs: Control):
 	# are only a few, the height too
 	if not is_instance_valid(grid) or not is_instance_valid(gs):
 		return
+	for fr in grid.get_children():
+		if fr is Control and fr.has_meta("fullrow"):
+			fr.custom_minimum_size.x = gs.size.x - 6
 	var tiles = grid.get_children().filter(func(t): return t is Control and t.has_meta("base"))
 	var n = tiles.size()
 	var W = gs.size.x - 6
@@ -505,7 +509,11 @@ func _club_panel() -> Control:
 	p.custom_minimum_size = Vector2(400, 0)
 	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var v = UI.vb(8)
-	p.add_child(UI.scroll(v))
+	# fixed width: a long line (star player's name) must not widen the panel and squeeze the club grid
+	var sc2 = UI.scroll(v)
+	sc2.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	sc2.custom_minimum_size.x = 0
+	p.add_child(sc2)
 	if pick < 0:
 		v.add_child(UI.sp(0, 40))
 		v.add_child(UI.center(UI.icon("shield", 80, UI.DIM)))
@@ -533,7 +541,7 @@ func _club_panel() -> Control:
 	var ord = func(n): return "%d%s" % [n, "th" if (n % 100 >= 11 and n % 100 <= 13) else ["th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th"][n % 10]]
 	v.add_child(UI.kv("Transfer budget", "about " + G.money(inf.budget), UI.GREEN))
 	v.add_child(UI.kv("Predicted finish", "%s of %d" % [ord.call(inf.rank), inf.of]))
-	v.add_child(UI.kv("Star player", "%s (%s, %d)" % [inf.star, inf.star_pos, inf.star_ovr]))
+	v.add_child(UI.kv("Star player", "%s · %s %d" % [inf.star, inf.star_pos, inf.star_ovr], UI.TEXT, 20))
 	v.add_child(UI.kv("Squad size", str(inf.n)))
 	if pick >= WB or wl >= 0:
 		v.add_child(UI.wrap("A league in the wider world: its players are generated for your career, and you will discover them as you go.", 16, UI.MUTED))

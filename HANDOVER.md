@@ -248,3 +248,4 @@ Everything Sudhi asked for after playing v0.9.0. Screens and code, in the order 
 
 ## v1.1.3 (15 Nov, APK, code 17): test build of the centred layout
 - Sudhi is still deciding between centred (this build) and v1.1.2 full screen. To go back: `git checkout 1d1d617 -- scripts/main.gd scripts/screens/screen.gd scripts/screens/menu.gd`.
+- Centred layout fixes (after v1.1.3 on Sudhi's long notch): nothing in a rail-less screen may have a fixed minimum width (it pushed the right side off screen): continent tabs follow the grid width (meta `fullrow`, set in `_fit_tiles`); the club panel is fixed at 400 with a horizontally clipped scroll, so picking a club no longer squeezes the grid; league cards base 336 so two fit. Test with `notch=96 hole=0-620` (a long notch, the narrowest case).
