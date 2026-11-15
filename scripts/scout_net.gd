@@ -267,13 +267,23 @@ static func add_report(p: Dictionary, sc: Dictionary, region := "") -> Dictionar
 	return r
 
 
+static var _ri := {}
+static var _ri_n := -1
+static var _ri_list = null
+
+
 static func report_for(pid: int):
+	# indexed: search asks this for every generated player, so a scan of all reports each time was the slow part
 	if not G.s.has("sn"):
 		return null
-	for r in G.s.sn.reports:
-		if int(r.get("pid", -1)) == pid:
-			return r
-	return null
+	var reps = G.s.sn.reports
+	if not is_same(reps, _ri_list) or reps.size() != _ri_n:
+		_ri.clear()
+		for k in range(reps.size() - 1, -1, -1):
+			_ri[int(reps[k].get("pid", -1))] = reps[k]   # newest (front) wins, as the old scan did
+		_ri_list = reps
+		_ri_n = reps.size()
+	return _ri.get(pid, null)
 
 
 static func _youth_report(sc: Dictionary, m: Dictionary):

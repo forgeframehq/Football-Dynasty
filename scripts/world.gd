@@ -75,6 +75,9 @@ const CAT = [
 	["Betway Premiership", "PSL", "South Africa", "Africa", 66, 52, 0.85, ["Ghana", "Nigeria", "Cameroon", "Senegal"],
 		["Mamelodi Sundowns", "Orlando Pirates", "Kaizer Chiefs", "Stellenbosch FC", "Sekhukhune United", "AmaZulu", "TS Galaxy", "Polokwane City", "Golden Arrows", "Chippa United",
 		"Richards Bay", "Magesi FC", "Siwelele", "Durban City", "Marumo Gallants", "Orbit College"]],
+	["Indian Super League", "ISL", "India", "Asia", 60, 50, 0.75, ["Brazil", "Spain", "Australia", "Nigeria", "Morocco"],
+		["Mohun Bagan Super Giant", "FC Goa", "Bengaluru FC", "Jamshedpur FC", "NorthEast United", "Mumbai City FC", "Odisha FC", "Kerala Blasters", "East Bengal",
+		"Punjab FC", "Chennaiyin FC", "Mohammedan SC", "Inter Kashi"]],
 ]
 # second divisions: [name, short, country (as the top league's), continent, top rep, bottom rep, local share, others, clubs, top league, promoted]
 const CAT2 = [
@@ -148,7 +151,7 @@ static func ensure():
 	# builds the world once per career (also for saves from before it existed); v2 adds the second divisions,
 	# v3 the twelve newer leagues (Denmark ... South Africa) and the third divisions of the top seven
 	var s = G.s
-	if s.has("world") and int(s.world.v) >= 3:
+	if s.has("world") and int(s.world.v) >= 4:
 		return
 	if not s.has("world"):
 		s["world"] = {"v": 0}
@@ -156,7 +159,7 @@ static func ensure():
 	added.append_array(_build(CAT, 1))      # tops up only what is missing, so safe to run again
 	added.append_array(_build(CAT2, 2))
 	added.append_array(_build(CAT3, 3))
-	s.world.v = 3
+	s.world.v = 4   # v4: Indian Super League
 	if added.size() > 0:
 		G.build_index()
 		fixtures(s.day)

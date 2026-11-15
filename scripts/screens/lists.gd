@@ -56,9 +56,8 @@ func build():
 		note = "Wage bill %s a week of a %s budget. Tap a player to offer a new contract." % [G.money(G.squad_wages(c)), G.money(c.wage_budget)]
 	else:
 		var budget = c.budget
-		for p in s.players.values():
-			if G.WD.hidden(p):
-				continue
+		for e in load("res://scripts/screens/search.gd").pool():
+			var p = e[0]
 			var sc_ = 0.0
 			var extra = ""
 			var cl = s.clubs[p.club].name if p.club >= 0 else "Free agent"

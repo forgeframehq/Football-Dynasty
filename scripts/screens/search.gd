@@ -81,14 +81,13 @@ func _template(p: Dictionary, announce := true):
 		UI.toast("Searching for players like %s" % G.pname(p), UI.accent)
 
 
+var _age := -1    # age and value of the player being tested, from the pool (-1: work them out)
+var _val := -1
+
+
 func _pass(p: Dictionary, c: Dictionary, st: int, ql: String) -> bool:
 	var s = G.s
 	if p.club == c.id:
-		return false
-	# home-based players in the wider world only show up once a scout has reported on them
-	if G.WD.hidden(p):
-		return false
-	if p.club >= 0 and s.leagues[s.clubs[p.club].lg].roe and ql == "":
 		return false
 	if F.grp >= 0 and G.LINE.get(p.pos, 2) != F.grp:
 		return false
@@ -102,12 +101,13 @@ func _pass(p: Dictionary, c: Dictionary, st: int, ql: String) -> bool:
 			return false
 	if p.ovr < F.ovr0 or p.ovr > F.ovr1:
 		return false
-	var ag = G.age(p)
+	var ag = _age if _age >= 0 else G.age(p)
 	if ag < F.age0 or ag > F.age1:
 		return false
-	if F.afford and G.value(p) > c.budget:
+	var vv = _val if _val >= 0 else G.value(p)
+	if F.afford and vv > c.budget:
 		return false
-	if F.val1 > 0 and G.value(p) > F.val1 * 1000000:
+	if F.val1 > 0 and vv > F.val1 * 1000000:
 		return false
 	if F.wage1 > 0 and p.wage > F.wage1 * 1000:
 		return false
@@ -138,16 +138,20 @@ func _pass(p: Dictionary, c: Dictionary, st: int, ql: String) -> bool:
 func _rank(p: Dictionary, c: Dictionary, best: Dictionary) -> Array:
 	# [passes, score, reason] for the chosen quick list
 	var s = G.s
-	var ag = G.age(p)
+	var ag = _age if _age >= 0 else G.age(p)
 	match F.list:
 		"top50":
 			return [p.club >= 0, p.ovr * 100.0 - ag, "%d rated, aged %d" % [p.ovr, ag]]
 		"wonderkids":
 			return [p.club >= 0 and ag <= 21, p.ovr * 100.0 - ag * 30.0, "%d rated at %d" % [p.ovr, ag]]
 		"free":
-			return [p.club < 0, float(p.ovr), "No fee · wants about %s a week" % G.money(G.wage_for(p.ovr, ag))]
+			if p.club >= 0:
+				return [false, 0.0, ""]
+			return [true, float(p.ovr), "No fee · wants about %s a week" % G.money(G.wage_for(p.ovr, ag))]
 		"listed":
-			return [p.club >= 0 and p.listed, float(p.ovr), "For sale at about %s" % G.money(G.TR.asking_price(p))]
+			if p.club < 0 or not p.listed:
+				return [false, 0.0, ""]
+			return [true, float(p.ovr), "For sale at about %s" % G.money(G.TR.asking_price(p))]
 		"expiring":
 			return [p.club >= 0 and p.cend <= s.season + 1, float(p.ovr), "Free in June · pre-contract possible"]
 		"similar":
@@ -187,7 +191,47 @@ func _rank(p: Dictionary, c: Dictionary, best: Dictionary) -> Array:
 	return [true, 0.0, ""]
 
 
+static var POOL := {"key": "", "list": []}
+
+
+static func pool() -> Array:
+	# the players search can show, built once a day: not at your club, not an undiscovered generated player.
+	# [player, age, value]. Rebuilt when the day, your club, the player count or the scouting knowledge changes.
+	var s = G.s
+	var c = G.uc()
+	var known = s.scout.known.size() + (s.sn.reports.size() if s.has("sn") else 0)
+	var k = "%d|%d|%d|%d|%d|%d" % [s.day, c.id, s.players.size(), known, c.players.size(), int(c.budget)]
+	if POOL.key == k:
+		return POOL.list
+	var out = []
+	for p in s.players.values():
+		if p.club == c.id or G.WD.hidden(p):
+			continue
+		var roe = p.club >= 0 and s.leagues[s.clubs[p.club].lg].roe
+		out.append([p, G.age(p), G.value(p), roe])
+	POOL.key = k
+	POOL.list = out
+	return out
+
+
+static var LAST := {"key": "", "rows": [], "why": {}}
+
+
 func _collect():
+	# same filters, sort and day as last time (turning a page, coming back from a player): reuse the result
+	pool()
+	var ck = "%s|%s|%s|%s|%s|%s" % [POOL.key, JSON.stringify(F), key, desc, str(args.get("pid", "")), str(args.get("rid", "")) + str(args.get("pos", ""))]
+	if LAST.key == ck:
+		rows = LAST.rows
+		why = LAST.why
+		return
+	_collect_now()
+	LAST.key = ck
+	LAST.rows = rows
+	LAST.why = why
+
+
+func _collect_now():
 	var s = G.s
 	var c = G.uc()
 	rows = []
@@ -204,7 +248,14 @@ func _collect():
 		best.avg = tot / max(1, c.players.size())
 		best.floor = best.avg - 6
 	var keyed = []
-	for p in s.players.values():
+	for e in pool():
+		if e[3] and ql == "":
+			continue
+		var p = e[0]
+		_age = e[1]
+		_val = e[2]
+		if F.list == "bargains" and (p.club < 0 or p.ovr < best.floor or _val > c.budget * 2):
+			continue   # cheap checks before the asking price is worked out
 		if not _pass(p, c, st, ql):
 			continue
 		var sc0 = 0.0
@@ -215,6 +266,8 @@ func _collect():
 			sc0 = rk[1]
 			why[p.id] = rk[2]
 		keyed.append([_keyval(p, sc0), p, sc0])
+	_age = -1
+	_val = -1
 	var cap = 50 if F.list in ["top50", "wonderkids"] else (90 if F.list != "" else 100000)
 	if F.list != "" and key != "score":
 		# a list keeps its own best, then re-sorts them by the chosen column
@@ -235,7 +288,7 @@ func _keyval(p: Dictionary, sc0: float) -> float:
 	match key:
 		"score": return sc0
 		"name": return -float(G.pfull(p).unicode_at(0))
-		"age": return float(G.age(p))
+		"age": return float(_age if _age >= 0 else G.age(p))
 		"ovr": return float(p.ovr)
 		"wage": return float(p.wage)
 		"cend": return float(p.cend)
@@ -245,7 +298,7 @@ func _keyval(p: Dictionary, sc0: float) -> float:
 		"dri": return float(p.st[3])
 		"def": return float(p.st[4])
 		"phy": return float(p.st[5])
-	return float(G.value(p))
+	return float(_val if _val >= 0 else G.value(p))
 
 
 func _fits_link(p: Dictionary) -> bool:
@@ -487,9 +540,15 @@ func _count() -> int:
 	var c = G.uc()
 	var st = G.TC.style_of(c)
 	var n = 0
-	for p in G.s.players.values():
-		if _pass(p, c, st, ""):
+	for e in pool():
+		if e[3]:
+			continue
+		_age = e[1]
+		_val = e[2]
+		if _pass(e[0], c, st, ""):
 			n += 1
+	_age = -1
+	_val = -1
 	return n
 
 
