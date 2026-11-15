@@ -144,7 +144,17 @@ func _build_pre():
 	var cap = UI.caps(G.fx_caption(f) + (" · derby" if G.is_derby(f.h, f.a) else ""), 17, UI.accent.lightened(0.3))
 	cap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	top.add_child(cap)
+	var ct = UI.fx_tex(f)
+	if ct != null:
+		var ch = UI.hb(10)
+		ch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ch.alignment = BoxContainer.ALIGNMENT_CENTER
+		ch.add_child(UI.emblem(ct, 44))
+		cap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		ch.add_child(cap)
+		top.add_child(ch)
+	else:
+		top.add_child(cap)
 	var wch = UI.panel(Color(0, 0, 0, 0.35), 10, 10, 4)
 	var wh = UI.hb(6)
 	wh.add_child(UI.icon(str(wx.i), 18, UI.TEXT))
@@ -1451,7 +1461,7 @@ func _show_ft():
 	p1.custom_minimum_size = Vector2(330, 0)
 	var v1 = UI.vb(4)
 	v1.add_child(UI.lbl(res, 40, col, "xbold"))
-	v1.add_child(UI.lbl_fill(G.fx_caption(f), 15, UI.MUTED))
+	v1.add_child(UI.with_emblem(UI.fx_tex(f), UI.lbl_fill(G.fx_caption(f), 15, UI.MUTED), 30))
 	var notes = []
 	if sim.et:
 		notes.append("after extra time")

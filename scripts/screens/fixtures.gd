@@ -88,7 +88,7 @@ func _mine(v: VBoxContainer, side: VBoxContainer, c: Dictionary):
 		var f = all[i]
 		var home = f.h == c.id
 		var oc = s.clubs[f.a if home else f.h]
-		var row = UI.trow([G.fmt_date(f.day), _tag(f), "H" if home else "A", UI.badge(oc, 22), oc.name, _result(f, c.id)], w,
+		var row = UI.trow([G.fmt_date(f.day), UI.with_emblem(UI.fx_tex(f), UI.lbl_fill(_tag(f), 17, UI.MUTED), 24, 6), "H" if home else "A", UI.badge(oc, 22), oc.name, _result(f, c.id)], w,
 			{"size": 18, "hi": is_same(f, sel), "alt": i % 2 == 0, "pad": 3, "bold": 4,
 			"cols": {0: UI.accent if is_same(f, nxt) else UI.MUTED, 1: UI.MUTED, 2: UI.TEXT if home else UI.MUTED, 4: UI.MUTED if f.played and not is_same(f, sel) else UI.TEXT},
 			"tap": func():
@@ -135,7 +135,7 @@ func _detail(v: VBoxContainer, f: Dictionary, cid: int, is_next: bool):
 	var hc = s.clubs[f.h]
 	var ac = s.clubs[f.a]
 	v.add_child(UI.divider())
-	v.add_child(UI.caps("%s · %s" % [G.fx_caption(f) if not f.get("fr", false) else "Pre-season friendly", G.fmt_date(f.day, true)], 15, UI.accent))
+	v.add_child(UI.with_emblem(UI.fx_tex(f), UI.caps("%s · %s" % [G.fx_caption(f) if not f.get("fr", false) else "Pre-season friendly", G.fmt_date(f.day, true)], 15, UI.accent), 40))
 	var hh = UI.hb(8)
 	hh.add_child(_name(hc, true))
 	hh.add_child(UI.badge(hc, 34))

@@ -27,7 +27,8 @@ func build():
 		var on = comp.id == sel
 		var r = UI.panel(Color(UI.accent, 0.16) if on else Color(1, 1, 1, 0.03), 10, 10, 6, Color(UI.accent, 0.55) if on else Color(0, 0, 0, 0))
 		var rh = UI.hb(10)
-		rh.add_child(UI.icon("trophy" if comp.kind == "cup" else "star-f", 22, UI.GOLD))
+		var cet = UI.comp_tex(str(comp.name))
+		rh.add_child(UI.emblem(cet, 36) if cet != null else UI.icon("trophy" if comp.kind == "cup" else "star-f", 22, UI.GOLD))
 		var tv = UI.vb(-4)
 		tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tv.add_child(UI.lbl_fill(comp.name, 19, UI.TEXT, "semi"))
@@ -55,7 +56,7 @@ func build():
 
 func _detail(comp: Dictionary, v: Control):
 	var s = G.s
-	v.add_child(UI.lbl(comp.name.to_upper(), 24, UI.TEXT, "xbold"))
+	v.add_child(UI.with_emblem(UI.comp_tex(str(comp.name)), UI.lbl(comp.name.to_upper(), 24, UI.TEXT, "xbold"), 64, 14))
 	if comp.done:
 		var w = s.clubs[comp.winner]
 		var wc = UI.panel(Color(UI.GOLD, 0.1), 22, 20, 16, Color(UI.GOLD, 0.4))

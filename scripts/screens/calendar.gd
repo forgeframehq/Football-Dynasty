@@ -150,7 +150,7 @@ func _detail(v: VBoxContainer, f, c: Dictionary):
 		var oc = s.clubs[f.a if home else f.h]
 		var card = UI.panel(Color(1, 1, 1, 0.05), 12, 12, 8)
 		var cv = UI.vb(2)
-		cv.add_child(UI.caps(G.fx_caption(f), 14, UI.DIM))
+		cv.add_child(UI.with_emblem(UI.fx_tex(f), UI.caps(G.fx_caption(f), 14, UI.DIM), 26))
 		var r = UI.hb(8)
 		r.add_child(UI.badge(oc, 40))
 		var tv = UI.vb(-4)

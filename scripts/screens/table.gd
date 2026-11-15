@@ -56,6 +56,9 @@ func build():
 	var b = pane(0, 1)
 	h.add_child(b[0])
 	v = b[1]
+	var lt = UI.comp_tex(str(l.name))
+	if lt != null:
+		v.add_child(UI.center(UI.emblem(lt, 96)))
 	v.add_child(UI.caps("Zones", 15, UI.accent))
 	for z in seen:
 		var lh = UI.hb(8)

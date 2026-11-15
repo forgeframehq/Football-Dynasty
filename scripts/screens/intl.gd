@@ -42,9 +42,10 @@ func _side(v: VBoxContainer, shown: Array):
 		var live = G.s.intl.live.has(t)
 		var ch = UI.panel(Color(UI.accent, 0.2) if i == sel else Color(1, 1, 1, 0.04), 8, 10, 6)
 		var cv = UI.vb(-4)
+		cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		cv.add_child(UI.lbl_fill("%s %d%s" % [t.name, t.year, "  · LIVE" if live else ""], 16, UI.GREEN if live else UI.TEXT, "semi"))
 		cv.add_child(UI.lbl_fill(("Winners: %s" % t.winner) if t.has("winner") else t.host, 14, UI.GOLD if t.has("winner") else UI.DIM))
-		ch.add_child(cv)
+		ch.add_child(UI.with_emblem(UI.comp_tex(str(t.name)), cv, 34))
 		var ii = i
 		UI.tap(ch, func():
 			sel = ii
@@ -55,7 +56,8 @@ func _side(v: VBoxContainer, shown: Array):
 func _tournament(v: VBoxContainer, t: Dictionary):
 	var s = G.s
 	var head = UI.hb(8)
-	head.add_child(UI.trophy(t.name, 56))
+	var it = UI.comp_tex(str(t.name))
+	head.add_child(UI.emblem(it, 64) if it != null else UI.trophy(t.name, 56))
 	head.add_child(UI.lbl("%s %d" % [t.name, t.year], 24, UI.TEXT, "xbold"))
 	head.add_child(UI.lbl_fill("  %s" % t.host, 16, UI.MUTED))
 	v.add_child(head)

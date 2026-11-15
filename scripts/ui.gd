@@ -633,6 +633,72 @@ func badge(c: Dictionary, size := 64) -> Control:
 	return b
 
 
+# competition and league emblems (Sudhi's ChatGPT sheets): assets/comps, assets/leagues/<db index>, assets/leagues/w
+const COMP_KEYS = [["AFC Champions", "afc_champions_league"], ["CAF Champions", "caf_champions_league"], ["Asian Cup", "afc_asian_cup"],
+	["Champions League", "champions_league"], ["Europa League", "europa_league"], ["Conference League", "conference_league"],
+	["Libertadores", "copa_libertadores"], ["CONCACAF", "concacaf_champions_cup"], ["World Cup", "fifa_world_cup"],
+	["European Championship", "uefa_european_championship"], ["Euro", "uefa_european_championship"], ["Copa Am", "copa_america"],
+	["Africa Cup", "africa_cup_of_nations"], ["AFCON", "africa_cup_of_nations"], ["FA Cup", "fa_cup"], ["League Cup", "league_cup"],
+	["Copa del Rey", "copa_del_rey"], ["Coppa Italia", "coppa_italia"], ["DFB-Pokal", "dfb_pokal"], ["Coupe de France", "coupe_de_france"]]
+const DB_LEAGUES = ["Premier League", "Championship", "League One", "League Two", "LaLiga", "LaLiga 2", "Serie A", "Serie B", "Bundesliga",
+	"2. Bundesliga", "3. Liga", "Ligue 1", "Ligue 2"]
+var _emb := {}
+
+
+func comp_tex(name: String) -> Texture2D:
+	# the emblem for a cup, continental or international competition, or a league, by name; null if none
+	if _emb.has(name):
+		return _emb[name]
+	var path = ""
+	for k in COMP_KEYS:
+		if name.contains(k[0]):
+			path = "res://assets/comps/%s.png" % k[1]
+			break
+	if path == "":
+		var i = DB_LEAGUES.find(name)
+		if i >= 0:
+			path = "res://assets/leagues/%d.png" % i
+		else:
+			var t = load("res://scripts/screens/new_career.gd").cat_emblem(name)
+			_emb[name] = t
+			return t
+	_emb[name] = load(path) if ResourceLoader.exists(path) else null
+	return _emb[name]
+
+
+func fx_tex(f: Dictionary) -> Texture2D:
+	if f.get("fr", false):
+		return null
+	if f.get("comp", "") != "":
+		var cp = G.CP.get_comp(str(f.comp))
+		return comp_tex(str(cp.name)) if cp != null else null
+	if int(f.get("lg", -1)) >= 0:
+		return comp_tex(str(G.s.leagues[f.lg].name))
+	return null
+
+
+func emblem(t: Texture2D, size := 28.0) -> Control:
+	var r = TextureRect.new()
+	r.texture = t
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	r.custom_minimum_size = Vector2(size, size)
+	r.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
+
+
+func with_emblem(t: Texture2D, node: Control, size := 26.0, sep := 8) -> Control:
+	# node with the emblem in front of it (or just node when there is no emblem)
+	if t == null:
+		return node
+	var h = hb(sep)
+	h.add_child(emblem(t, size))
+	node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(node)
+	return h
+
+
 func trophy(title: String, h := 96.0) -> Control:
 	# picture for a trophy, chosen from its name; falls back to the icon
 	var n = 5
