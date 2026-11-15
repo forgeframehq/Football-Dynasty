@@ -373,11 +373,8 @@ func rail_wide() -> bool:
 func left_inset() -> int:
 	# screens without the rail: a small camera hole no longer costs the whole strip beside it. The page runs to the
 	# edge of the glass (a corner of a panel may sit behind the hole); only a long notch still pushes everything right.
-	# full screen, but no text behind the camera: backgrounds run edge to edge (they hang off the screen, not its
-	# content); panel edges may reach into the cut-out strip, while the text inside them (about 16 px in) starts past it
-	# FM Mobile style: the content block is centred with the same margin both sides, wide enough to clear the camera
-	var edge = notch_l if rail_wide() else (int(hole_x.y) if hole_x.y > 0 else 0)
-	return edge + 6 if edge > 0 else 0
+	# Sudhi's call (15 Nov): always full screen, even with a long notch; a little of the page may sit behind the camera
+	return 0
 
 
 func _dev_hole():
@@ -410,9 +407,7 @@ func rail_w() -> int:
 func _apply_left():
 	if safe == null or rail == null:
 		return
-	safe.add_theme_constant_override("margin_left", 0)
-	if stack.size() > 0 and is_instance_valid(stack[-1]) and stack[-1].has_method("_inset"):
-		stack[-1]._inset()
+	safe.add_theme_constant_override("margin_left", 0 if rail.visible else left_inset())
 	if int(rail.custom_minimum_size.x) != rail_w():
 		rail.custom_minimum_size = Vector2(rail_w(), 0)
 		if rail.visible and uses_chrome():

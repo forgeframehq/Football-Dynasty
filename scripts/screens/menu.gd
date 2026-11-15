@@ -14,22 +14,13 @@ func build():
 	body.add_child(holder)
 	# background scene if one is supplied, otherwise the stadium art on the right
 	if ResourceLoader.exists("res://assets/scenes/title.jpg"):
-		# the picture hangs off the screen itself, not the inset content, so it runs under the camera cut-out
-		if has_node("title_bg"):
-			get_node("title_bg").queue_free()
-		var full = Control.new()
-		full.name = "title_bg"
-		full.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		full.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		add_child(full)
-		move_child(full, 0)
 		var bg = TextureRect.new()
 		bg.texture = load("res://assets/scenes/title.jpg")
 		bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		full.add_child(bg)
+		holder.add_child(bg)
 		var shade = TextureRect.new()
 		var g = Gradient.new()
 		g.set_color(0, Color(0.02, 0.03, 0.06, 0.94))
@@ -42,7 +33,7 @@ func build():
 		shade.stretch_mode = TextureRect.STRETCH_SCALE
 		shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		full.add_child(shade)
+		holder.add_child(shade)
 	else:
 		var box = CenterContainer.new()
 		box.mouse_filter = Control.MOUSE_FILTER_IGNORE
