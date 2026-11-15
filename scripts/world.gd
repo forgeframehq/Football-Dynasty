@@ -248,7 +248,8 @@ static func quick(f: Dictionary):
 	var s = G.s
 	var h = s.clubs[f.h]
 	var a = s.clubs[f.a]
-	var d = (h.rep - a.rep) * 0.045
+	# rep gap capped so the strongest side does not run up cricket scores every week
+	var d = clamp((h.rep - a.rep) * 0.04, -0.65, 0.65)
 	var hg = _pois(1.45 * exp(d))
 	var ag = _pois(1.12 * exp(-d))
 	f.played = true
@@ -316,7 +317,8 @@ static func _pick(xi: Array):
 	var tot = 0.0
 	var w = []
 	for p in xi:
-		var v = [0.05, 0.5, 1.4, 3.2][G.LINE[p.pos]] * (1.0 + (p.ovr - 60) * 0.03)
+		# goals shared more evenly than before (one striker used to take 55+ a season); a hot scorer cools a little as his tally grows
+		var v = [0.05, 0.5, 1.4, 3.4][G.LINE[p.pos]] * (1.0 + (p.ovr - 60) * 0.03) / (1.0 + p.ss.g / 60.0)
 		w.append(max(0.01, v))
 		tot += max(0.01, v)
 	var r = G.rng.randf() * tot

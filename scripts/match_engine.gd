@@ -228,7 +228,9 @@ func recalc(i: int):
 		a += aw * (0.65 * e + 0.35 * f * (st[1] + st[3] + st[0]) / 3.0)
 		m += mw * (0.65 * e + 0.35 * f * (st[2] + st[3]) / 2.0)
 		d += dw * (0.65 * e + 0.35 * f * (st[4] + st[5]) / 2.0)
-		var x0 = (base[0] * 0.75 + 0.14) * q.p0 * rd.sh * pmod[4]
+		# a striker on a huge season tally gets a smaller share of the shots (defences key on him, he is rested, team-mates step up);
+		# this only moves who shoots, not how many goals the team scores
+		var x0 = (base[0] * 0.75 + 0.14) * q.p0 * rd.sh * pmod[4] / (1.0 + max(0, int(p.ss.g) - 12) / 24.0)
 		var x1 = (0.7 * base[0] + 0.5 * base[1] + 0.03) * q.p1 * rd["as"] * pmod[5]
 		w0.append(x0)
 		w1.append(x1)

@@ -1396,10 +1396,14 @@ func save_game():
 	# write to a temporary file first and swap it in, so a crash or a flat battery mid-save cannot corrupt the career
 	s.user["last_save"] = s.day
 	var tmp = save_path() + ".tmp"
+	# "FDZ1" + raw size + zstd bytes: about six times smaller than the old plain file; load_game still reads old saves
+	var raw = var_to_bytes(s)
 	var f = FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
 		return
-	f.store_var(s)
+	f.store_buffer("FDZ1".to_ascii_buffer())
+	f.store_64(raw.size())
+	f.store_buffer(raw.compress(FileAccess.COMPRESSION_ZSTD))
 	f.close()
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(save_path()))
 	var m = FileAccess.open(meta_path(), FileAccess.WRITE)
@@ -1428,11 +1432,9 @@ func backup() -> bool:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(BK_DIR))
 	var base = "%s/s%d_%06d" % [BK_DIR, slot, s.day]
 	s.user["bk_day"] = s.day
-	var f = FileAccess.open(base + ".sav", FileAccess.WRITE)
-	if f == null:
+	# copy the file just saved rather than serialising the whole career a second time
+	if DirAccess.copy_absolute(ProjectSettings.globalize_path(save_path()), ProjectSettings.globalize_path(base + ".sav")) != OK:
 		return false
-	f.store_var(s)
-	f.close()
 	var m = FileAccess.open(base + ".meta", FileAccess.WRITE)
 	if m != null:
 		var md = _meta()
@@ -1481,9 +1483,7 @@ func load_game(i = null) -> bool:
 		slot = i
 	if not has_save():
 		return false
-	var f = FileAccess.open(save_path(), FileAccess.READ)
-	var d = f.get_var()
-	f.close()
+	var d = read_save(save_path())
 	if typeof(d) != TYPE_DICTIONARY or not d.has("players"):
 		return false
 	DB.load_db()
@@ -1494,6 +1494,22 @@ func load_game(i = null) -> bool:
 	lu_cache = {}
 	active = true
 	return true
+
+
+static func read_save(path: String):
+	# compressed saves (v1.1.1 on) first, then the old plain format
+	var f = FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return null
+	if f.get_buffer(4).get_string_from_ascii() == "FDZ1":
+		var n = f.get_64()
+		var z = f.get_buffer(f.get_length() - 12)
+		f.close()
+		return bytes_to_var(z.decompress(n, FileAccess.COMPRESSION_ZSTD))
+	f.seek(0)
+	var d = f.get_var()
+	f.close()
+	return d
 
 
 func save_meta(i = null):
