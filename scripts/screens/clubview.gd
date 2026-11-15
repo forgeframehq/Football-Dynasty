@@ -27,6 +27,7 @@ func build():
 	var a = pane(320, 4)
 	h.add_child(a[0])
 	var v = a[1]
+	v.add_child(UI.stadium_banner(float(c.rep), 84))
 	var hh = UI.hb(12)
 	hh.add_child(UI.badge(c, 60))
 	var hv = UI.vb(0)

@@ -751,6 +751,7 @@ func _club_panel() -> Control:
 	var c = _cl(pick)
 	var inf = _inf(pick)
 	var l = {"name": _lg_name(pick), "country": nat, "tier": 1} if pick >= WB or wl >= 0 else raw.leagues[int(c.lg)]
+	v.add_child(UI.stadium_banner(float(inf.rep), 92))   # the ground by size, non-league to mega stadium
 	var head = UI.hb(14)
 	head.add_child(UI.badge({"c1": c.c1, "c2": c.c2, "short": c.short, "id": pick, "name": c.name}, 84))
 	var hv = UI.vb(-2)

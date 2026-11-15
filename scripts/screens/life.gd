@@ -33,6 +33,7 @@ var pick := -1
 
 
 func build():
+	backdrop("office", 0.8)
 	var s = G.s
 	var u = s.user
 	var lf = G.OPS.life()

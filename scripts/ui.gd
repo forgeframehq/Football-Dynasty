@@ -677,6 +677,44 @@ func fx_tex(f: Dictionary) -> Texture2D:
 	return null
 
 
+func stadium_tex(rep: float) -> Texture2D:
+	# five stadium pictures by size (assets/stadiums/tier1..5): non-league ground up to a mega stadium
+	var t = 1 if rep < 58 else (2 if rep < 66 else (3 if rep < 74 else (4 if rep < 82 else 5)))
+	var p = "res://assets/stadiums/tier%d.jpg" % t
+	return load(p) if ResourceLoader.exists(p) else null
+
+
+func stadium_banner(rep: float, h := 120.0) -> Control:
+	# a stadium picture strip with a fade at the bottom, for club headers
+	var t = stadium_tex(rep)
+	var c = Control.new()
+	c.custom_minimum_size = Vector2(0, h)
+	c.clip_contents = true
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if t == null:
+		return c
+	var r = TextureRect.new()
+	r.texture = t
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	r.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(r)
+	var g = TextureRect.new()
+	var gr = Gradient.new()
+	gr.set_color(0, Color(0, 0, 0, 0))
+	gr.set_color(1, Color(CARD, 0.95))
+	var gt = GradientTexture2D.new()
+	gt.gradient = gr
+	gt.fill_from = Vector2(0, 0.35)
+	gt.fill_to = Vector2(0, 1)
+	g.texture = gt
+	g.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(g)
+	return c
+
+
 func emblem(t: Texture2D, size := 28.0) -> Control:
 	var r = TextureRect.new()
 	r.texture = t

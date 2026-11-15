@@ -8,6 +8,7 @@ var sort := 0
 
 
 func build():
+	backdrop("training", 0.8)
 	var c = G.uc()
 	var s = G.s
 	body.add_child(UI.topbar("Training"))

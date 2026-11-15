@@ -27,6 +27,7 @@ func build():
 	if args.has("tab") and not has_meta("init"):
 		set_meta("init", true)
 		tab = int(args.tab)
+	backdrop("academy" if tab == 2 else "scouting", 0.8)
 	UI.main.t_title = "Scouting"
 	UI.main.t_sub = "%d of %d scouts · %d mission%s out · %d reports · academy %d of %d" % [G.SN.scouts().size(), G.SN.cap(), s.sn.missions.size(), "" if s.sn.missions.size() == 1 else "s",
 		s.sn.reports.size(), G.SN.academy().size(), G.SN.academy_cap()]

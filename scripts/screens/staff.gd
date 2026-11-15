@@ -7,6 +7,7 @@ var only_ex := false
 
 
 func build():
+	backdrop("office", 0.82)
 	G.SF.ensure()
 	var c = G.uc()
 	UI.main.t_title = "Staff"

@@ -6,6 +6,7 @@ var all_lg := false
 
 
 func build():
+	backdrop("press", 0.82)
 	G.MG.ensure()
 	var s = G.s
 	var c = G.uc()

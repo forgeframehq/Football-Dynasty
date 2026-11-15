@@ -79,8 +79,14 @@ func on_resume():
 
 func backdrop(scene: String, dim := 0.6):
 	# full-screen scene image behind the screen's content
-	var path = "res://assets/scenes/%s.jpg" % scene
-	if has_node("backdrop") or not ResourceLoader.exists(path):
+	# the 15 Nov scene set (assets/scenes/bg) first, under the old names too
+	var nw = {"press_room": "press", "dressing_room": "dressing"}.get(scene, scene)
+	var path = "res://assets/scenes/bg/%s.jpg" % nw
+	if not ResourceLoader.exists(path):
+		path = "res://assets/scenes/%s.jpg" % scene
+	if has_node("backdrop"):
+		get_node("backdrop").free()
+	if not ResourceLoader.exists(path):
 		return
 	var t = TextureRect.new()
 	t.name = "backdrop"

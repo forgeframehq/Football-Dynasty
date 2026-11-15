@@ -69,6 +69,7 @@ func build():
 		UI.main.call_deferred("back")
 		return
 	var p = G.s.players[args.pid]
+	backdrop("signing", 0.8)
 	if not inited:
 		_init_state(p)
 	if args.mode != "sell" and d.stage == "club" and fee == 0:
