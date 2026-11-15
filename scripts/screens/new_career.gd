@@ -405,7 +405,7 @@ func _league_card(li: int, cnt: int, avg: float) -> PanelContainer:
 		em.texture = load(lp)
 		em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		em.custom_minimum_size = Vector2(64, 64)
+		em.custom_minimum_size = Vector2(84, 84)
 		top.add_child(em)
 	else:
 		top.add_child(UI.flag(l.country, 52))
@@ -415,10 +415,13 @@ func _league_card(li: int, cnt: int, avg: float) -> PanelContainer:
 	tr.add_child(UI.caps("Tier %d" % int(l.tier), 15, UI.GOLD))
 	tr.add_child(UI.half_stars(clamp((avg - 56.0) / 5.0, 0.5, 5.0), 14))
 	tt.add_child(tr)
-	tt.add_child(UI.lbl_fill(l.name.to_upper(), 25, UI.TEXT, "xbold"))
-	top.add_child(tt)
+	tt.add_child(UI.lbl_fill(l.name.to_upper(), 24, UI.TEXT, "xbold"))
 	var full = l.country in playable or l.country == _club_nation()
-	top.add_child(UI.chip("FULL ENGINE" if full else "QUICK RESULTS", Color(UI.GREEN if full else UI.MUTED, 0.22), UI.GREEN if full else UI.MUTED, 13))
+	var cr = UI.hb(8)
+	cr.add_child(UI.chip("FULL ENGINE" if full else "QUICK RESULTS", Color(UI.GREEN if full else UI.MUTED, 0.22), UI.GREEN if full else UI.MUTED, 13))
+	cr.add_child(UI.caps("%d clubs · avg %d" % [cnt, int(round(avg))], 14, UI.MUTED))
+	tt.add_child(cr)
+	top.add_child(tt)
 	v.add_child(top)
 	# favourites: the three strongest clubs
 	var ids = []
@@ -460,7 +463,6 @@ func _league_card(li: int, cnt: int, avg: float) -> PanelContainer:
 		if cd[2] == l.country and (cd[0] != "lc" or int(l.tier) <= 4):
 			cups.append(cd[1])
 	v.add_child(UI.kv("Cups", ", ".join(cups) if cups.size() > 0 else "—", UI.TEXT, 17))
-	v.add_child(UI.kv("Clubs · avg rating", "%d · %d" % [cnt, int(round(avg))], UI.TEXT, 17))
 	return t
 
 
