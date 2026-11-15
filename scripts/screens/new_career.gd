@@ -286,13 +286,7 @@ func _picker():
 				if int(raw.clubs[i].lg) == li:
 					cnt += 1
 					best += info[i].rep
-			var t = _tile(300, 170)
-			var tv = t.get_child(0)
-			tv.add_child(UI.caps("Tier %d" % int(l.tier), 18, UI.GOLD))
-			tv.add_child(UI.wrap(l.name.to_upper(), 30, UI.TEXT, "xbold"))
-			tv.add_child(UI.sp())
-			tv.add_child(UI.kv("Clubs", str(cnt)))
-			tv.add_child(UI.kv("Average rating", str(int(round(best / max(1, cnt))))))
+			var t = _league_card(li, cnt, best / max(1, cnt))
 			var idx = li
 			UI.tap(t, func():
 				lg = idx
@@ -387,6 +381,87 @@ func _playable_sheet():
 			g.add_child(b)
 		v.add_child(g)
 	UI.sheet("Playable nations", build)
+
+
+# each league's own colour for its card (original colours, not the real competitions' branding)
+const LCOL = ["5B2A86", "1F5FA8", "B8402E", "2E8B57", "C2423A", "D9822B", "1B6FB5", "3A9D5D", "C8102E", "2F4F8F", "6B7A8F", "1E3A8A", "4C8C3A"]
+const UEFA = {0: [4, 2], 4: [4, 2], 6: [4, 2], 8: [4, 2], 11: [3, 2]}
+
+
+func _league_card(li: int, cnt: int, avg: float) -> PanelContainer:
+	# a league's own card: emblem (assets/leagues/<index>.png when Sudhi supplies one, else the flag), stars,
+	# full engine or quick results, the favourites, format, money, best player and cups
+	var l = raw.leagues[li]
+	var col = Color.html(LCOL[li % LCOL.size()])
+	var t = UI.panel(col.darkened(0.72), 16, 14, 12, col.darkened(0.2))
+	t.custom_minimum_size = Vector2(360, 250)
+	t.set_meta("base", Vector2(360, 250))
+	var v = UI.vb(5)
+	t.add_child(v)
+	var top = UI.hb(12)
+	var lp = "res://assets/leagues/%d.png" % li
+	if ResourceLoader.exists(lp):
+		var em = TextureRect.new()
+		em.texture = load(lp)
+		em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		em.custom_minimum_size = Vector2(64, 64)
+		top.add_child(em)
+	else:
+		top.add_child(UI.flag(l.country, 52))
+	var tt = UI.vb(0)
+	tt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var tr = UI.hb(8)
+	tr.add_child(UI.caps("Tier %d" % int(l.tier), 15, UI.GOLD))
+	tr.add_child(UI.half_stars(clamp((avg - 56.0) / 5.0, 0.5, 5.0), 14))
+	tt.add_child(tr)
+	tt.add_child(UI.lbl_fill(l.name.to_upper(), 25, UI.TEXT, "xbold"))
+	top.add_child(tt)
+	var full = l.country in playable or l.country == _club_nation()
+	top.add_child(UI.chip("FULL ENGINE" if full else "QUICK RESULTS", Color(UI.GREEN if full else UI.MUTED, 0.22), UI.GREEN if full else UI.MUTED, 13))
+	v.add_child(top)
+	# favourites: the three strongest clubs
+	var ids = []
+	for i in raw.clubs.size():
+		if int(raw.clubs[i].lg) == li:
+			ids.append(i)
+	ids.sort_custom(func(x, y): return info[x].rep > info[y].rep)
+	var fr = UI.hb(6)
+	fr.add_child(UI.caps("Favourites", 13, UI.MUTED))
+	for k in min(3, ids.size()):
+		var c = raw.clubs[ids[k]].duplicate()
+		fr.add_child(UI.badge(c, 26))
+		fr.add_child(UI.lbl(c.short, 15, UI.TEXT, "semi"))
+	v.add_child(fr)
+	# format: European places, promotion, relegation
+	var fm = []
+	if UEFA.has(li):
+		fm.append("%d CL" % UEFA[li][0])
+		fm.append("%d EL" % UEFA[li][1])
+	for lk in G.LG.LINKS:
+		if lk[1] == li:
+			fm.append("%d up%s" % [lk[2], " + PO" if lk[3] != "rel" else ""])
+		if lk[0] == li:
+			fm.append("%d down" % (lk[2] + (1 if lk[3] == "eng4" else 0)))
+	v.add_child(UI.kv("Format", " · ".join(fm), UI.TEXT, 17))
+	var tierf = [1.0, 0.22, 0.07, 0.03][clampi(int(l.tier) - 1, 0, 3)]
+	var bsum = 0.0
+	for i in ids:
+		bsum += 900000.0 * pow(1.2, info[i].rep - 60.0)
+	v.add_child(UI.kv("Winner · budgets", "%s · ~%s" % [G.money(40000000.0 * tierf), G.money(G.nice(bsum / max(1, ids.size())))], UI.TEXT, 17))
+	var bp = -1
+	for i in ids:
+		if bp < 0 or info[i].star_ovr > info[bp].star_ovr:
+			bp = i
+	if bp >= 0:
+		v.add_child(UI.kv("Best player", "%s · %s %d · %s" % [info[bp].star, info[bp].star_pos, info[bp].star_ovr, raw.clubs[bp].short], UI.TEXT, 17))
+	var cups = []
+	for cd in G.CP.CUPS:
+		if cd[2] == l.country and (cd[0] != "lc" or int(l.tier) <= 4):
+			cups.append(cd[1])
+	v.add_child(UI.kv("Cups", ", ".join(cups) if cups.size() > 0 else "—", UI.TEXT, 17))
+	v.add_child(UI.kv("Clubs · avg rating", "%d · %d" % [cnt, int(round(avg))], UI.TEXT, 17))
+	return t
 
 
 func _fit_tiles(grid: HFlowContainer, gs: Control):

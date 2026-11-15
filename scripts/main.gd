@@ -375,8 +375,9 @@ func left_inset() -> int:
 	# edge of the glass (a corner of a panel may sit behind the hole); only a long notch still pushes everything right.
 	# full screen, but no text behind the camera: backgrounds run edge to edge (they hang off the screen, not its
 	# content); panel edges may reach into the cut-out strip, while the text inside them (about 16 px in) starts past it
+	# FM Mobile style: the content block is centred with the same margin both sides, wide enough to clear the camera
 	var edge = notch_l if rail_wide() else (int(hole_x.y) if hole_x.y > 0 else 0)
-	return max(0, edge - 14)
+	return edge + 6 if edge > 0 else 0
 
 
 func _dev_hole():
