@@ -141,6 +141,8 @@ func can_leave() -> bool:
 	elif lg >= 0 or wl >= 0:
 		lg = -1
 		wl = -1
+		if _divisions().size() <= 1:
+			nat = ""      # a one-division nation (Korea ...) goes straight back to the continent list
 	elif nat != "":
 		nat = ""
 	else:
@@ -206,13 +208,14 @@ func _picker():
 		wl = -1
 		pick = -1
 		refresh()]]
-	if wl >= 0:
-		crumbs.append([G.WD.all_cat()[wl][0], func():
+	if nat != "" and _divisions().size() > 1:
+		crumbs.append([G.WD.nat_of(nat), func():
+			lg = -1
+			wl = -1
 			pick = -1
 			refresh()])
-	elif nat != "":
-		crumbs.append([nat, func():
-			lg = -1
+	if wl >= 0:
+		crumbs.append([G.WD.all_cat()[wl][0], func():
 			pick = -1
 			refresh()])
 	if lg >= 0:
@@ -260,14 +263,17 @@ func _picker():
 			tv2.add_child(UI.center(UI.flag(e[2], 120)))
 			var l2 = UI.lbl(e[0].to_upper(), 26, UI.TEXT, "xbold")
 			l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # long names wrap instead of widening the tile
+			l2.custom_minimum_size.x = 60
 			tv2.add_child(l2)
 			var sl2 = UI.caps("%s · %d clubs" % [e[2], e[8].size() + (8 if cont == "Europe" else 0)], 16, UI.MUTED)
 			sl2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			tv2.add_child(sl2)
 			var wii = wi
 			UI.tap(t2, func():
-				wl = wii
 				nat = G.WD.CAT[wii][2]
+				if _divisions().size() <= 1:
+					wl = wii
 				refresh())
 			grid.add_child(t2)
 			later.append(t2)
@@ -285,6 +291,8 @@ func _picker():
 			tv.add_child(UI.center(UI.flag(n, 120)))
 			var l = UI.lbl(n.to_upper(), 30, UI.TEXT, "xbold")
 			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			l.custom_minimum_size.x = 60
 			tv.add_child(l)
 			var sl = UI.caps("%d divisions · %d clubs" % [cnt, clubs], 16, UI.MUTED)
 			sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -317,9 +325,9 @@ func _picker():
 		var allc = G.WD.all_cat()
 		for wi in allc.size():
 			var e = allc[wi]
-			if G.WD.cat_tier(wi) < 2 or G.WD.nat_of(e[2]) != G.WD.nat_of(nat):
+			if G.WD.nat_of(e[2]) != G.WD.nat_of(nat):
 				continue
-			var t3 = _world_card(wi)
+			var t3 = _cat_card(wi)
 			var wix = wi
 			UI.tap(t3, func():
 				wl = wix
@@ -555,6 +563,100 @@ func _league_card(li: int, cnt: int, avg: float) -> PanelContainer:
 	return t
 
 
+const CONT_CUP = {"Europe": "Champions League", "South America": "Copa Libertadores", "Asia": "AFC Champions League", "Africa": "CAF Champions League", "North America": "CONCACAF Champions Cup"}
+static var _wl_map = null
+
+
+static func cat_emblem(name: String) -> Texture2D:
+	# a catalogue league's emblem (assets/leagues/w, Sudhi's ChatGPT sheets), or null
+	if _wl_map == null:
+		_wl_map = {}
+		var fa = FileAccess.open("res://assets/leagues/w/map.json", FileAccess.READ)
+		if fa != null:
+			_wl_map = JSON.parse_string(fa.get_as_text())
+	var f = str(_wl_map.get(name, ""))
+	var p = "res://assets/leagues/w/" + f
+	return load(p) if f != "" and ResourceLoader.exists(p) else null
+
+
+func _cat_card(wi: int) -> PanelContainer:
+	# the same card as the database leagues (Sudhi: "why can't all of them be like the English league"):
+	# emblem, stars, engine, favourites, format, money, best player, cups
+	var e = G.WD.all_cat()[wi]
+	var tier = G.WD.cat_tier(wi)
+	var col = Color.html(LCOL[(e[0].hash() & 0x7fffffff) % LCOL.size()])
+	var t = UI.panel(col.darkened(0.72), 16, 14, 12, col.darkened(0.2))
+	t.custom_minimum_size = Vector2(336, 250)
+	t.set_meta("base", Vector2(336, 250))
+	var v = UI.vb(5)
+	t.add_child(v)
+	var ids = []
+	for i in raw.clubs.size():
+		if raw.leagues[int(raw.clubs[i].lg)].name == e[0]:
+			ids.append(i)
+	for j in wclubs.size():
+		if wclubs[j].cat == wi:
+			ids.append(WB + j)
+	ids.sort_custom(func(x, y): return _inf(x).rep > _inf(y).rep)
+	var avg = 0.0
+	for i in ids:
+		avg += float(_inf(i).rep)
+	avg /= max(1, ids.size())
+	var top = UI.hb(12)
+	var et = cat_emblem(e[0])
+	if et != null:
+		var em = TextureRect.new()
+		em.texture = et
+		em.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		em.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		em.custom_minimum_size = Vector2(84, 84)
+		top.add_child(em)
+	else:
+		top.add_child(UI.flag(e[2], 52))
+	var tt = UI.vb(0)
+	tt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var tr = UI.hb(8)
+	tr.add_child(UI.caps("Tier %d" % tier, 15, UI.GOLD))
+	tr.add_child(UI.half_stars(clamp((avg - 56.0) / 5.0, 0.5, 5.0), 14))
+	tt.add_child(tr)
+	tt.add_child(UI.lbl_fill(e[0].to_upper(), 24, UI.TEXT, "xbold"))
+	var full = _key_of(e) in playable or _key_of(e) == _club_nation()
+	var cr = UI.hb(8)
+	cr.add_child(UI.chip("FULL ENGINE" if full else "QUICK RESULTS", Color(UI.GREEN if full else UI.MUTED, 0.22), UI.GREEN if full else UI.MUTED, 13))
+	cr.add_child(UI.caps("%d clubs · avg %d" % [ids.size(), int(round(avg))], 14, UI.MUTED))
+	tt.add_child(cr)
+	top.add_child(tt)
+	v.add_child(top)
+	var fr = UI.hb(6)
+	fr.add_child(UI.caps("Favourites", 13, UI.MUTED))
+	for k in min(3, ids.size()):
+		var c = _cl(ids[k]).duplicate()
+		fr.add_child(UI.badge(c, 26))
+		fr.add_child(UI.lbl(str(c.short), 15, UI.TEXT, "semi"))
+	v.add_child(fr)
+	var fm = []
+	if tier == 1:
+		fm.append("4 %s" % {"Europe": "CL", "South America": "Libertadores", "Asia": "AFC CL", "Africa": "CAF CL", "North America": "CONCACAF"}[e[3]])
+	else:
+		fm.append("%d up" % int(e[10]))
+	var allc = G.WD.all_cat()
+	for e2 in allc:
+		if e2.size() > 10 and e2[9] == e[0]:
+			fm.append("%d down" % int(e2[10]))
+	v.add_child(UI.kv("Format", " · ".join(fm), UI.TEXT, 17))
+	var bsum = 0.0
+	for i in ids:
+		bsum += float(_inf(i).budget)
+	v.add_child(UI.kv("Winner · budgets", "%s · ~%s" % [G.money(40000000.0 * 0.12 * [1.0, 0.35, 0.12][tier - 1]), G.money(G.nice(bsum / max(1, ids.size())))], UI.TEXT, 17))
+	var bp = -1
+	for i in ids:
+		if i < WB and (bp < 0 or info[i].star_ovr > info[bp].star_ovr):
+			bp = i
+	v.add_child(UI.kv("Best player", ("%s · %s %d · %s" % [info[bp].star, info[bp].star_pos, info[bp].star_ovr, raw.clubs[bp].short]) if bp >= 0 else "Generated: scout to find out", UI.TEXT, 17))
+	v.add_child(UI.kv("Cups", CONT_CUP[e[3]] if tier == 1 else "—", UI.TEXT, 17))
+	return t
+
+
 func _world_card(wi: int) -> PanelContainer:
 	# a catalogue division in a nation's league list: same size and look as the league cards, less detail
 	var e = G.WD.all_cat()[wi]
@@ -611,7 +713,7 @@ func _fit_tiles(grid: HFlowContainer, gs: Control):
 	var cols = clampi(int((W + sep) / (base.x + sep)), 1, n)
 	var rows = int(ceil(n / float(cols)))
 	cols = int(ceil(n / float(rows)))
-	var w = floor((W - sep * (cols - 1)) / cols)
+	var w = min(floor((W - sep * (cols - 1)) / cols), base.x * 1.5)
 	var hh = base.y
 	if rows * (base.y + sep) <= H + sep:
 		hh = min(floor((H - sep * (rows - 1)) / rows), base.y * 1.6)

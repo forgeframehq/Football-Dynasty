@@ -74,12 +74,14 @@ func run(m):
 				nc2.wl = wi
 		nc2.refresh()
 		await snap("divs_primera")
-		for wi in allc.size():
-			if allc[wi][0] == "Liga Portugal":
-				nc2.wl = wi
-		nc2.nat = "Portugal"
+		nc2.wl = -1
+		nc2.nat = "Brazil"
 		nc2.refresh()
-		await snap("divs_portugal")
+		await snap("divs_brazil")
+		nc2.nat = ""
+		nc2.cont = "South America"
+		nc2.refresh()
+		await snap("divs_samerica")
 		main.back()
 	if want.call("new"):
 		main.open("new_career", {"slot": 0})
